@@ -637,7 +637,7 @@ popover button {
 }
 
 .mmu_color_swatch {
-    font-size: 3em;
+    font-size: 2.5em;
 }
 
 .mmu_sensor_text {
@@ -658,14 +658,33 @@ popover button {
     padding-right: 15px;
 }
 
+.mmu_status_text {
+    color: #a0a0a0;
+}
+
 .mmu_gate_text {
+    color: #a0a0a0;
+}
+
+.mmu_tool_text {
     margin-top: 8px;
     margin-bottom: 8px;
     font-size: 1.2em;
 }
 
+
+.mmu_color_image {
+    margin-top: 3px;
+    margin-bottom: 3px;
+}
+
+.mmu_filament_text {
+    font-size: 1.2em;
+}
+
 .mmu_material_text {
-    font-size: 1.6em;
+    font-size: 1.2em;
+    font-weight: bold;
 }
 
 .mmu_status {

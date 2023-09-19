@@ -12,6 +12,8 @@ from gi.repository import Gtk, GLib, Pango, Gdk
 from ks_includes.screen_panel import ScreenPanel
 from ks_includes.KlippyRest import KlippyRest
 from panels.mmu_spoolman import SpoolmanSpool
+import threading
+import time
 
 class Panel(ScreenPanel):
     
@@ -49,6 +51,7 @@ class Panel(ScreenPanel):
         GObject.type_register(SpoolmanSpool)
 
         self.load_spools()
+        self.is_running=True
 
         grid = Gtk.Grid()
         grid.set_column_homogeneous(True)
@@ -56,6 +59,7 @@ class Panel(ScreenPanel):
 
         mmu = self._printer.get_stat("mmu")
         num_gates = len(mmu['gate_status'])
+
         for i in range(num_gates):
             status_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
             status = self.labels[f'status_{i}'] = self._gtk.Image()
@@ -72,8 +76,8 @@ class Panel(ScreenPanel):
             gate_box.pack_start(gate_label, True, True, 0)
 
             color = self.labels[f'color_{i}'] = Gtk.Label(f'⬤')
-            color.get_style_context().add_class("mmu_color_swatch")
-            #color.set_xalign(0.7)
+            color.get_style_context().add_class("mmu_spoolman_color_swatch")
+            color.set_xalign(0.0)
             color_image = self.labels[f'color_image_{i}'] = self._gtk.Image()
             color_image.get_style_context().add_class("mmu_color_image")
 
@@ -89,6 +93,19 @@ class Panel(ScreenPanel):
             vendor.get_style_context().add_class("mmu_vendor_text")
             vendor.set_xalign(0)
 
+            usage = self.labels[f'usage_{i}'] = Gtk.Label("n/a")
+            usage.get_style_context().add_class("mmu_usage_text")
+            usage.set_xalign(0)
+
+            remaining_weight = self.labels[f'remaining_weight_{i}'] = Gtk.Label("n/a")
+            remaining_weight.get_style_context().add_class("mmu_remaining_weight_text")
+            remaining_weight.set_xalign(1)
+
+            remaining_length = self.labels[f'remaining_length_{i}'] = Gtk.Label("n/a")
+            remaining_length.get_style_context().add_class("mmu_remaining_length_text")
+            remaining_length.set_xalign(1)
+
+
             tools = self.labels[f'tools_{i}'] = Gtk.Label("n/a")
             tools.get_style_context().add_class("mmu_tool_text")
             tools.set_xalign(0.3)
@@ -98,11 +115,13 @@ class Panel(ScreenPanel):
 
             grid.attach(gate_box,   0, i, 1, 1)
             grid.attach(tools,      1, i, 1, 1)
-            #grid.attach(color,      2, i, 2, 1)
-            grid.attach(color_image,      2, i, 1, 1)
-            grid.attach(material,   3, i, 2, 1)
-            grid.attach(filament,   4, i, 5, 1)
-            grid.attach(status_box, 11, i, 3, 1)
+            grid.attach(color,      2, i, 1, 1)
+            #grid.attach(color_image,      2, i, 1, 1)
+            grid.attach(material,   3, i, 1, 1)
+            grid.attach(filament,   4, i, 3, 1)
+            grid.attach(remaining_weight,   7, i, 1, 1)
+            grid.attach(remaining_length,   8, i, 1, 1)
+            grid.attach(status_box, 9, i, 2, 1)
             #grid.attach(edit,      14, i, 2, 1)
 
         self.labels['unknown_icon'] = self._gtk.Image('mmu_unknown').get_pixbuf()
@@ -117,6 +136,8 @@ class Panel(ScreenPanel):
             'color': Gtk.Label('⬤'),
             'material': Gtk.Label('PLA'),
             'tools': Gtk.Label("n/a"),
+            'remaining_weight':Gtk.Label("n/a"),
+            'remaining_length':Gtk.Label("n/a"),
             'save': self._gtk.Button('mmu_save', f'Save', 'color3'),
             'c_picker': self._gtk.Button('mmu_color_chooser', None, 'color1', scale=self.bts * 1.2),
             'c_selector': Gtk.ComboBoxText(),
@@ -217,6 +238,12 @@ class Panel(ScreenPanel):
         self.content.add(layers)
         self.gate_tool_map = self.build_gate_tool_map()
 
+    def refresh_spools(self):
+        while self.is_running:
+            self.load_spools()
+            GLib.timeout_add_seconds(2, self.refresh)
+            time.sleep(10)
+
     def load_spools(self):
         hide_archived=False
         spools = self.apiClient.post_request("server/spoolman/proxy", json={
@@ -224,9 +251,11 @@ class Panel(ScreenPanel):
             "path": f"/v1/spool?allow_archived={not hide_archived}",
         })
         if not spools or "result" not in spools:
-            self._screen.show_error_modal("Exception when trying to fetch spools")
+            #self._screen.show_error_modal("Exception when trying to fetch spools")
+            logging.error("Exception when trying to fetch spools")
             return
         materials=[]
+        self.spools.clear()
         for spool in spools["result"]:
             spoolObject = SpoolmanSpool(**spool)
             #self._model.append(None, [spoolObject])
@@ -235,6 +264,11 @@ class Panel(ScreenPanel):
                 materials.append(spoolObject.filament.material)
 
     def activate(self):
+        self.timer=threading.Timer(10,self.refresh_spools)
+        self.timer.start()
+        self.refresh()
+
+    def refresh(self):
         mmu = self._printer.get_stat("mmu")
         gate_status = mmu['gate_status']
         gate_material = mmu['gate_material']
@@ -242,31 +276,70 @@ class Panel(ScreenPanel):
         gate_color = mmu['gate_color']
         num_gates = len(gate_status)
         gate= mmu['gate']
-
         for i in range(num_gates):
             g_map = self.gate_tool_map[i]
-            status_icon, status_str = self.get_status_details(gate_status[i])
+            status_icon, status_str, status_color = self.get_status_details(gate_status[i])
             tool_str = self.get_tool_details(g_map['tools'])
             color = self.get_color_details(gate_color[i])
+            background_color=None
             if gate == i:
                 self.labels[f'gate_label_{i}'].set_label(f'> #{i}')
+                self.labels[f'gate_label_{i}'].override_color(Gtk.StateType.NORMAL, Gdk.RGBA(0,1,0,1))
+                background_color=Gdk.RGBA(0.2,0.2,0.2,1)
             else:
                 self.labels[f'gate_label_{i}'].set_label(f'#{i}')
+                self.labels[f'gate_label_{i}'].override_color(Gtk.StateType.NORMAL, None)
+
             self.labels[f'status_{i}'].clear()
             self.labels[f'status_{i}'].set_from_pixbuf(self.labels[f'{status_icon}'])
             self.labels[f'available_{i}'].set_label(status_str)
+            self.labels[f'available_{i}'].override_color(Gtk.StateType.NORMAL, status_color)
             self.labels[f'color_{i}'].override_color(Gtk.StateType.NORMAL, color)
+
+            for a in [self.labels[f'gate_label_{i}'],self.labels[f'status_{i}'],self.labels[f'available_{i}'], self.labels[f'tools_{i}'], self.labels[f'filament_{i}'],self.labels[f'remaining_length_{i}'],self.labels[f'remaining_weight_{i}'],self.labels[f'material_{i}'],self.labels[f'color_{i}']]:
+                a.override_background_color(Gtk.StateType.NORMAL, background_color)
+
 
             material="-"
             vendor=""
             filament="-"
+            usage=""
+            remaining_length=""
+            remaining_weight=""
+            remaining_percentage=""
+            remaining_percentage_val=0
             if str(gate_spool_id[i]) in self.spools:
                 material=self.spools[str(gate_spool_id[i])].filament.material
                 vendor=self.spools[str(gate_spool_id[i])].filament.vendor.name
                 filament=self.spools[str(gate_spool_id[i])].filament.name
                 pixbuf=self.spools[str(gate_spool_id[i])].icon
+                used_length=self.spools[str(gate_spool_id[i])].used_length/10.0
+                if hasattr(self.spools[str(gate_spool_id[i])],"remaining_length"):
+                    remaining_length_val=self.spools[str(gate_spool_id[i])].remaining_length/10.0
+                    remaining_length=f"{remaining_length_val:.2f}cm"
+                if hasattr(self.spools[str(gate_spool_id[i])],"remaining_weight"):
+                    remaining_weight_val=self.spools[str(gate_spool_id[i])].remaining_weight
+                    remaining_weight=f"{remaining_weight_val:.0f}g"
+                    remaining_percentage_val=100/(self.spools[str(gate_spool_id[i])].filament.weight/self.spools[str(gate_spool_id[i])].remaining_weight)
+                    remaining_percentage=f"{remaining_percentage_val:.0f}%"
+                color_hex=self.spools[str(gate_spool_id[i])].filament.color_hex
+                color = Gdk.RGBA()
+                if not Gdk.RGBA.parse(color, color_hex):
+                    Gdk.RGBA.parse(color, '#' + color_hex)
+                self.labels[f'color_{i}'].override_color(Gtk.StateType.NORMAL, color)
+                usage=f"{used_length:.2f}" #/{remaining_length:.2f}"
                 self.labels[f'color_image_{i}'].set_from_pixbuf(pixbuf.scale_simple(pixbuf.get_width()*0.9, pixbuf.get_height()*0.9, 1))
 
+            #self.labels[f'usage_{i}'].set_label(usage) 
+            logging.debug(remaining_weight)
+            self.labels[f'remaining_weight_{i}'].set_label(remaining_weight) 
+            self.labels[f'remaining_length_{i}'].set_label(remaining_percentage) 
+            color = Gdk.RGBA(0,1,0,1)
+            if remaining_percentage_val < 5:
+                color = Gdk.RGBA(1,0,0,1)
+            elif remaining_percentage_val < 80:
+                color = Gdk.RGBA(1,0.8,0,1)
+            self.labels[f'remaining_length_{i}'].override_color(Gtk.StateType.NORMAL,color)
             self.labels[f'material_{i}'].set_label(material) 
             self.labels[f'filament_{i}'].set_label(filament) 
             #self.labels[f'vendor_{i}'].set_label(vendor) 
@@ -274,17 +347,23 @@ class Panel(ScreenPanel):
 
         self.labels['layers'].set_current_page(0) # Gate list layer
 
+    def deactivate(self):
+        self.is_running=False
+
     def get_status_details(self, gate_status):
         if gate_status in (self.GATE_AVAILABLE, self.GATE_AVAILABLE_FROM_BUFFER):
             status_icon = 'available_icon'
             status_str = "Available"
+            status_color = Gdk.RGBA(0,1,0,1)
         elif gate_status == self.GATE_EMPTY:
             status_icon = 'empty_icon'
             status_str = "Empty"
+            status_color = Gdk.RGBA(1,0,0,1)
         else: 
             status_icon = 'unknown_icon'
             status_str = "Unknown"
-        return status_icon, status_str
+            status_color = Gdk.RGBA(0.5,0.5,0.5,1)
+        return status_icon, status_str, status_color
 
     def get_tool_details(self, tools):
         tool_str = ''
@@ -329,7 +408,7 @@ class Panel(ScreenPanel):
             elif 'mmu' in data:
                 e_data = data['mmu']
                 if 'ttg_map' in e_data or 'gate' in e_data or 'gate_status' in e_data or 'gate_material' in e_data or 'gate_color' in e_data:
-                    self.activate()
+                    self.refresh()
 
     def select_edit(self, widget, sel_gate):
         self.ui_sel_gate = sel_gate

@@ -625,8 +625,8 @@ popover button {
 }
 
 .mmu_tool_text {
-    margin-top: 6px;
-    margin-bottom: 6px;
+    padding-top: 6px;
+    padding-bottom: 6px;
     font-size: 1.8em;
 }
 
@@ -639,6 +639,12 @@ popover button {
 .mmu_color_swatch {
     font-size: 2.5em;
 }
+
+.mmu_spoolman_color_swatch {
+    font-size: 2.3em;
+    padding-bottom: 6px;
+}
+
 
 .mmu_sensor_text {
     font-size: 1.6em;
@@ -667,8 +673,8 @@ popover button {
 }
 
 .mmu_tool_text {
-    margin-top: 8px;
-    margin-bottom: 8px;
+    padding-top: 8px;
+    padding-bottom: 8px;
     font-size: 1.2em;
 }
 

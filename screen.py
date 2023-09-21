@@ -178,7 +178,7 @@ class KlipperScreen(Gtk.Window):
             self.base_panel.titlebar.set_visible(False)
             self.base_panel.titlebar.set_no_show_all(True)
 
-            for x in ["printing","ready"]:
+            for x in ["printing","ready","paused"]:
                 state_callbacks[x]=self.state_sticky_panel 
         else:
             self.base_panel.action_bar.set_visible(True)

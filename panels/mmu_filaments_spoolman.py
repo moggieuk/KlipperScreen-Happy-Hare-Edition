@@ -59,7 +59,7 @@ class Panel(ScreenPanel):
 
         mmu = self._printer.get_stat("mmu")
         num_gates = len(mmu['gate_status'])
-
+        self.gate_spool_id=mmu['gate_spool_id']
         for i in range(num_gates):
             status_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
             status = self.labels[f'status_{i}'] = self._gtk.Image()
@@ -264,11 +264,13 @@ class Panel(ScreenPanel):
                 materials.append(spoolObject.filament.material)
 
     def activate(self):
+        self.is_running=True
         self.timer=threading.Timer(10,self.refresh_spools)
         self.timer.start()
         self.refresh()
 
     def refresh(self):
+
         mmu = self._printer.get_stat("mmu")
         gate_status = mmu['gate_status']
         gate_material = mmu['gate_material']
@@ -276,6 +278,10 @@ class Panel(ScreenPanel):
         gate_color = mmu['gate_color']
         num_gates = len(gate_status)
         gate= mmu['gate']
+        if gate_spool_id != None:
+            logging.debug("SPOOLID "+str(self.gate_spool_id))
+            logging.debug("SPOOLID2 "+str(self._printer.get_stat('mmu', 'gate_spool_id')[2]))
+            
         for i in range(num_gates):
             g_map = self.gate_tool_map[i]
             status_icon, status_str, status_color = self.get_status_details(gate_status[i])
@@ -331,7 +337,6 @@ class Panel(ScreenPanel):
                 self.labels[f'color_image_{i}'].set_from_pixbuf(pixbuf.scale_simple(pixbuf.get_width()*0.9, pixbuf.get_height()*0.9, 1))
 
             #self.labels[f'usage_{i}'].set_label(usage) 
-            logging.debug(remaining_weight)
             self.labels[f'remaining_weight_{i}'].set_label(remaining_weight) 
             self.labels[f'remaining_length_{i}'].set_label(remaining_percentage) 
             color = Gdk.RGBA(0,1,0,1)
@@ -404,10 +409,15 @@ class Panel(ScreenPanel):
     def process_update(self, action, data):
         if action == "notify_status_update":
             if 'configfile' in data:
+                logging.debug(data)
                 return
             elif 'mmu' in data:
                 e_data = data['mmu']
-                if 'ttg_map' in e_data or 'gate' in e_data or 'gate_status' in e_data or 'gate_material' in e_data or 'gate_color' in e_data:
+                logging.debug(e_data)                
+                if 'ttg_map' in e_data or 'gate' in e_data or 'gate_status' in e_data or 'gate_material' in e_data or 'gate_color' in e_data  or 'gate_spool_id' in e_data:
+                    if 'gate_spool_id' in e_data:
+                        self.gate_spool_id=e_data['gate_spool_id']
+                        logging.debug(e_data)
                     self.refresh()
 
     def select_edit(self, widget, sel_gate):

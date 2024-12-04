@@ -1,5 +1,6 @@
-import logging
 import json
+import logging
+
 import gi
 
 gi.require_version("Gtk", "3.0")
@@ -37,6 +38,7 @@ class Panel(ScreenPanel):
         if action != "notify_status_update":
             return
 
+        j2_refreshed = False
         unique_cbs = []
         for x in data:
             for i in data[x]:
@@ -48,8 +50,23 @@ class Panel(ScreenPanel):
         # Call specific associated callbacks
         if unique_cbs:
             self.j2_data = self._printer.get_printer_status_data() # Happy Hare: must refresh for dynamic sensitive state
+            j2_refreshed = True
         for cb in unique_cbs:
             cb[0](cb[1])
+
+        # New Klipperscreen "active" support
+        for item in self.autogrid:
+            key = item.get_name()
+            for item_dict in self.items:
+                if key in item_dict and 'active' in item_dict[key]:
+                    if not j2_refreshed:
+                        self.j2_data = self._printer.get_printer_status_data()
+                        j2_refreshed = True
+                    if self.evaluate_enable(item_dict[key]['active']):
+                        item.get_style_context().add_class("menu_active")
+                    else:
+                        item.get_style_context().remove_class("menu_active")
+                    break
 
     def register_callback(self, var, method, arg): # Happy Hare
         if var in self.menu_callbacks:
@@ -69,23 +86,15 @@ class Panel(ScreenPanel):
         enabled = []
         for item in items:
             key = list(item)[0]
-            if item[key].get('show_disabled', "False").strip().lower() == "true": # Happy Hare
-                if self.evaluate_enable(item[key]['enable']):
-                    self.labels[key].set_sensitive(True)
-                else:
-                    self.labels[key].set_sensitive(False)
-                enabled.append(self.labels[key])
+            show_disabled = item[key].get('show_disabled', "False").strip().lower() == "true"
+            is_enabled = self.evaluate_enable(item[key]['enable'])
+            if show_disabled:
+                self.labels[key].set_sensitive(is_enabled)
             else:
-                if self.evaluate_enable(item[key]['enable']):
-                    enabled.append(self.labels[key])
-                else:
-                    # Just don't show the button
+                if not self.evaluate_enable(item[key]['enable']):
                     logging.debug(f"X > {key}")
-# Happy Hare Upstream logic:
-#            if not self.evaluate_enable(item[key]['enable']):
-#                logging.debug(f"X > {key}")
-#                continue
-#            enabled.append(self.labels[key])
+                    continue
+            enabled.append(self.labels[key])
         self.autogrid.__init__(enabled, columns, expand_last, self._screen.vertical_mode)
         return self.autogrid
 
@@ -143,9 +152,12 @@ class Panel(ScreenPanel):
                 for var in item['refresh_on'].split(', '):
                     self.register_callback(var, self.check_enable, i)
 
+            b.set_name(key)
             self.labels[key] = b
 
     def evaluate_enable(self, enable):
+        if enable is None:
+            return False
         if enable == "{{ moonraker_connected }}":
             logging.info(f"moonraker connected {self._screen._ws.connected}")
             return self._screen._ws.connected
@@ -158,4 +170,3 @@ class Panel(ScreenPanel):
         except Exception as e:
             logging.debug(f"Error evaluating enable statement: {enable}\n{e}")
             return False
-

@@ -1,4 +1,5 @@
 import logging
+
 import gi
 import re # Happy Hare
 
@@ -273,9 +274,13 @@ class Printer:
                 "output_pins": {"count": self.output_pin_count},
                 "pwm_tools": {"count": self.pwm_tools_count},
                 "gcode_macros": {"count": len(self.get_gcode_macros()), "list": self.get_gcode_macros()},
-                "idle_timeout": self.get_stat("idle_timeout").copy(), # Happy Hare: Added back because used in menu sensitivity
                 "leds": {"count": self.ledcount},
                 "config_sections": list(self.config.keys()),
+                "homed_axes": self.get_stat("toolhead", "homed_axes"),
+                "quad_gantry_level": self.get_stat("quad_gantry_level"),
+                "z_tilt": self.get_stat("z_tilt"),
+                "available_commands": self.available_commands,
+                "idle_timeout": self.get_stat("idle_timeout").copy(), # Happy Hare: Added back because used in menu sensitivity
                 **({"mmu": self.get_stat("mmu")} if self.has_mmu else {}), # Happy Hare
             }
         }

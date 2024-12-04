@@ -80,6 +80,13 @@ button.active {
     background-color: @active;
 }
 
+
+button.menu_active {
+    border-width: 0.25em;
+    border-style: dashed;
+    border-color: @active;
+}
+
 button:disabled,
 button.color1:disabled,
 button.color2:disabled,
@@ -561,6 +568,24 @@ popover button {
     background-color: @bg;
     padding: 1em 3.1em;
     margin: 0;
+}
+
+.lock
+.lock button
+.lock button:hover,
+.lock button:focus,
+.lock button:active {
+    border: 0;
+    margin: 0;
+    background-color: Transparent;
+}
+
+.lockscreen_entry {
+    margin: 2em;
+}
+
+.lockscreen_button {
+    padding: 2em;
 }
 
 .screensaver,

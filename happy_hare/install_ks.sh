@@ -2,8 +2,8 @@
 #
 # MMU KlipperScreen Happy Hare edition supplemental installer
 #
-# Copyright (C) 2023  moggieuk#6538 (discord)
-#                     moggieuk@hotmail.com
+# Copyright (C) 2023-2025  moggieuk#6538 (discord)
+#                          moggieuk@hotmail.com
 #
 # Screen Capture: scrot -s -D :0.0
 #

@@ -1,5 +1,6 @@
 import logging
 import os
+
 import gi
 
 gi.require_version("Gtk", "3.0")
@@ -24,12 +25,16 @@ class Panel(ScreenPanel):
         restart_ks = self._gtk.Button("refresh", _("Restart") + " KlipperScreen", "color3")
         restart_ks.connect("clicked", self._screen.restart_ks)
 
+        lock_screen = self._gtk.Button("lock", _("Lock"), "color3")
+        lock_screen.connect("clicked", self._screen.lock_screen.lock)
+
         self.main = Gtk.Grid(row_homogeneous=True, column_homogeneous=True)
         if self._printer and self._printer.state not in {'disconnected', 'startup', 'shutdown', 'error'}:
-            self.main.attach(estop, 0, 0, 1, 1)
+            self.main.attach(estop, 0, 0, 1, 2)
         self.main.attach(restart_ks, 1, 0, 1, 1)
-        self.main.attach(poweroff, 0, 1, 1, 1)
-        self.main.attach(restart, 1, 1, 1, 1)
+        self.main.attach(lock_screen, 2, 0, 1, 1)
+        self.main.attach(poweroff, 1, 1, 1, 1)
+        self.main.attach(restart, 2, 1, 1, 1)
         self.content.add(self.main)
 
     def reboot_poweroff(self, widget, method):
@@ -75,4 +80,12 @@ class Panel(ScreenPanel):
             if method == "reboot":
                 self._screen._ws.send_method("machine.reboot")
             else:
+                self.turn_off_power_devices()
                 self._screen._ws.send_method("machine.shutdown")
+
+    def turn_off_power_devices(self):
+        if self.ks_printer_cfg is not None and self._screen._ws.connected:
+            power_devices = self.ks_printer_cfg.get("power_devices", "")
+            if power_devices and self._printer.get_power_devices():
+                logging.info(f"Turning off associated power devices: {power_devices}")
+                self._screen.power_devices(widget=None, devices=power_devices, on=False)

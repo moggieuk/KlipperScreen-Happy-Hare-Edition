@@ -2,6 +2,7 @@
 import logging
 import os
 import pathlib
+
 import gi
 
 gi.require_version("Gtk", "3.0")
@@ -179,7 +180,7 @@ class KlippyGtk:
             format_label(b, lines)
         if style is not None:
             b.get_style_context().add_class(style)
-        b.connect("clicked", self.screen.reset_screensaver_timeout)
+        b.connect("clicked", self.screen.screensaver.reset_timeout)
         return b
 
     @staticmethod
@@ -238,7 +239,7 @@ class KlippyGtk:
             dialog.add_events(Gdk.EventMask.BUTTON_RELEASE_MASK)
             dialog.connect("button-release-event", self.remove_dialog)
 
-        dialog.connect("response", self.screen.reset_screensaver_timeout)
+        dialog.connect("response", self.screen.screensaver.reset_timeout)
         dialog.connect("response", callback, *args)
         dialog.get_style_context().add_class("dialog")
 
@@ -263,6 +264,8 @@ class KlippyGtk:
             return
         if self.screen.updating:
             return
+        if dialog == self.screen.confirm:
+            self.screen.confirm = None
         dialog.destroy()
         if dialog in self.screen.dialogs:
             logging.info("Removing Dialog")

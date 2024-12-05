@@ -801,7 +801,7 @@ class KlipperScreen(Gtk.Window):
             self.show_panel("extrude")
 
     def state_printing(self):
-        self.close_screensaver() # Happy Hare
+        #self.screensaver.close() # Happy Hare
         if self._config.get_main_config().get("sticky_panel", None): return # Happy Hare
         if self.prompt is not None: return # Happy Hare
         mmu_active = True if "mmu_main" in self._cur_panels else False # Happy Hare
@@ -1206,7 +1206,7 @@ class KlipperScreen(Gtk.Window):
         self.log_notification("Printer Initialized", 1)
 
         # Happy Hare: Set sensible default value based on mmu config that we are connected to
-        mmu_default_spoolman = str(bool(self.printer.has_mmu and self.printer.spoolman and self.printer.get_config_section("mmu")["enable_spoolman"]))
+        mmu_default_spoolman = str(bool(self.printer.has_mmu and self.printer.spoolman and self.printer.get_config_section("mmu")["spoolman_support"] != "off"))
         self._config.set("main", "mmu_use_spoolman", mmu_default_spoolman)
         # Happy Hare ^^^
         return False

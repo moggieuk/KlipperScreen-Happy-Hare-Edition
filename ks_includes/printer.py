@@ -276,9 +276,6 @@ class Printer:
                 "gcode_macros": {"count": len(self.get_gcode_macros()), "list": self.get_gcode_macros()},
                 "leds": {"count": self.ledcount},
                 "config_sections": list(self.config.keys()),
-                "homed_axes": self.get_stat("toolhead", "homed_axes"),
-                "quad_gantry_level": self.get_stat("quad_gantry_level"),
-                "z_tilt": self.get_stat("z_tilt"),
                 "available_commands": self.available_commands,
                 "idle_timeout": self.get_stat("idle_timeout").copy(), # Happy Hare: Added back because used in menu sensitivity
                 **({"mmu": self.get_stat("mmu")} if self.has_mmu else {}), # Happy Hare
@@ -327,6 +324,15 @@ class Printer:
             return self.data.get(stat, {}).get(substat, {})
         else:
             return self.data.get(stat, {})
+
+    def set_stat(self, stat, data):
+        if self.data is None:
+            logging.error("Data is not initialized")
+            return
+        if stat not in self.data:
+            logging.error(f"Stat '{stat}' not found in data")
+            return
+        self.data[stat].update(data)
 
     def get_fan_speed(self, fan="fan"):
         speed = 0

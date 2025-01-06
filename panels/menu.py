@@ -152,12 +152,9 @@ class Panel(ScreenPanel):
                 for var in item['refresh_on'].split(', '):
                     self.register_callback(var, self.check_enable, i)
 
-            b.set_name(key)
             self.labels[key] = b
 
     def evaluate_enable(self, enable):
-        if enable is None:
-            return False
         if enable == "{{ moonraker_connected }}":
             logging.info(f"moonraker connected {self._screen._ws.connected}")
             return self._screen._ws.connected

@@ -8,7 +8,7 @@ msgstr ""
 "Project-Id-Version: \n"
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2024-11-26 12:31-0300\n"
-"PO-Revision-Date: 2024-10-11 06:01+0000\n"
+"PO-Revision-Date: 2024-12-13 06:00+0000\n"
 "Last-Translator: Selim <technical50@users.noreply.hosted.weblate.org>\n"
 "Language-Team: Turkish <https://hosted.weblate.org/projects/klipperscreen/"
 "klipperscreen/tr/>\n"
@@ -17,11 +17,11 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=n != 1;\n"
-"X-Generator: Weblate 5.8-dev\n"
+"X-Generator: Weblate 5.9-dev\n"
 
 #, python-format
 msgid "%s will be updated to version"
-msgstr "%s şu sürüme güncellenecektir:"
+msgstr "%s bu sürüme güncellenecektir:"
 
 msgid "(default)"
 msgstr "(varsayılan)"
@@ -55,17 +55,17 @@ msgstr "Uygula"
 
 #, python-format
 msgid "Apply %s%.3f offset to Endstop?"
-msgstr "Endstop'a %s%.3f telafi uygulansın mı?"
+msgstr "Endstop'a %s%.3f telafisi uygulansın mı?"
 
 #, python-format
 msgid "Apply %s%.3f offset to Probe?"
-msgstr "Ölçme Çubuğu'na %s%.3f telafi uygulansın mı?"
+msgstr "Ölçme Çubuğu'na %s%.3f telafisi uygulansın mı?"
 
 msgid "Archived"
 msgstr "Arşivlenen"
 
 msgid "Are you sure do you want to exclude the object?"
-msgstr "Nesneyi hariç tutmak istediğinizden emin misiniz?"
+msgstr "Nesneyi çıkarmak istediğinizden emin misiniz?"
 
 msgid "Are you sure you want to run Emergency Stop?"
 msgstr "Acil Durdurmak istediğinizden emin misiniz?"
@@ -83,7 +83,7 @@ msgid "Are you sure you wish to shutdown the system?"
 msgstr "Sistemi kapatmak istediğinizden emin misiniz?"
 
 msgid "Asks for confirmation before stopping"
-msgstr "Durmadan önce onay ister"
+msgstr "Durmadan önce onay istemektedir"
 
 msgid "Auto"
 msgstr "Otomatik"
@@ -501,7 +501,7 @@ msgid "Loading..."
 msgstr "Yükleniyor..."
 
 msgid "Lock"
-msgstr ""
+msgstr "Kilitle"
 
 msgid "Lost Connection to Moonraker"
 msgstr "Moonraker ile Bağlantı Koptu"
@@ -913,10 +913,10 @@ msgid "Unload"
 msgstr "Çıkart"
 
 msgid "Unlock"
-msgstr ""
+msgstr "Kilidi Aç"
 
 msgid "Unlock failed"
-msgstr ""
+msgstr "Kilit açma başarısız"
 
 msgid "Unretract Extra Length"
 msgstr "İleri İtme Ekstra Uzunluk"

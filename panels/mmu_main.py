@@ -266,7 +266,7 @@ class Panel(ScreenPanel):
                         self.update_status()
                     if 'tool' in e_data or 'filament_pos' in e_data or 'filament_direction' in e_data:
                         self.update_filament_status()
-                    if 'tool' in e_data or 'next_tool' in e_data or 'sync_drive' in e_data:
+                    if 'tool' in e_data or 'next_tool' in e_data or 'sync_drive' in e_data or 'filament' in e_data:
                         self.update_tool()
                     if 'enabled' in e_data:
                         self.update_enabled()

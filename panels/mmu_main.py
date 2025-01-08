@@ -1,8 +1,8 @@
 # Happy Hare MMU Software
 # Main MMU management panel
 #
-# Copyright (C) 2023  moggieuk#6538 (discord)
-#                     moggieuk@hotmail.com
+# Copyright (C) 2023-2025  moggieuk#6538 (discord)
+#                          moggieuk@hotmail.com
 #
 import logging, gi, re
 
@@ -394,10 +394,10 @@ class Panel(ScreenPanel):
             self.labels['picker'].set_label(f"Tools...")
             if filament != "Unloaded":
                 self.labels['unload'].set_image(self.labels['unload_img'])
-                self.labels['unload'].set_label(f"Unload")
+                self.labels['unload'].set_label("Unload")
             else:
                 self.labels['unload'].set_image(self.labels['eject_img'])
-                self.labels['unload'].set_label(f"Eject")
+                self.labels['unload'].set_label("Eject")
 
     def update_tool_buttons(self, tool_sensitive=True):
         mmu = self._printer.get_stat("mmu")
@@ -476,6 +476,7 @@ class Panel(ScreenPanel):
         mmu = self._printer.get_stat("mmu")
         if encoder_pos == None:
             encoder_pos = mmu['filament_position'] # Use real position instead
+        encoder_pos=round(encoder_pos, 1)
         mmu_print_state = mmu['print_state']
         filament = mmu['filament']
         action = mmu['action']

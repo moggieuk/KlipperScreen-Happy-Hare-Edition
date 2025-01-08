@@ -143,6 +143,9 @@ class Panel(ScreenPanel):
         speedbox.add(speedgrid)
 
         filament_sensors = self._printer.get_filament_sensors()
+        pattern = re.compile(r'filament_switch_sensor (mmu_|unit_).*') # Happy Hare MMU sensors to filter out (too noisy)
+        filament_sensors = [item for item in filament_sensors if not pattern.match(item)] # Happy Hare: Remove MMU sensors
+
         sensors = Gtk.Grid(valign=Gtk.Align.CENTER, row_spacing=5, column_spacing=5)
         with_switches = (
             len(filament_sensors) < 4
@@ -155,7 +158,7 @@ class Panel(ScreenPanel):
             self.labels[x] = {
                 'label': Gtk.Label(
                     label=self.prettify(name), hexpand=True, halign=Gtk.Align.CENTER,
-                    ellipsize=Pango.EllipsizeMode.START),
+                    ellipsize=Pango.EllipsizeMode.END), # Happy Hare: Pango.EllipsizeMode.START --> END
                 'box': Gtk.Box()
             }
             self.labels[x]['box'].pack_start(self.labels[x]['label'], True, True, 10)

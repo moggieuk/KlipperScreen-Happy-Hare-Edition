@@ -1,8 +1,8 @@
 # Happy Hare MMU Software
 # Display and editing of TTG map and endless spool groups
 #
-# Copyright (C) 2023  moggieuk#6538 (discord)
-#                     moggieuk@hotmail.com
+# Copyright (C) 2023-2025  moggieuk#6538 (discord)
+#                          moggieuk@hotmail.com
 #
 import logging, gi
 

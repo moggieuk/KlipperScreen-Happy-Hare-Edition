@@ -1,8 +1,8 @@
 # Happy Hare MMU Software
 # State recovery panel
 #
-# Copyright (C) 2023  moggieuk#6538 (discord)
-#                     moggieuk@hotmail.com
+# Copyright (C) 2023-2025  moggieuk#6538 (discord)
+#                          moggieuk@hotmail.com
 #
 import logging, gi
 
@@ -50,9 +50,9 @@ class Panel(ScreenPanel):
             'gate': Gtk.Label("Gate #0"),
             'g_increase': self._gtk.Button('increase', None, scale=self.bts * 1.2),
             'filament': Gtk.CheckButton("Filament: Unknown"),
-            'reset': self._gtk.Button('mmu_reset', 'Reset MMU', 'color1'),
+            'reset': self._gtk.Button('mmu_reset', 'Reset MMU...', 'color1'),
             'auto': self._gtk.Button('mmu_recover_auto', 'Auto Recover', 'color2'),
-            'manual': self._gtk.Button('mmu_recover_manual', 'Set State', 'color1'),
+            'manual': self._gtk.Button('mmu_recover_manual', 'Set State...', 'color1'),
         }
 
         self.labels['t_decrease'].connect("clicked", self.select_toolgate, 'tool', -1)
@@ -336,12 +336,7 @@ class Panel(ScreenPanel):
         )
 
     def select_auto(self, widget):
-        self._screen._confirm_send_action(
-            None,
-            "This will automatically attempt to reset the MMU filament state\n\nSure you want to continue?",
-            "printer.gcode.script",
-            {'script': "MMU_RECOVER"}
-        )
+        self._screen._ws.klippy.gcode_script(f"MMU_RECOVER")
 
     def select_reset(self, widget):
         self._screen._confirm_send_action(

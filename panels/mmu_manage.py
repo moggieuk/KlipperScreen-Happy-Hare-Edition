@@ -33,7 +33,7 @@ class Panel(ScreenPanel):
         # btn_states: The "gaps" are what functionality the state takes away. Multiple states are combined
         self.btn_states = {
             'all':             ['gate', 'checkgate', 'recover', 'load', 'unload', 'home', 'motors_off', 'servo_up', 'servo_move', 'servo_down', 'grip', 'release', 'load_ext', 'unload_ext', 'sync', 'unsync'],
-            'homed':           ['gate', 'checkgate', 'recover', 'load', 'unload',         'motors_off', 'servo_up', 'servo_move', 'servo_down', 'grip', 'release', 'load_ext', 'unload_ext', 'sync', 'unsync'],
+            'homed':           ['gate', 'checkgate', 'recover', 'load', 'unload', 'home', 'motors_off', 'servo_up', 'servo_move', 'servo_down', 'grip', 'release', 'load_ext', 'unload_ext', 'sync', 'unsync'],
             'not_homed':       [                     'recover',         'unload', 'home', 'motors_off', 'servo_up', 'servo_move', 'servo_down', 'grip', 'release', 'load_ext', 'unload_ext', 'sync', 'unsync'],
             'servo_up':        ['gate', 'checkgate', 'recover', 'load', 'unload', 'home', 'motors_off',             'servo_move', 'servo_down', 'grip', 'release', 'load_ext', 'unload_ext', 'sync', 'unsync'],
             'servo_move':      ['gate', 'checkgate', 'recover', 'load', 'unload', 'home', 'motors_off', 'servo_up',               'servo_down', 'grip', 'release', 'load_ext', 'unload_ext', 'sync', 'unsync'],

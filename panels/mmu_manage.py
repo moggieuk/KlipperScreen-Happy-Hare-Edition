@@ -99,7 +99,7 @@ class Panel(ScreenPanel):
         self.labels['g_decrease'].set_hexpand(False)
         self.labels['g_decrease'].get_style_context().add_class("mmu_sel_decrease")
 
-        selector_type = self._printer.get_stat("mmu")['selector_type']
+        selector_type = self._get_selector_type()
         grid = Gtk.Grid()
         grid.set_column_homogeneous(True)
         grid.set_row_homogeneous(True)
@@ -177,6 +177,20 @@ class Panel(ScreenPanel):
             self.ui_sel_gate = mmu['gate']
         else:
             self.ui_sel_gate = 0
+
+    def _get_selector_type(self):
+        # v3.1 method... (assume similar units for now)
+        mmu_machine = self._printer.get_stat("mmu_machine")
+        unit0 = mmu_machine.get('unit_0', None)
+        if unit0: return unit0.selector_type
+
+        # v3.0...
+        mmu = self._printer.get_stat("mmu")
+        selector_type = mmu.get('selector_type', None)
+        if selector_type: return selector_type
+
+        # Prior to v3.0
+        return 'LinearSelector'
 
     def select_gate(self, widget, param=0):
         mmu = self._printer.get_stat("mmu")
@@ -281,7 +295,7 @@ class Panel(ScreenPanel):
         action = mmu['action']
         filament = mmu['filament']
         sync_drive = mmu['sync_drive']
-        selector_type = mmu['selector_type']
+        selector_type = self._get_selector_type()
 
         ui_state = []
         if enabled:

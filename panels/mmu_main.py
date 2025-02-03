@@ -437,7 +437,7 @@ class Panel(ScreenPanel):
                 self.labels['tool'].set_label(f"n/a")
                 self.labels['tool'].set_sensitive(tool_sensitive)
         else:
-            self.labels['tool'].set_label(action)
+            self.labels['tool'].set_label(action[:11])
             self.labels['tool'].set_sensitive(False)
 
         if self.ui_sel_tool == self.TOOL_GATE_BYPASS:

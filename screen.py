@@ -172,7 +172,9 @@ class KlipperScreen(Gtk.Window):
             self.show_error_modal("Invalid config file", self._config.get_errors())
             return
         self.base_panel.activate()
-        self.set_screenblanking_timeout(self._config.get_main_config().get('screen_blanking'))
+        self.use_dpms = self._config.get_main_config().getboolean("use_dpms", fallback=True)
+        self.use_dpms &= functions.dpms_loaded
+        self.set_dpms(self.use_dpms)
         self.lock_screen = LockScreen(self)
         self.log_notification("KlipperScreen Started", 1)
         self.initial_connection()
@@ -668,7 +670,7 @@ class KlipperScreen(Gtk.Window):
             return False
         state = functions.get_DPMS_state()
         if state == functions.DPMS_State.Fail:
-            logging.info("DPMS State FAIL: Stopping DPMS Check")
+            self.show_popup_message(_("DPMS has failed and has been disabled"))
             self.set_dpms(False)
             return False
         elif state != functions.DPMS_State.On:
@@ -678,61 +680,83 @@ class KlipperScreen(Gtk.Window):
 
     def wake_screen(self):
         # Wake the screen (it will go to standby as configured)
+        if not self.use_dpms:
+            logging.debug("DPMS is disabled cannot wake the screen")
+            return
         if self._config.get_main_config().get('screen_blanking') != "off":
             logging.debug("Screen wake up")
-            if not self.wayland:
-                os.system(f"xset -display {self.display_number} dpms force on")
+        try:
+            subprocess.run(
+                f"xset -display {self.display_number} dpms force on",
+                shell=True, check=True
+            )
+        except subprocess.CalledProcessError as e:
+            self.show_popup_message(f"Error: {e}")
+            self.set_dpms(False)
+            return
 
     def set_dpms(self, use_dpms):
         if not use_dpms:
-            GLib.source_remove(self.check_dpms_timeout)
+            if self.check_dpms_timeout is not None:
+                GLib.source_remove(self.check_dpms_timeout)
             self.check_dpms_timeout = None
+            state = functions.get_DPMS_state()
+            if state != functions.DPMS_State.Fail:
+                try:
+                    subprocess.run(
+                        f"xset -display {self.display_number} dpms 0 0 0",
+                        shell=True, check=True
+                    )
+                    subprocess.run(
+                        f"xset -display {self.display_number} -dpms",
+                        shell=True, check=True
+                    )
+                except subprocess.CalledProcessError as e:
+                    self.show_popup_message(f"FAILED to turn DPMS off on {self.display_number}:\n {e}")
+                    return
         self.use_dpms = use_dpms
-        logging.info(f"DPMS set to: {self.use_dpms}")
-        if self.printer.state in ("printing", "paused"):
+        self._config.set("main", "use_dpms", use_dpms)
+        self._config.save_user_config_options()
+        if self.printer and self.printer.state in ("printing", "paused"):
             self.set_screenblanking_timeout(self._config.get_main_config().get('screen_blanking_printing'))
         else:
             self.set_screenblanking_timeout(self._config.get_main_config().get('screen_blanking'))
 
+    def set_dpms_timeout(self):
+        try:
+            subprocess.run(
+                f"xset -display {self.display_number} dpms 0 {self.blanking_time} 0",
+                shell=True, check=True
+            )
+            logging.info(f"DPMS on {self.display_number} set to: {self.blanking_time}")
+        except subprocess.CalledProcessError as e:
+            self.show_popup_message(f"DPMS Error:\n {e}")
+            self.set_dpms(False)
+            return
+        if self.blanking_time > 0 and self.check_dpms_timeout is None:
+            self.check_dpms_timeout = GLib.timeout_add_seconds(1, self.check_dpms_state)
+            return
+
     def set_screenblanking_printing_timeout(self, time):
-        if self.printer.state in ("printing", "paused"):
+        if self.printer and self.printer.state in ("printing", "paused"):
             self.set_screenblanking_timeout(time)
 
     def set_screenblanking_timeout(self, time):
-        if not self.wayland:
-            os.system(f"xset -display {self.display_number} s off")
-        self.use_dpms = self._config.get_main_config().getboolean("use_dpms", fallback=True)
-
+        # disable screensaver we have our own
+        os.system(f"xset -display {self.display_number} s off")
+        os.system(f"xset -display {self.display_number} s noblank")
         if time == "off":
-            logging.debug(f"Screen blanking: {time}")
             self.blanking_time = 0
-            if not self.wayland:
-                os.system(f"xset -display {self.display_number} dpms 0 0 0")
-            return
-
-        self.blanking_time = abs(int(time))
-        logging.debug(f"Changing screen blanking to: {self.blanking_time}")
-        if self.use_dpms and functions.dpms_loaded is True:
-            if not self.wayland:
-                os.system(f"xset -display {self.display_number} +dpms")
-            if functions.get_DPMS_state() == functions.DPMS_State.Fail:
-                logging.info("DPMS State FAIL")
-                self.show_popup_message(_("DPMS has failed to load and has been disabled"))
-                self._config.set("main", "use_dpms", "False")
-                self._config.save_user_config_options()
-            else:
-                logging.debug("Using DPMS")
-                if not self.wayland:
-                    os.system(f"xset -display {self.display_number} dpms 0 {self.blanking_time} 0")
-                if self.check_dpms_timeout is None:
-                    self.check_dpms_timeout = GLib.timeout_add_seconds(1, self.check_dpms_state)
-                return
-        # Without dpms just blank the screen
-        logging.debug("Not using DPMS")
-        if not self.wayland:
-            os.system(f"xset -display {self.display_number} dpms 0 0 0")
-        self.screensaver.reset_timeout()
-        return
+        else:
+            try:
+                self.blanking_time = abs(int(time))
+            except Exception as exc:
+                logging.exception(exc)
+        if self.use_dpms:
+            self.set_dpms_timeout()
+        else:
+            self.screensaver.reset_timeout()
+        logging.debug(f"Blanking timeout: {time} DPMS:{self.use_dpms}")
 
     def show_printer_select(self, widget=None):
         self.base_panel.show_heaters(False)
@@ -983,6 +1007,53 @@ class KlipperScreen(Gtk.Window):
         if self._cur_panels and hasattr(self.panels[self._cur_panels[-1]], "process_update"):
             self.panels[self._cur_panels[-1]].process_update(*args)
 
+    def confirm_save(self, widget):
+        buttons = [
+            {"name": _("Save"), "response": Gtk.ResponseType.OK, "style": 'dialog-info'},
+            {"name": _("Cancel"), "response": Gtk.ResponseType.CANCEL, "style": 'dialog-error'}
+        ]
+        label = Gtk.Label(label=_("Save configuration?") + "\n\n" + _("Klipper will reboot"),
+                          hexpand=True, vexpand=True,
+                          halign=Gtk.Align.CENTER, valign=Gtk.Align.CENTER,
+                          wrap=True, wrap_mode=Pango.WrapMode.WORD_CHAR)
+        grid = Gtk.Grid()
+        grid.attach(label, 0, 3, 2, 1)
+        offset = self.printer.get_stat("gcode_move", "homing_origin")
+        zoffset = float(offset[2]) if offset else 0
+        if zoffset != 0:
+            sign = "+" if zoffset > 0 else "-"
+            msg = f"Apply {sign}{abs(zoffset)} offset?"
+            zlabel = Gtk.Label(label=msg, hexpand=True, vexpand=True, wrap=True)
+            grid.attach(zlabel, 0, 1, 2, 1)
+            if "Z_OFFSET_APPLY_PROBE" in self.printer.available_commands:
+                apply_probe = self.gtk.Button(label=_("Save Z") + "\n" + "Probe", style="color1")
+                apply_probe.set_vexpand(False)
+                apply_probe.set_size_request(-1, self.gtk.dialog_buttons_height)
+                apply_probe.connect("clicked", self.save, "Z_OFFSET_APPLY_PROBE")
+                grid.attach(apply_probe, 0, 2, 1, 1)
+            if "Z_OFFSET_APPLY_ENDSTOP" in self.printer.available_commands:
+                apply_end = self.gtk.Button(label=_("Save Z") + "\n" + "Endstop", style="color2")
+                apply_end.set_vexpand(False)
+                apply_end.set_size_request(-1, self.gtk.dialog_buttons_height)
+                apply_end.connect("clicked", self.save, "Z_OFFSET_APPLY_ENDSTOP")
+                grid.attach(apply_end, 1, 2, 1, 1)
+        if self.confirm is not None:
+            self.gtk.remove_dialog(self.confirm)
+        self.confirm = self.gtk.Dialog(
+            "KlipperScreen", buttons, grid, self.save
+        )
+
+    def save(self, dialog, response_id):
+        self.gtk.remove_dialog(dialog)
+        if response_id == Gtk.ResponseType.OK:
+            self._ws.klippy.gcode_script("SAVE_CONFIG")
+        if response_id == "Z_OFFSET_APPLY_PROBE":
+            self._ws.klippy.gcode_script("Z_OFFSET_APPLY_PROBE")
+            self._ws.klippy.gcode_script("SAVE_CONFIG")
+        if response_id == "Z_OFFSET_APPLY_ENDSTOP":
+            self._ws.klippy.gcode_script("Z_OFFSET_APPLY_ENDSTOP")
+            self._ws.klippy.gcode_script("SAVE_CONFIG")
+
     def _confirm_send_action(self, widget, text, method, params=None):
         buttons = [
             {"name": _("Accept"), "response": Gtk.ResponseType.OK, "style": 'dialog-info'},
@@ -1124,6 +1195,10 @@ class KlipperScreen(Gtk.Window):
         if self.reinit_count > self.max_retries or 'printer_select' in self._cur_panels:
             logging.info("Stopping Retries")
             return False
+        if not self.server_info:
+            logging.debug("Connection Lost Retrying")
+            self.connect_to_moonraker()
+            return False
         self.reinit_count += 1
         self.server_info = self.apiclient.get_server_info()
         logging.info(f"Moonraker info {self.server_info}")
@@ -1197,6 +1272,7 @@ class KlipperScreen(Gtk.Window):
         self.ws_subscribe()
 
         self.files.set_gcodes_path()
+        self.power_devices(None, self._config.get_main_config().get("screen_on_devices", ""), on=True)
 
         logging.info("Printer initialized")
         self.initialized = True

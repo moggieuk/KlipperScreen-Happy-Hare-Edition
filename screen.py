@@ -75,6 +75,7 @@ class KlipperScreen(Gtk.Window):
     initializing = False
     popup_timeout = None
     wayland = False
+    windowed = False
     notification_log = []
     prompt = None
     tempstore_timeout = None
@@ -135,6 +136,7 @@ class KlipperScreen(Gtk.Window):
             if mon_n > 0:
                 logging.error("Monitor selection is only supported for fullscreen")
             self.set_resizable(True)
+            self.windowed = True
         else:
             self.width = monitor.get_geometry().width
             self.height = monitor.get_geometry().height
@@ -186,7 +188,7 @@ class KlipperScreen(Gtk.Window):
     def state_execute(self, state, callback):
         self.screensaver.close()
         if 'printer_select' in self._cur_panels:
-            logging.debug(f"Connected printer chaged {state}")
+            logging.debug(f"Connected printer changed {state}")
             return False
         if state in ("printing", "paused"):
             self.set_screenblanking_timeout(self._config.get_main_config().get('screen_blanking_printing'))
@@ -860,7 +862,7 @@ class KlipperScreen(Gtk.Window):
     def toggle_shortcut(self, show):
         if show and not self.printer.get_printer_status_data()["printer"]["gcode_macros"]["count"] > 0:
             self.show_popup_message(
-                _("No elegible macros:") + "\n"
+                _("No eligible macros:") + "\n"
                 + _("macros with a name starting with '_' are hidden") + "\n"
                 + _("macros that use 'rename_existing' are hidden") + "\n"
                 + _("LOAD_FILAMENT/UNLOAD_FILAMENT are hidden and should be used from extrude") + "\n"

@@ -103,7 +103,7 @@ class Panel(ScreenPanel):
             grid.attach(color,      6, i, 2, 1)
             grid.attach(material,   8, i, 3, 1)
             grid.attach(tools,     11, i, 3, 1)
-            grid.attach(edit,      14, i, 2, 1)
+            grid.attach(edit,      13, i, 2, 1)
 
         self.labels['unknown_icon'] = self._gtk.Image('mmu_unknown', width=img_width, height=img_height).get_pixbuf()
         self.labels['available_icon'] = self._gtk.Image('mmu_tick', width=img_width, height=img_height).get_pixbuf()
@@ -223,13 +223,17 @@ class Panel(ScreenPanel):
         edit_grid.attach(pad,                       0, 3, 16, 1)
 
         scroll = self._gtk.ScrolledWindow()
-        scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+        scroll.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
         scroll.add(grid)
+
+        edit_scroll = self._gtk.ScrolledWindow()
+        edit_scroll.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
+        edit_scroll.add(edit_grid)
 
         self.labels['layers'] = layers = Gtk.Notebook()
         layers.set_show_tabs(False)
         layers.insert_page(scroll, None, 0)
-        layers.insert_page(edit_grid, None, 1)
+        layers.insert_page(edit_scroll, None, 1)
 
         self.content.add(layers)
 

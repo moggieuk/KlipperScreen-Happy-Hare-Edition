@@ -151,6 +151,7 @@ class Panel(ScreenPanel):
         gate_color = mmu['gate_color']
         num_gates = len(gate_status)
         gate= mmu['gate']
+
         for i in range(num_gates):
             g_map = self.gate_tool_map[i]
             status_icon, status_str, status_color = self.get_status_details(gate_status[i])
@@ -169,46 +170,58 @@ class Panel(ScreenPanel):
             self.labels[f'available_{i}'].override_color(Gtk.StateType.NORMAL, status_color)
             self.labels[f'color_{i}'].override_color(Gtk.StateType.NORMAL, color)
 
-            for a in [self.labels[f'gate_label_{i}'],self.labels[f'available_{i}'], self.labels[f'tools_{i}'], self.labels[f'filament_{i}'],self.labels[f'remaining_percentage_{i}'],self.labels[f'remaining_weight_{i}'],self.labels[f'material_{i}'],self.labels[f'color_{i}']]:
+            for a in [
+                self.labels[f'gate_label_{i}'],
+                self.labels[f'available_{i}'],
+                self.labels[f'tools_{i}'],
+                self.labels[f'filament_{i}'],
+                self.labels[f'remaining_percentage_{i}'],
+                self.labels[f'remaining_weight_{i}'],
+                self.labels[f'material_{i}'],
+                self.labels[f'color_{i}'],
+            ]:
                 a.override_background_color(Gtk.StateType.NORMAL, background_color)
 
             material="-"
             vendor=""
-            filament="-"
+            name="-"
             usage=""
             remaining_length=""
             remaining_weight=""
             remaining_percentage=""
             remaining_percentage_val=0
+
             if str(gate_spool_id[i]) in self.spools:
                 spool=self.spools[str(gate_spool_id[i])]
-                material=spool.filament.material
-                if spool.filament.vendor:
-                    vendor=spool.filament.vendor.name
-                else:
-                    vendor = "n/a"
-                filament=spool.filament.name
+#                logging.info("PAUL ******* : spool=%s, filament=%s" % (vars(spool), vars(spool.filament)))
+
+                material=spool.filament.material if hasattr(spool.filament,"material") else "-"
+                vendor=spool.filament.vendor.name if spool.filament.vendor else "n/a"
+                name=spool.filament.name if hasattr(spool.filament,"name") else "-"
+                used_length = spool.used_length if hasattr(spool,"used_length") else 0
+                remaining_length = spool.remaining_length if hasattr(spool,"remaining_length") else 0
+                initial_weight = spool.initial_weight if hasattr(spool,"initial_weight") else spool.filament.weight if hasattr(spool.filament,"weight") else 0
+                remaining_weight = spool.remaining_weight if hasattr(spool,"remaining_weight") else 0
                 pixbuf=spool.icon
-                used_length=spool.used_length/10.0
-                if hasattr(spool,"remaining_length"):
-                    remaining_length_val=spool.remaining_length/10.0
-                    remaining_length=f"{remaining_length_val:.2f}cm"
-                if hasattr(spool,"remaining_weight"):
-                    remaining_weight_val=spool.remaining_weight
-                    remaining_weight=f"{remaining_weight_val:.0f}g"
-                    remaining_percentage_val=100/(spool.filament.weight/spool.remaining_weight) if spool.remaining_weight else 0
-                    remaining_percentage=f"{remaining_percentage_val:.0f}%"
+
+                used_length_val=spool.used_length/10.0
+                remaining_length_val=remaining_length/10.0
+                remaining_percentage_val=100/(initial_weight/remaining_weight) if remaining_weight else 0
+
+                remaining_length_str=f"{remaining_length_val:.2f}cm"
+                remaining_weight_str=f"{remaining_weight:.0f}g"
+                remaining_percentage_str=f"{remaining_percentage_val:.0f}%"
 
                 color_hex=spool.filament.color_hex[:6].lower() if hasattr(spool.filament, 'color_hex') else ''
                 color = Gdk.RGBA()
                 if not Gdk.RGBA.parse(color, color_hex):
                     Gdk.RGBA.parse(color, '#' + color_hex)
                 self.labels[f'color_{i}'].override_color(Gtk.StateType.NORMAL, color)
-                usage=f"{used_length:.2f}" 
+                usage=f"{used_length/10:.2f}" 
                 self.labels[f'color_image_{i}'].set_from_pixbuf(pixbuf.scale_simple(pixbuf.get_width()*0.9, pixbuf.get_height()*0.9, 1))
 
-            self.labels[f'remaining_weight_{i}'].set_label(remaining_weight) 
-            self.labels[f'remaining_percentage_{i}'].set_label(remaining_percentage) 
+            self.labels[f'remaining_weight_{i}'].set_label(remaining_weight_str) 
+            self.labels[f'remaining_percentage_{i}'].set_label(remaining_percentage_str) 
 
             color = self.COLOR_GREEN
             if remaining_percentage_val < 5:
@@ -218,7 +231,7 @@ class Panel(ScreenPanel):
             self.labels[f'remaining_percentage_{i}'].override_color(Gtk.StateType.NORMAL,color)
 
             self.labels[f'material_{i}'].set_label(material[:6]) 
-            self.labels[f'filament_{i}'].set_label(filament[:15])
+            self.labels[f'filament_{i}'].set_label(name[:15])
             #self.labels[f'vendor_{i}'].set_label(vendor) 
             self.labels[f'tools_{i}'].set_label(tool_str)
 

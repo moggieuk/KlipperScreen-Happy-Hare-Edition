@@ -187,13 +187,12 @@ class Panel(ScreenPanel):
             name="-"
             usage=""
             remaining_length=""
-            remaining_weight=""
-            remaining_percentage=""
+            remaining_weight_str=""
+            remaining_percentage_str=""
             remaining_percentage_val=0
 
             if str(gate_spool_id[i]) in self.spools:
                 spool=self.spools[str(gate_spool_id[i])]
-#                logging.info("PAUL ******* : spool=%s, filament=%s" % (vars(spool), vars(spool.filament)))
 
                 material=spool.filament.material if hasattr(spool.filament,"material") else "-"
                 vendor=spool.filament.vendor.name if spool.filament.vendor else "n/a"

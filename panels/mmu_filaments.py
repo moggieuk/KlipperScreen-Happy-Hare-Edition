@@ -196,8 +196,8 @@ class Panel(ScreenPanel):
         current_gate_grid.attach(edit_status_box,          0, 0, 3, 1)
         current_gate_grid.attach(edit_gate_box,            3, 0, 3, 1)
         current_gate_grid.attach(self.labels['color'],     6, 0, 2, 1)
-        current_gate_grid.attach(self.labels['material'],  8, 0, 4, 1)
-        current_gate_grid.attach(self.labels['spool_id'], 12, 0, 2, 1)
+        current_gate_grid.attach(self.labels['material'],  8, 0, 3, 1)
+        current_gate_grid.attach(self.labels['spool_id'], 11, 0, 3, 1)
 #       current_gate_grid.attach(self.labels['tools'],    11, 0, 3, 1) # Not useful on edit
         current_gate_grid.attach(self.labels['cancel'],   14, 0, 2, 1)
 

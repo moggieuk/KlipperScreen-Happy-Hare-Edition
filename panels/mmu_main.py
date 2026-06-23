@@ -708,8 +708,12 @@ class Panel(ScreenPanel, MmuMixin):
         gate = mmu["gate"]
         gate_color = mmu["gate_color"]
 
-        cs = self._printer.get_config_section("mmu")
-        gate_homing_endstop = cs["gate_homing_endstop"]
+        # PAUL TODO temp hack to assume non-renamed unit0
+        # TODO should reference current unit, look name in mmu_machine.unit_X.name. Then get correct parameters
+        cs = self._printer.get_config_section("mmu_unit_parameters unit0") or self._printer.get_config_section("mmu")
+        gate_homing_endstop = cs.get("gate_homing_endstop")
+        if gate_homing_endstop is None:
+            raise KeyError("gate_homing_endstop not found in mmu_parameters or mmu config")
 
         space = "┈"
         gate_mark = "┤"
@@ -784,9 +788,9 @@ class Panel(ScreenPanel, MmuMixin):
         bowden_half = bowden_length // 2
 
         encoder_ref_pos = (
-            FILAMENT_POS_IN_BOWDEN
-            if gate_homing_endstop == V3_SENSOR_GATE
-            else FILAMENT_POS_START_BOWDEN
+            FILAMENT_POS_START_BOWDEN
+            if gate_homing_endstop == SENSOR_ENCODER
+            else FILAMENT_POS_IN_BOWDEN
         )
 
         parts = [
@@ -798,7 +802,7 @@ class Panel(ScreenPanel, MmuMixin):
             (
                 "En" + past(encoder_ref_pos) * 2
                 if self.has_encoder()
-                else pad(FILAMENT_POS_START_BOWDEN, 4)
+                else pad(encoder_ref_pos, 4)
             ),
 
             past(FILAMENT_POS_IN_BOWDEN) * bowden_half,

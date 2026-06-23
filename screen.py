@@ -1186,10 +1186,11 @@ class KlipperScreen(Gtk.Window):
 
     def power_devices(self, widget=None, devices=None, on=False):
         devs = self.search_power_devices(devices)
-        if on:
-            self._ws.api.power_device_on(devs)
-        else:
-            self._ws.api.power_device_off(devs)
+        if _ws is not None:
+            if on:
+                self._ws.api.power_device_on(devs)
+            else:
+                self._ws.api.power_device_off(devs)
 
     def _init_printer(self, msg, go_to_splash=False):
         self.printer_initializing(msg, go_to_splash)

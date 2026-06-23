@@ -89,7 +89,7 @@ class Printer:
             elif section in ("led", "neopixel", "dotstar", "pca9533", "pca9632"):
                 self.ledcount += 1
 
-            if x == 'mmu': # Happy Hare
+            if x in ['mmu', 'mmu_machine']: # Happy Hare
                 self.has_mmu = True
 
         self.tools = sorted(self.tools)

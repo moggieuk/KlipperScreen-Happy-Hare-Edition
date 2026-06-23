@@ -310,9 +310,8 @@ class MmuMixin:
 
     def get_selector_type(self):
         # >v3.1 method...
-        # (TODO current KlipperScreen only supports single mmu_unit)
         mmu_machine = self._printer.get_stat("mmu_machine")
-        unit0 = mmu_machine.get('unit_0')
+        unit0 = mmu_machine.get('unit_0') # PAUL TODO: support multi-unit
         if unit0 is not None:
             return unit0['selector_type']
 

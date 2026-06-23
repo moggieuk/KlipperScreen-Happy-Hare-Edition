@@ -386,10 +386,8 @@ class BasePanel(ScreenPanel):
         self.show_shortcut(self.shortcut["panel"])
         self.show_printer_select(len(self._config.get_printers()) > 1)
         if self._printer is not None: # Happy Hare
-            logging.error(f"PAUL: update_action_bar() connect={connected}, printer_select={printer_select}, has_mmu={self._printer.has_mmu}")
             self.show_mmu_shortcut(
                 connected and
-#PAUL                printer_select and
                 self._config.get_main_config().getboolean('side_mmu_shortcut', True) and
                 self._printer.has_mmu
             )

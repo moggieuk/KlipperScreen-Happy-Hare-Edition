@@ -239,7 +239,7 @@ class KlipperScreenConfig:
                     "screen_on_devices",
                     "screen_off_devices",
                     "print_view",
-                    'sticky_panel',       # Happy Hare PAUL
+                    'sticky_panel',       # Happy Hare
                     "lock_password",
                     "side_shortcut_target",
                 )
@@ -321,20 +321,17 @@ class KlipperScreenConfig:
                         self.config.remove_option(section, key)
                     else:
                         self.errors.append(msg)
-                elif key in numbers and not self.is_float(config[section][key]) \
-                        or key in bools and not self.is_bool(config[section][key]):
-                    if key == "mmu_use_spoolman": # Happy Hare added temporary upgrade hack
-                        logging.error("PAUL: mmu_use_spoolman hook activated?")
+                elif (
+                    key in numbers
+                    and not self.is_float(config[section][key])
+                    or key in bools
+                    and not self.is_bool(config[section][key])
+                ):
+                    if key == "mmu_use_spoolman": # Happy Hare added temporary upgrade hack (Not sure if this is needed anymore)
+                        logging.error("PAUL: *************** mmu_use_spoolman hook activated?")
                         self.config.remove_option(section, key)
                         self.config.set(section, key, "True")
                         continue
-# PAUL current orig
-#                elif (
-#                    key in numbers
-#                    and not self.is_float(config[section][key])
-#                    or key in bools
-#                    and not self.is_bool(config[section][key])
-#                ):
                     msg = (
                         f'Unable to parse "{key}" from [{section}]\n'
                         f"Expected a "

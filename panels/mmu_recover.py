@@ -23,7 +23,7 @@ class Panel(ScreenPanel, MmuMixin):
         # We need to keep track of just a little bit of UI state
         self.ui_sel_tool = self.ui_sel_gate = NOT_SET
         self.ui_sel_loaded = NOT_SET
-        self.min_tool = TOOL_BYPASS
+        self.min_tool = TOOL_GATE_BYPASS
 
         # btn_states: The "gaps" are what functionality the state takes away. Multiple states are combined
         self.btn_states = {
@@ -136,7 +136,7 @@ class Panel(ScreenPanel, MmuMixin):
         tool = mmu['tool']
         ui_state = []
         if enabled:
-            if tool == TOOL_BYPASS:
+            if tool == TOOL_GATE_BYPASS:
                 ui_state.append("bypass")
         else:
             ui_state.append("disabled")
@@ -197,29 +197,29 @@ class Panel(ScreenPanel, MmuMixin):
         if toolgate == "tool":
             if param < 0 and self.ui_sel_tool > self.min_tool:
                 self.ui_sel_tool -= 1
-                if self.ui_sel_tool == TOOL_UNKNOWN:
-                    self.ui_sel_tool = TOOL_BYPASS
+                if self.ui_sel_tool == TOOL_GATE_UNKNOWN:
+                    self.ui_sel_tool = TOOL_GATE_BYPASS
             elif param > 0 and self.ui_sel_tool < num_gates - 1:
                 self.ui_sel_tool += 1
-                if self.ui_sel_tool == TOOL_UNKNOWN:
+                if self.ui_sel_tool == TOOL_GATE_UNKNOWN:
                     self.ui_sel_tool = 0
 
             # Be smart about updating a gate. Only override if it is helpful / necessary
-            if self.ui_sel_tool == TOOL_BYPASS:
-                self.ui_sel_gate = TOOL_BYPASS
+            if self.ui_sel_tool == TOOL_GATE_BYPASS:
+                self.ui_sel_gate = TOOL_GATE_BYPASS
             elif self.ui_sel_tool >= 0:
                 suggested_gate, possible_gates = self.get_possible_gates(self.ui_sel_tool)
-                if self.ui_sel_gate == TOOL_UNKNOWN or self.ui_sel_gate == TOOL_BYPASS or not self.ui_sel_gate in possible_gates:
+                if self.ui_sel_gate == TOOL_GATE_UNKNOWN or self.ui_sel_gate == TOOL_GATE_BYPASS or not self.ui_sel_gate in possible_gates:
                     self.ui_sel_gate = suggested_gate
 
         elif toolgate == "gate":
-            if param < 0 and self.ui_sel_gate > (self.min_tool if self.ui_sel_tool == TOOL_BYPASS else 0):
+            if param < 0 and self.ui_sel_gate > (self.min_tool if self.ui_sel_tool == TOOL_GATE_BYPASS else 0):
                 self.ui_sel_gate -= 1
-                if self.ui_sel_gate == TOOL_UNKNOWN:
-                    self.ui_sel_gate = TOOL_BYPASS
+                if self.ui_sel_gate == TOOL_GATE_UNKNOWN:
+                    self.ui_sel_gate = TOOL_GATE_BYPASS
             elif param > 0 and self.ui_sel_gate < num_gates - 1:
                 self.ui_sel_gate += 1
-                if self.ui_sel_gate == TOOL_UNKNOWN:
+                if self.ui_sel_gate == TOOL_GATE_UNKNOWN:
                     self.ui_sel_gate = 0
         else:
             # Filament loaded switch
@@ -249,11 +249,11 @@ class Panel(ScreenPanel, MmuMixin):
             else:
                 self.labels['t_increase'].set_sensitive(tool_sensitive)
 
-        if self.ui_sel_tool == TOOL_BYPASS or not tool_sensitive:
+        if self.ui_sel_tool == TOOL_GATE_BYPASS or not tool_sensitive:
             self.labels['g_decrease'].set_sensitive(False)
             self.labels['g_increase'].set_sensitive(False)
         else:
-            if self.ui_sel_gate == (self.min_tool if self.ui_sel_tool == TOOL_BYPASS else 0):
+            if self.ui_sel_gate == (self.min_tool if self.ui_sel_tool == TOOL_GATE_BYPASS else 0):
                 self.labels['g_decrease'].set_sensitive(False)
             else:
                 self.labels['g_decrease'].set_sensitive(tool_sensitive)
@@ -264,22 +264,22 @@ class Panel(ScreenPanel, MmuMixin):
                 self.labels['g_increase'].set_sensitive(tool_sensitive)
 
         if (self.ui_sel_tool == NOT_SET or self.ui_sel_gate == NOT_SET
-                or self.ui_sel_loaded == NOT_SET or self.ui_sel_tool == TOOL_UNKNOWN
-                or self.ui_sel_gate == TOOL_UNKNOWN or not tool_sensitive):
+                or self.ui_sel_loaded == NOT_SET or self.ui_sel_tool == TOOL_GATE_UNKNOWN
+                or self.ui_sel_gate == TOOL_GATE_UNKNOWN or not tool_sensitive):
             self.labels['manual'].set_sensitive(False)
         else:
             self.labels['manual'].set_sensitive(tool_sensitive)
 
         if self.ui_sel_tool >= 0:
             self.labels['tool'].set_label(f"T{self.ui_sel_tool}")
-        elif self.ui_sel_tool == TOOL_BYPASS:
+        elif self.ui_sel_tool == TOOL_GATE_BYPASS:
             self.labels['tool'].set_label(f"Bypass")
         else:
             self.labels['tool'].set_label(f"n/a")
 
         if self.ui_sel_gate >= 0:
             self.labels['gate'].set_label(f"Gate #{self.ui_sel_gate}")
-        elif self.ui_sel_gate == TOOL_BYPASS:
+        elif self.ui_sel_gate == TOOL_GATE_BYPASS:
             self.labels['gate'].set_label(f"Bypass")
         else:
             self.labels['gate'].set_label(f"n/a")
@@ -301,8 +301,8 @@ class Panel(ScreenPanel, MmuMixin):
         gate = mmu['gate']
         filament = mmu['filament']
 
-        tool_str = (f"T{tool}") if tool >= 0 else "Bypass" if tool == TOOL_BYPASS else "Unknown"
-        gate_str = (f"#{gate}") if gate >= 0 else "Bypass" if gate == TOOL_BYPASS else "Unknown"
+        tool_str = (f"T{tool}") if tool >= 0 else "Bypass" if tool == TOOL_GATE_BYPASS else "Unknown"
+        gate_str = (f"#{gate}") if gate >= 0 else "Bypass" if gate == TOOL_GATE_BYPASS else "Unknown"
         self.labels['tool_label'].set_label(f"Tool: {tool_str}")
         self.labels['gate_label'].set_label(f"Gate: {gate_str}")
         self.labels['filament_label'].set_label(f"Filament: {filament}")
@@ -313,7 +313,7 @@ class Panel(ScreenPanel, MmuMixin):
         endless_spool = mmu['endless_spool']
         warning = ""
         loaded = "Loaded" if self.ui_sel_loaded == 1 else "Unloaded"
-        if self.ui_sel_gate != TOOL_BYPASS:
+        if self.ui_sel_gate != TOOL_GATE_BYPASS:
             suggested_gate, possible_gates = self.get_possible_gates(self.ui_sel_tool)
             if self.ui_sel_gate != suggested_gate:
                 warning = (f"\n\nSpecified gate may not the correct gate for T{self.ui_sel_tool}.\nProceed will update the TTG map and mark the gate available")
@@ -321,7 +321,7 @@ class Panel(ScreenPanel, MmuMixin):
                     warning += (f"\nEndlessSpool group includes gates: {possible_gates}")
             summary = (f"T{self.ui_sel_tool} on Gate #{self.ui_sel_gate} with filament {loaded}")
         else:
-            self.ui_sel_gate = TOOL_BYPASS
+            self.ui_sel_gate = TOOL_GATE_BYPASS
             summary = (f"Bypass (on bypass gate) with filament {loaded}")
 
         sel_loaded = self.ui_sel_loaded
@@ -336,7 +336,7 @@ class Panel(ScreenPanel, MmuMixin):
 
 
     def select_auto(self, widget):
-        self._screen._ws.klippy.gcode_script(f"MMU_RECOVER")
+        self._screen._ws.api.gcode_script(f"MMU_RECOVER")
 
 
     def select_reset(self, widget):

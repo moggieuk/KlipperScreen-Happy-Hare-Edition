@@ -375,35 +375,8 @@ class KlipperScreen(Gtk.Window):
                 "exclude_object": ["current_object", "objects", "excluded_objects"],
                 "manual_probe": ["is_active"],
                 "screws_tilt_adjust": ["results", "error", "max_deviation"],
-                "mmu": [
-                    "enabled",
-                    "is_locked",
-                    "is_homed",
-                    "tool",
-                    "next_tool",
-                    "last_tool",
-                    "last_toolchange",
-                    "gate",
-                    "clog_detection",
-                    "endless_spool",
-                    "filament",
-                    "servo",
-                    "gate_status",
-                    "gate_material",
-                    "gate_color",
-                    "gate_spool_id",
-                    "endless_spool_groups",
-                    "ttg_map",
-                    "filament_pos",
-                    "filament_direction",
-                    "action",
-                    "has_bypass", # PAUL remove and assume True
-                    "sync_drive",
-                    "sync_feedback_bias_modelled",
-                    "tool_extrusion_multipliers",
-                    "tool_speed_multipliers",
-                    "print_state",
-                ],
+                "mmu": None,
+                "mmu_machine": None,
             }
         }
         for extruder in self.printer.get_tools():
@@ -1020,7 +993,6 @@ class KlipperScreen(Gtk.Window):
         self.base_panel.update_shortcut(target)
 
     def toggle_mmu_shortcut(self, value): # Happy Hare
-        logging.error("PAUL: toggle_mmu_shortcut")
         self.base_panel.show_mmu_shortcut(value and self.printer.has_mmu)
 
     def change_language(self, widget, lang):
@@ -1214,7 +1186,6 @@ class KlipperScreen(Gtk.Window):
 
     def power_devices(self, widget=None, devices=None, on=False):
         devs = self.search_power_devices(devices)
-#PAUL        if self._ws is not None: # Happy Hare added
         if on:
             self._ws.api.power_device_on(devs)
         else:
@@ -1294,6 +1265,7 @@ class KlipperScreen(Gtk.Window):
         self._ws.api.query_configfile(self.set_configfile, printer_info)
 
     def set_configfile(self, data, method, params, printer_info):
+        logging.error("PAUL: screen.set_configfile() data={data}")
         if "error" in data:
             self._init_printer("Error getting printer configuration")
             return
@@ -1314,6 +1286,7 @@ class KlipperScreen(Gtk.Window):
         config['status']['configfile']['config'].update(fs)
 
     def set_objects(self, data, method, params):
+        logging.error("PAUL: set_objects() called")
         if "error" in data:
             self._init_printer("Error getting printer objects list")
             return

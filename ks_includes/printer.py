@@ -248,7 +248,7 @@ class Printer:
         if self.sensors is None:
             self.sensors = [x for x in list(self.get_config_section_list("filament_switch_sensor ")) if not re.match(mmu_gate_sensors, x)] # Happy Hare" filter out "gate" sensors -- too many
             self.sensors.extend(iter(self.get_config_section_list("filament_motion_sensor ")))
-        logging.error(f"PAUL: get_filament_sensors() ==> {self.sensors}")
+        logging.error(f"PAUL: ********** get_filament_sensors() ==> {self.sensors}")
         return self.sensors
 
     def get_mmu_encoders(self): # Happy Hare - v3 legacy lookup
@@ -287,6 +287,7 @@ class Printer:
                 "available_commands": self.available_commands,
                 "idle_timeout": self.get_stat("idle_timeout").copy(), # Happy Hare: Added back because used in menu sensitivity
                 **({"mmu": self.get_stat("mmu")} if self.has_mmu else {}), # Happy Hare
+                **({"mmu_machine": self.get_stat("mmu_machine")} if self.has_mmu else {}), # Happy Hare
             },
         }
 

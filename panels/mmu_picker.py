@@ -15,17 +15,8 @@ from panels.mmu_mixin import *
 
 class Panel(ScreenPanel, MmuMixin):
 
-    COLOR_SWATCH = '⬤'
-    EMPTY_SWATCH = '◯'
-
     def __init__(self, screen, title):
         super().__init__(screen, title)
-
-        self.COLOR_RED = Gdk.RGBA(1,0,0,1)
-        self.COLOR_GREEN = Gdk.RGBA(0,1,0,1)
-        self.COLOR_DARK_GREY = Gdk.RGBA(0.2,0.2,0.2,1)
-        self.COLOR_LIGHT_GREY = Gdk.RGBA(0.5,0.5,0.5,1)
-        self.COLOR_ORANGE = Gdk.RGBA(1,0.8,0,1)
 
         grid = Gtk.Grid()
         grid.set_column_homogeneous(True)
@@ -44,7 +35,7 @@ class Panel(ScreenPanel, MmuMixin):
             tool = self.labels[f'tool_{i}'] = self._gtk.Button('extruder', f'T{i}', 'color2')
             tool.connect("clicked", self.select_tool, i)
 
-            color = self.labels[f'color_{i}'] = Gtk.Label(self.EMPTY_SWATCH)
+            color = self.labels[f'color_{i}'] = Gtk.Label(EMPTY_SWATCH)
             color.get_style_context().add_class("mmu_color_swatch")
             color.set_xalign(0.7)
 
@@ -115,9 +106,9 @@ class Panel(ScreenPanel, MmuMixin):
             self.labels[f'available_{i}'].override_color(Gtk.StateType.NORMAL, status_color)
             self.labels[f'tool_{i}'].set_sensitive(gate_status[i] in (GATE_AVAILABLE, GATE_AVAILABLE_FROM_BUFFER))
             if gate_color[i] != '':
-                self.labels[f'color_{i}'].set_text(self.COLOR_SWATCH)
+                self.labels[f'color_{i}'].set_text(COLOR_SWATCH)
             else:
-                self.labels[f'color_{i}'].set_text(self.EMPTY_SWATCH)
+                self.labels[f'color_{i}'].set_text(EMPTY_SWATCH)
             self.labels[f'color_{i}'].override_color(Gtk.StateType.NORMAL, color)
             self.labels[f'material_{i}'].set_label(gate_material[gate][:6])
             self.labels[f'gate_{i}'].set_label(gate_str)
@@ -128,19 +119,19 @@ class Panel(ScreenPanel, MmuMixin):
         if gate_status == GATE_AVAILABLE:
             status_icon = 'available_icon'
             status_str = "Available"
-            status_color = self.COLOR_GREEN
+            status_color = COLOR_GREEN
         elif gate_status == GATE_AVAILABLE_FROM_BUFFER:
             status_icon = 'available_icon'
             status_str = "Buffered"
-            status_color = self.COLOR_GREEN
+            status_color = COLOR_GREEN
         elif gate_status == GATE_EMPTY:
             status_icon = 'empty_icon'
             status_str = "Empty"
-            status_color = self.COLOR_RED
+            status_color = COLOR_RED
         else: 
             status_icon = 'unknown_icon'
             status_str = "Unknown"
-            status_color = self.COLOR_LIGHT_GREY
+            status_color = COLOR_LIGHT_GREY
         return status_icon, status_str, status_color
 
 
@@ -177,10 +168,10 @@ class Panel(ScreenPanel, MmuMixin):
         mmu = self._printer.get_stat("mmu")
         tool = mmu['tool']
         filament = mmu['filament']
-        if tool == TOOL_BYPASS and filament == "Loaded":
+        if tool == TOOL_GATE_BYPASS and filament == "Loaded":
             # Should not of got here but do nothing for safety
             pass
         else:
-            self._screen._ws.klippy.gcode_script(f"MMU_CHANGE_TOOL TOOL={selected_tool}")
+            self._screen._ws.api.gcode_script(f"MMU_CHANGE_TOOL TOOL={selected_tool}")
             self._screen._menu_go_back()
 

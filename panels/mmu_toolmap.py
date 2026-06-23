@@ -359,11 +359,11 @@ class Panel(ScreenPanel, MmuMixin):
         self._gtk.remove_dialog(dialog)
         if response_id == Gtk.ResponseType.APPLY:
             if action == "reset":
-                self._screen._ws.klippy.gcode_script(f"MMU_TTG_MAP RESET=1 QUIET=1")
-                self._screen._ws.klippy.gcode_script(f"MMU_ENDLESS_SPOOL RESET=1 QUIET=1")
+                self._screen._ws.api.gcode_script(f"MMU_TTG_MAP RESET=1 QUIET=1")
+                self._screen._ws.api.gcode_script(f"MMU_ENDLESS_SPOOL RESET=1 QUIET=1")
             else:
                 ttg_map=",".join(map(str,self.ui_ttg_map))
                 groups=",".join(map(str,self.ui_endless_spool_groups))
-                self._screen._ws.klippy.gcode_script(f"MMU_TTG_MAP MAP={ttg_map} QUIET=1")
-                self._screen._ws.klippy.gcode_script(f"MMU_ENDLESS_SPOOL GROUPS={groups} QUIET=1 ENABLE={self.ui_es_enabled}")
+                self._screen._ws.api.gcode_script(f"MMU_TTG_MAP MAP={ttg_map} QUIET=1")
+                self._screen._ws.api.gcode_script(f"MMU_ENDLESS_SPOOL GROUPS={groups} QUIET=1 ENABLE={self.ui_es_enabled}")
 

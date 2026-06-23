@@ -164,7 +164,7 @@ class Panel(ScreenPanel):
                     label=self.prettify(name),
                     hexpand=True,
                     halign=Gtk.Align.CENTER,
-                    ellipsize=Pango.EllipsizeMode.END), # Happy Hare: Changed Pango.EllipsizeMode.START --> END
+                    ellipsize=Pango.EllipsizeMode.END, # Happy Hare: Changed Pango.EllipsizeMode.START --> END
                 ),
                 "box": Gtk.Box(),
             }

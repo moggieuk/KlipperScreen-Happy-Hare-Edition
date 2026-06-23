@@ -21,12 +21,6 @@ class Panel(ScreenPanel, MmuMixin):
         super().__init__(screen, title)
         self.ui_sel_tool = 0
 
-        self.COLOR_RED = Gdk.RGBA(1,0,0,1)
-        self.COLOR_GREEN = Gdk.RGBA(0,1,0,1)
-        self.COLOR_DARK_GREY = Gdk.RGBA(0.2,0.2,0.2,1)
-        self.COLOR_LIGHT_GREY = Gdk.RGBA(0.5,0.5,0.5,1)
-        self.COLOR_ORANGE = Gdk.RGBA(1,0.8,0,1)
-
         self.spools={}
         SpoolmanSpool.theme_path = screen.theme
         GObject.type_register(SpoolmanSpool)
@@ -163,8 +157,8 @@ class Panel(ScreenPanel, MmuMixin):
             background_color=None
             if gate == i:
                 self.labels[f'gate_label_{i}'].set_label(f'> #{i}')
-                self.labels[f'gate_label_{i}'].override_color(Gtk.StateType.NORMAL, self.COLOR_GREEN)
-                background_color=self.COLOR_DARK_GREY
+                self.labels[f'gate_label_{i}'].override_color(Gtk.StateType.NORMAL, COLOR_GREEN)
+                background_color=COLOR_DARK_GREY
             else:
                 self.labels[f'gate_label_{i}'].set_label(f'#{i}')
                 self.labels[f'gate_label_{i}'].override_color(Gtk.StateType.NORMAL, None)
@@ -225,11 +219,11 @@ class Panel(ScreenPanel, MmuMixin):
             self.labels[f'remaining_weight_{i}'].set_label(remaining_weight_str) 
             self.labels[f'remaining_percentage_{i}'].set_label(remaining_percentage_str) 
 
-            color = self.COLOR_GREEN
+            color = COLOR_GREEN
             if remaining_percentage_val < 5:
-                color = self.COLOR_RED
+                color = COLOR_RED
             elif remaining_percentage_val < 30:
-                color = self.COLOR_ORANGE
+                color = COLOR_ORANGE
             self.labels[f'remaining_percentage_{i}'].override_color(Gtk.StateType.NORMAL,color)
 
             self.labels[f'material_{i}'].set_label(material[:6]) 
@@ -244,19 +238,19 @@ class Panel(ScreenPanel, MmuMixin):
         if gate_status == GATE_AVAILABLE:
             status_icon = 'available_icon'
             status_str = "Available"
-            status_color = self.COLOR_GREEN
+            status_color = COLOR_GREEN
         elif gate_status == GATE_AVAILABLE_FROM_BUFFER:
             status_icon = 'available_icon'
             status_str = "Buffered"
-            status_color = self.COLOR_GREEN
+            status_color = COLOR_GREEN
         elif gate_status == GATE_EMPTY:
             status_icon = 'empty_icon'
             status_str = "Empty"
-            status_color = self.COLOR_RED
+            status_color = COLOR_RED
         else: 
             status_icon = 'unknown_icon'
             status_str = "Unknown"
-            status_color = self.COLOR_LIGHT_GREY
+            status_color = COLOR_LIGHT_GREY
         return status_icon, status_str, status_color
 
 

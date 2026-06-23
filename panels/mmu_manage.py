@@ -23,7 +23,7 @@ class Panel(ScreenPanel, MmuMixin):
         self.ui_sel_gate = NOT_SET
         self.ui_action_button_name = self.ui_action_button_label = None
 
-        self.min_gate = TOOL_BYPASS
+        self.min_gate = TOOL_GATE_BYPASS
 
         # btn_states: The "gaps" are what functionality the state takes away. Multiple states are combined
         self.btn_states = {
@@ -94,30 +94,36 @@ class Panel(ScreenPanel, MmuMixin):
         self.labels['g_decrease'].set_hexpand(False)
         self.labels['g_decrease'].get_style_context().add_class("mmu_sel_decrease")
 
-        selector_type = self._get_selector_type()
+        selector_type = self.get_selector_type()
         grid = Gtk.Grid()
         grid.set_column_homogeneous(True)
         grid.set_row_homogeneous(True)
-        if selector_type in ['RotarySelector', 'LinearSelector']:
+
+        if selector_type in ['RotarySelector', 'LinearSelector', 'LinearServoSelector']:
             grid.attach(self.labels['g_decrease'], 0, 0, 1, 1)
             grid.attach(self.labels['gate'],       1, 0, 1, 1)
             grid.attach(self.labels['g_increase'], 2, 0, 1, 1)
+
             if selector_type == 'RotarySelector':
                 grid.attach(self.labels['grip'],       4, 0, 1, 1)
                 grid.attach(self.labels['release'],    5, 0, 1, 1)
-            elif selector_type == 'LinearSelector':
+
+            elif selector_type == 'LinearServoSelector':
                 grid.attach(self.labels['servo_up'],   3, 0, 1, 1)
                 grid.attach(self.labels['servo_move'], 4, 0, 1, 1)
                 grid.attach(self.labels['servo_down'], 5, 0, 1, 1)
+
             grid.attach(self.labels['recover'],    0, 1, 2, 1)
             grid.attach(self.labels['checkgate'],  2, 1, 2, 1)
             grid.attach(self.labels['home'],       4, 1, 1, 1)
             grid.attach(self.labels['motors_off'], 5, 1, 1, 1)
             grid.attach(self.labels['load'],       0, 2, 1, 1)
             grid.attach(self.labels['unload'],     1, 2, 1, 1)
-            if selector_type == 'LinearSelector':
+
+            if selector_type == 'LinearServoSelector':
                 grid.attach(self.labels['sync'],       2, 2, 1, 1)
                 grid.attach(self.labels['unsync'],     3, 2, 1, 1)
+
             grid.attach(self.labels['load_ext'],   4, 2, 1, 1)
             grid.attach(self.labels['unload_ext'], 5, 2, 1, 1)
         else:
@@ -171,7 +177,7 @@ class Panel(ScreenPanel, MmuMixin):
     def init_gate_values(self):
         # Get starting values
         mmu = self._printer.get_stat("mmu")
-        if self.ui_sel_gate == NOT_SET and mmu['gate'] != TOOL_UNKNOWN:
+        if self.ui_sel_gate == NOT_SET and mmu['gate'] != TOOL_GATE_UNKNOWN:
             self.ui_sel_gate = mmu['gate']
         else:
             self.ui_sel_gate = 0
@@ -181,12 +187,15 @@ class Panel(ScreenPanel, MmuMixin):
         # v3.1 method... (assume similar units for now)
         mmu_machine = self._printer.get_stat("mmu_machine")
         unit0 = mmu_machine.get('unit_0', None)
-        if unit0: return unit0.selector_type
+        logging.info(f"PAUL: mmu_machine={mmu_machine}, unit0={unit0}")
+        if unit0 is not None:
+            return unit0['selector_type']
 
         # v3.0...
         mmu = self._printer.get_stat("mmu")
         selector_type = mmu.get('selector_type', None)
-        if selector_type: return selector_type
+        if selector_type:
+            return selector_type
 
         # Prior to v3.0
         return 'LinearSelector'
@@ -198,19 +207,19 @@ class Panel(ScreenPanel, MmuMixin):
 
         if param < 0 and self.ui_sel_gate > self.min_gate:
             self.ui_sel_gate -= 1
-            if self.ui_sel_gate == TOOL_UNKNOWN:
-                self.ui_sel_gate = TOOL_BYPASS
+            if self.ui_sel_gate == TOOL_GATE_UNKNOWN:
+                self.ui_sel_gate = TOOL_GATE_BYPASS
         elif param > 0 and self.ui_sel_gate < num_gates - 1:
             self.ui_sel_gate += 1
-            if self.ui_sel_gate == TOOL_UNKNOWN:
+            if self.ui_sel_gate == TOOL_GATE_UNKNOWN:
                 self.ui_sel_gate = 0
         elif param == 0:
             self.ui_action_button_name = 'gate'
             self.ui_action_button_label = self.labels[self.ui_action_button_name].get_label()
-            if self.ui_sel_gate == TOOL_BYPASS:
-                self._screen._ws.klippy.gcode_script(f"MMU_SELECT_BYPASS")
+            if self.ui_sel_gate == TOOL_GATE_BYPASS:
+                self._screen._ws.api.gcode_script(f"MMU_SELECT_BYPASS")
             elif mmu['filament'] != "Loaded":
-                self._screen._ws.klippy.gcode_script(f"MMU_SELECT GATE={self.ui_sel_gate}")
+                self._screen._ws.api.gcode_script(f"MMU_SELECT GATE={self.ui_sel_gate}")
             return
         self.update_gate_buttons()
 
@@ -218,7 +227,7 @@ class Panel(ScreenPanel, MmuMixin):
     def select_gatebutton(self, widget):
         self.ui_action_button_name = 'gate'
         self.ui_action_button_label = self.labels[self.ui_action_button_name].get_label()
-        self._screen._ws.klippy.gcode_script(f"MMU_SELECT GATE={self.ui_sel_gate}")
+        self._screen._ws.api.gcode_script(f"MMU_SELECT GATE={self.ui_sel_gate}")
 
 
     def select_checkgate(self, widget):
@@ -226,21 +235,21 @@ class Panel(ScreenPanel, MmuMixin):
         self.ui_action_button_label = self.labels[self.ui_action_button_name].get_label()
         mmu = self._printer.get_stat("mmu")
         current_gate = mmu['gate']
-        self._screen._ws.klippy.gcode_script(f"MMU_CHECK_GATE GATE={current_gate} QUIET=1")
+        self._screen._ws.api.gcode_script(f"MMU_CHECK_GATE GATE={current_gate} QUIET=1")
 
 
     def select_sync(self, widget):
-        self._screen._ws.klippy.gcode_script("MMU_SYNC_GEAR_MOTOR SYNC=1")
+        self._screen._ws.api.gcode_script("MMU_SYNC_GEAR_MOTOR SYNC=1")
 
 
     def select_unsync(self, widget):
-        self._screen._ws.klippy.gcode_script("MMU_SYNC_GEAR_MOTOR SYNC=0")
+        self._screen._ws.api.gcode_script("MMU_SYNC_GEAR_MOTOR SYNC=0")
 
 
     def select_load(self, widget):
         self.ui_action_button_name = 'load'
         self.ui_action_button_label = self.labels[self.ui_action_button_name].get_label()
-        self._screen._ws.klippy.gcode_script(f"MMU_LOAD")
+        self._screen._ws.api.gcode_script(f"MMU_LOAD")
 
 
     def select_unload_eject(self, widget):
@@ -249,15 +258,15 @@ class Panel(ScreenPanel, MmuMixin):
         mmu = self._printer.get_stat("mmu")
         filament = mmu['filament']
         if filament != "Unloaded":
-            self._screen._ws.klippy.gcode_script(f"MMU_UNLOAD")
+            self._screen._ws.api.gcode_script(f"MMU_UNLOAD")
         else:
-            self._screen._ws.klippy.gcode_script(f"MMU_EJECT")
+            self._screen._ws.api.gcode_script(f"MMU_EJECT")
 
 
     def select_home(self, widget):
         self.ui_action_button_name = 'home'
         self.ui_action_button_label = self.labels[self.ui_action_button_name].get_label()
-        self._screen._ws.klippy.gcode_script(f"MMU_HOME")
+        self._screen._ws.api.gcode_script(f"MMU_HOME")
 
 
     def select_motors_off(self, widget):
@@ -270,35 +279,35 @@ class Panel(ScreenPanel, MmuMixin):
 
 
     def select_servo_up(self, widget):
-        self._screen._ws.klippy.gcode_script(f"MMU_SERVO POS=up")
+        self._screen._ws.api.gcode_script(f"MMU_SERVO POS=up")
 
 
     def select_servo_move(self, widget):
-        self._screen._ws.klippy.gcode_script(f"MMU_SERVO POS=move")
+        self._screen._ws.api.gcode_script(f"MMU_SERVO POS=move")
 
 
     def select_servo_down(self, widget):
-        self._screen._ws.klippy.gcode_script(f"MMU_SERVO POS=down")
+        self._screen._ws.api.gcode_script(f"MMU_SERVO POS=down")
 
 
     def select_grip(self, widget):
-        self._screen._ws.klippy.gcode_script(f"MMU_GRIP")
+        self._screen._ws.api.gcode_script(f"MMU_GRIP")
 
 
     def select_release(self, widget):
-        self._screen._ws.klippy.gcode_script(f"MMU_RELEASE")
+        self._screen._ws.api.gcode_script(f"MMU_RELEASE")
 
 
     def select_load_extruder(self, widget):
         self.ui_action_button_name = 'load_ext'
         self.ui_action_button_label = self.labels[self.ui_action_button_name].get_label()
-        self._screen._ws.klippy.gcode_script(f"MMU_LOAD EXTRUDER_ONLY=1")
+        self._screen._ws.api.gcode_script(f"MMU_LOAD EXTRUDER_ONLY=1")
 
 
     def select_unload_extruder(self, widget):
         self.ui_action_button_name = 'unload_ext'
         self.ui_action_button_label = self.labels[self.ui_action_button_name].get_label()
-        self._screen._ws.klippy.gcode_script(f"MMU_UNLOAD EXTRUDER_ONLY=1")
+        self._screen._ws.api.gcode_script(f"MMU_UNLOAD EXTRUDER_ONLY=1")
 
 
     # Dynamically update button sensitivity based on state
@@ -317,7 +326,7 @@ class Panel(ScreenPanel, MmuMixin):
         if enabled:
             ui_state.append("homed" if is_homed else "not_homed")
 
-            if tool == TOOL_BYPASS:
+            if tool == TOOL_GATE_BYPASS:
                 if filament == "Loaded":
                     ui_state.append("bypass_loaded")
                 elif filament == "Unloaded":
@@ -339,10 +348,10 @@ class Panel(ScreenPanel, MmuMixin):
                 self.labels['unload'].set_image(self.labels['eject_img'])
                 self.labels['unload'].set_label("Eject")
 
-            if selector_type == 'RotarySelector':
+            if selector_type in ['RotarySelector']:
                 grip = mmu.get('grip', None)
                 ui_state.append("gripped" if grip.lower() == 'gripped'  else "released")
-            elif selector_type == 'LinearSelector':
+            elif selector_type in ['LinearServoSelector']:
                 servo = mmu.get('servo', None)
                 servo_states = {
                     'Up': ['servo_up'],
@@ -381,7 +390,7 @@ class Panel(ScreenPanel, MmuMixin):
         filament = mmu['filament']
         num_gates = len(mmu['gate_status'])
         action = mmu['action']
-        if (gate == TOOL_BYPASS and filament != "Unloaded") or not gate_sensitive:
+        if (gate == TOOL_GATE_BYPASS and filament != "Unloaded") or not gate_sensitive:
             self.labels['g_decrease'].set_sensitive(False)
             self.labels['g_increase'].set_sensitive(False)
         else:
@@ -402,7 +411,7 @@ class Panel(ScreenPanel, MmuMixin):
                     self.labels['gate'].set_sensitive(False)
                 else:
                     self.labels['gate'].set_sensitive(gate_sensitive)
-            elif self.ui_sel_gate == TOOL_BYPASS:
+            elif self.ui_sel_gate == TOOL_GATE_BYPASS:
                 self.labels['gate'].set_label(f"Bypass")
                 if mmu['gate'] == self.ui_sel_gate:
                     self.labels['gate'].set_sensitive(False)
@@ -414,7 +423,7 @@ class Panel(ScreenPanel, MmuMixin):
             self.labels['gate'].set_label(action)
             self.labels['gate'].set_sensitive(False)
 
-        if self.ui_sel_gate == TOOL_BYPASS:
+        if self.ui_sel_gate == TOOL_GATE_BYPASS:
             self.labels['checkgate'].set_sensitive(False)
         elif gate_sensitive:
             self.labels['checkgate'].set_sensitive(True)

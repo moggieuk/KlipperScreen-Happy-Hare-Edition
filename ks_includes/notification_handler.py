@@ -122,12 +122,12 @@ class NotificationHandler:
             and "TESTZ" not in data
             and "MEASURE_AXES_NOISE" not in data
             and "ACCELEROMETER_QUERY" not in data
-            and "MMU" not in data
-            and "TTG Map" not in data
-            and "Gates / Filaments" not in data
-            and "from Unknown to" not in data
-            and "Tool Unknown" not in data
-        ): # Happy Hare modified (added MMU, TTG Map, Gates.., from Unknown to, Tool Unknown)
+            and "MMU" not in data.lower()       # Happy Hare
+            and "TTG Map" not in data           # Happy Hare
+            and "Gates / Filaments" not in data # Happy Hare
+            and "from Unknown to" not in data   # Happy Hare
+            and "Tool Unknown" not in data      # Happy Hare
+        ):
             if data.startswith("// "): # Happy Hare added
                 self._screen.show_popup_message(data[3:], from_ws=True)
             else:

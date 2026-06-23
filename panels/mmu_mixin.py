@@ -11,6 +11,9 @@
 # (")_(") Happy Hare Ready
 #
 # This file may be distributed under the terms of the GNU GPLv3 license.
+#
+
+from gi.repository import Gdk
 
 
 TOOL_GATE_UNKNOWN = -1
@@ -76,6 +79,7 @@ SENSOR_ENTRY_PREFIX      = "mmu_entry"
 
 # Old v3 endstop/sensor names
 V3_SENSOR_GATE           = "mmu_gate"
+V3_SENSOR_GEAR           = "mmu_gear"
 
 # Standard symbolic color names
 W3C_COLORS = {
@@ -229,37 +233,94 @@ W3C_COLORS = {
     'yellowgreen': '#9ACD32',
 }
 
+COLOR_RED        = Gdk.RGBA(1,0,0,1)
+COLOR_GREEN      = Gdk.RGBA(0,1,0,1)
+COLOR_DARK_GREY  = Gdk.RGBA(0.2,0.2,0.2,1)
+COLOR_LIGHT_GREY = Gdk.RGBA(0.5,0.5,0.5,1)
+COLOR_ORANGE     = Gdk.RGBA(1,0.8,0,1)
+
+COLOR_SWATCH = '⬤'
+EMPTY_SWATCH = '◯'
+
 
 class MmuMixin:
 
     def check_sensor(self, s):
+        # v4...
+        mmu = self._printer.get_stat("mmu")
+        sensors = mmu.get('sensors')
+        if sensors is not None:
+            return sensors.get(s)
+
+        # v3...
         sensor = self._printer.get_stat(f"filament_switch_sensor {s}_sensor")
         if sensor:
             if sensor['enabled']:
-                if sensor['filament_detected']:
-                    return 1
-                else:
-                    return 0
-            return -1
+                return sensor['filament_detected']
+
         return None
 
 
     def has_sensor(self, s):
+        # v4...
+        mmu = self._printer.get_stat("mmu")
+        sensors = mmu.get('sensors')
+        if sensors is not None:
+            if sensors.get(s) is not None:
+                return True
+            return False
+
+        # v3...
+        if s == SENSOR_SHARED_EXIT:
+            s = V3_SENSOR_GATE
+        elif s == SENSOR_EXIT:
+            s = V3_SENSOR_GEAR
         sensor = self._printer.get_stat(f"filament_switch_sensor {s}_sensor")
         if sensor:
             return sensor['enabled']
+
         return False
 
 
     def has_encoder(self):
-        # PAUL v3 method
+        # v4...
+        mmu = self._printer.get_stat("mmu")
+        encoder = mmu.get('encoder')
+        if encoder is not None:
+            return True
+
+        # v3...
         encoder = self._printer.get_stat('mmu_encoder mmu_encoder', None)
         if encoder:
             return True
-        else:
-            return None
+
+        return False
 
 
     def has_buffer(self):
-        # PAUL v3 method
-        return False
+        return any(
+            self.has_sensor(sensor)
+            for sensor in (
+                SENSOR_COMPRESSION,
+                SENSOR_TENSION,
+                SENSOR_PROPORTIONAL,
+            )
+        )
+
+
+    def get_selector_type(self):
+        # >v3.1 method...
+        # (TODO current KlipperScreen only supports single mmu_unit)
+        mmu_machine = self._printer.get_stat("mmu_machine")
+        unit0 = mmu_machine.get('unit_0')
+        if unit0 is not None:
+            return unit0['selector_type']
+
+        # v3.0...
+        mmu = self._printer.get_stat("mmu")
+        selector_type = mmu.get('selector_type', None)
+        if selector_type:
+            return selector_type
+
+        # Prior to v3.0
+        return 'LinearServoSelector'

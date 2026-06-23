@@ -32,8 +32,8 @@ class Panel(ScreenPanel, MmuMixin):
         # We need to keep track of just a little bit of UI state
         self.ui_runout_mark = 0.
         self.ui_sel_tool = NOT_SET
-
         self.min_tool = TOOL_GATE_BYPASS
+        self._last_sync_feedback_bias_rounded = -9.9
 
         # btn_states: The "gaps" are what functionality the state takes away. Multiple states are combined
         self.btn_states = {
@@ -229,25 +229,15 @@ class Panel(ScreenPanel, MmuMixin):
         self.bold_filament = self._config.get_main_config().getboolean("mmu_bold_filament", False)
 
     def process_update(self, action, data):
-        if action == "notify_status_update":
-            logging.info(f"PAUL: mmu_main.process_update(). data={data.get('mmu')}")
-            did_update_filament_status = False
+        if action == "notify_status_update" and data is not None:
+            logging.info(f"PAUL: mmu_main.process_update(). data={data.get('mmu')}\n")
+            filament_status_updated = False
 
             try:
                 # v3 encoder
                 if 'mmu_encoder mmu_encoder' in data: # There is only one mmu_encoder
                     ee_data = data['mmu_encoder mmu_encoder']
                     self.update_encoder(ee_data)
-
-                # v3 buffer
-                if (
-                    'filament_switch_sensor toolhead_sensor' in data or
-                    'filament_switch_sensor mmu_gate_sensor' in data or
-                    'filament_switch_sensor extruder_sensor' in data
-                ):
-                    self.update_filament_status()
-                    did_update_filament_status = True
-
 
                 # v4 contains everything required in 'printer.mmu'
                 if 'mmu' in data:
@@ -259,12 +249,15 @@ class Panel(ScreenPanel, MmuMixin):
 
                     # v4 buffer
                     if (
-                        not did_update_filament_status
+                        not filament_status_updated
                         and self.has_buffer()
-                        and 'sync_feedback_bias_modelled' in e_data
                     ):
-                        self.update_filament_status()
-                        did_update_filament_status = True
+                        if 'sync_feedback_state' in e_data:
+                            self.update_filament_status()
+                            filament_status_updated = True
+                        elif 'sync_feedback_bias_modelled' in e_data and self._should_update_proportional():
+                            self.update_filament_status()
+                            filament_status_updated = True
 
                     if any(
                         key in e_data
@@ -273,7 +266,7 @@ class Panel(ScreenPanel, MmuMixin):
                         self.update_status()
 
                     if (
-                        not did_update_filament_status
+                        not filament_status_updated
                         or any(
                             key in e_data
                             for key in ('tool', 'filament_pos', 'filament_direction')
@@ -331,6 +324,13 @@ class Panel(ScreenPanel, MmuMixin):
         return f"{-v:.1f}mm"
 
 
+    # Prevent unecessary updates
+    def _should_update_proportional(self):
+        mmu = self._printer.get_stat("mmu")
+        value = mmu.get("sync_feedback_bias_modelled")
+        return round(value, 1) != self._last_sync_feedback_bias_rounded
+
+
     def select_check_gates(self, widget):
         self._screen._confirm_send_action(
             None,
@@ -354,9 +354,9 @@ class Panel(ScreenPanel, MmuMixin):
                 self.ui_sel_tool = 0
         elif param == 0:
             if self.ui_sel_tool == TOOL_GATE_BYPASS:
-                self._screen._ws.klippy.gcode_script(f"MMU_SELECT_BYPASS")
+                self._screen._ws.api.gcode_script(f"MMU_SELECT_BYPASS")
             elif self.ui_sel_tool != tool or mmu['filament'] != "Loaded":
-                self._screen._ws.klippy.gcode_script(f"MMU_CHANGE_TOOL TOOL={self.ui_sel_tool} QUIET=1")
+                self._screen._ws.api.gcode_script(f"MMU_CHANGE_TOOL TOOL={self.ui_sel_tool} QUIET=1")
             return
         self.update_tool_buttons()
 
@@ -365,9 +365,9 @@ class Panel(ScreenPanel, MmuMixin):
         mmu = self._printer.get_stat("mmu")
         filament = mmu['filament']
         if filament != "Unloaded":
-            self._screen._ws.klippy.gcode_script(f"MMU_UNLOAD")
+            self._screen._ws.api.gcode_script(f"MMU_UNLOAD")
         else:
-            self._screen._ws.klippy.gcode_script(f"MMU_EJECT")
+            self._screen._ws.api.gcode_script(f"MMU_EJECT")
 
 
     def select_picker(self, widget):
@@ -375,13 +375,13 @@ class Panel(ScreenPanel, MmuMixin):
         mmu = self._printer.get_stat("mmu")
         tool = mmu['tool']
         if tool == TOOL_GATE_BYPASS:
-            self._screen._ws.klippy.gcode_script(f"MMU_LOAD EXTRUDER_ONLY=1")
+            self._screen._ws.api.gcode_script(f"MMU_LOAD EXTRUDER_ONLY=1")
         else:
             self._screen.show_panel('mmu_picker', 'MMU Tool Picker')
 
 
     def select_pause(self, widget):
-        self._screen._ws.klippy.gcode_script(f"MMU_PAUSE FORCE_IN_PRINT=1")
+        self._screen._ws.api.gcode_script(f"MMU_PAUSE FORCE_IN_PRINT=1")
 
 
     def select_message(self, widget):
@@ -390,11 +390,11 @@ class Panel(ScreenPanel, MmuMixin):
 
 
     def select_resume(self, widget):
-        self._screen._ws.klippy.gcode_script(f"RESUME")
+        self._screen._ws.api.gcode_script(f"RESUME")
 
 
     def select_unlock(self, widget):
-        self._screen._ws.klippy.gcode_script(f"MMU_UNLOCK")
+        self._screen._ws.api.gcode_script(f"MMU_UNLOCK")
 
 
     def update_enabled(self):
@@ -439,6 +439,7 @@ class Panel(ScreenPanel, MmuMixin):
             else:
                 self.labels['unload'].set_image(self.labels['eject_img'])
                 self.labels['unload'].set_label("Eject")
+
 
     def update_tool_buttons(self, tool_sensitive=True):
         mmu = self._printer.get_stat("mmu")
@@ -702,13 +703,13 @@ class Panel(ScreenPanel, MmuMixin):
 
     def get_filament_text(self, markup=False, bold=False):
         mmu = self._printer.get_stat("mmu")
-        cs = self._printer.get_config_section("mmu")
-
         tool = mmu["tool"]
         pos = mmu["filament_pos"]
         direction = mmu["filament_direction"]
         gate = mmu["gate"]
         gate_color = mmu["gate_color"]
+
+        cs = self._printer.get_config_section("mmu")
         gate_homing_endstop = cs["gate_homing_endstop"]
 
         space = "┈"
@@ -717,7 +718,7 @@ class Panel(ScreenPanel, MmuMixin):
         trig_sensor = "◉"
 
         if bold:
-            home, line, arrow = "█", "█", "▌"
+            home, line, arrow = "▌", "█", "▌"
         else:
             home, line, arrow = "┫", "━", "▶"
 
@@ -755,82 +756,22 @@ class Panel(ScreenPanel, MmuMixin):
             return space + gate_mark + "Nz  "
 
         def buffer_segment():
-            state = mmu.get("bowden_sensor_state")
-            value = mmu.get("bowden_sensor_value")
+            state = mmu.get("sync_feedback_state")
+            value = mmu.get("sync_feedback_bias_modelled")
 
+            if state == "disabled":
+                return "[  X  ]"
+            if state == "inactive":
+                return "[  -  ]"
             if state == "compressed":
-                return "[> C <]"
+                return "[▶ C ◀]"
             if state == "tension":
-                return "[< T >]"
+                return "[◀ T ▶]"
             if state == "neutral":
-                return f"[{value: .1f}]" if value is not None else "[  N  ]"
-            return "[  ?  ]"
-
-
-    def get_filament_text(self, markup=False, bold=False):
-        mmu = self._printer.get_stat("mmu")
-        cs = self._printer.get_config_section("mmu")
-
-        tool = mmu["tool"]
-        pos = mmu["filament_pos"]
-        direction = mmu["filament_direction"]
-        gate = mmu["gate"]
-        gate_color = mmu["gate_color"]
-        gate_homing_endstop = cs["gate_homing_endstop"]
-
-        space = "┈"
-        gate_mark = "┤"
-        empty_sensor = "◯"
-        trig_sensor = "◉"
-
-        if bold:
-            home, line, arrow = "█", "█", "▌"
-        else:
-            home, line, arrow = "┫", "━", "▶"
-
-        def past(target_pos):
-            return arrow if pos >= target_pos else space
-
-        def sensor_label(sensor, label=""):
-            marker = trig_sensor if self.check_sensor(sensor) else empty_sensor
-            return marker + label
-
-        def homed_segment(target_pos, label):
-            if pos > target_pos:
-                return arrow + label + arrow
-            if pos == target_pos:
-                return home + label + space
-            return space + label + space
-
-        def pad(target_pos, length):
-            if pos > target_pos:
-                return arrow * length
-            if pos == target_pos:
-                left = length - length // 2
-                right = length // 2
-                return arrow * left + space * right
-            return space * length
-
-        def optional_sensor(sensor, target_pos, width=3):
-            if self.has_sensor(sensor):
-                return homed_segment(target_pos, sensor_label(sensor))
-            return pad(target_pos, width)
-
-        def nozzle_segment():
-            if pos >= FILAMENT_POS_LOADED:
-                return arrow + home + "Nz" + arrow * 2
-            return space + gate_mark + "Nz  "
-
-        def buffer_segment():
-            state = mmu.get("bowden_sensor_state")
-            value = mmu.get("bowden_sensor_value")
-
-            if state == "compressed":
-                return "[> C <]"
-            if state == "tension":
-                return "[< T >]"
-            if state == "neutral":
-                return f"[{value: .1f}]" if value is not None else "[  N  ]"
+                if value is not None:
+                    self._last_sync_feedback_bias_rounded = round(value, 1)
+                    return f"[{value: .1f}]"
+                return "[  N  ]"
             return "[  ?  ]"
 
         if tool >= 0:
@@ -840,7 +781,7 @@ class Panel(ScreenPanel, MmuMixin):
         else:
             tool_text = "T? "
 
-        bowden_length = max(1, 16 - len(tool_text))
+        bowden_length = max(1, 14 - len(tool_text))
         bowden_half = bowden_length // 2
 
         encoder_ref_pos = (
@@ -888,9 +829,9 @@ class Panel(ScreenPanel, MmuMixin):
             parts.append(" UNLOADED")
         elif pos == FILAMENT_POS_UNKNOWN:
             parts.append(" UNKNOWN")
-        elif direction == self.DIRECTION_LOAD:
+        elif direction == DIRECTION_LOAD:
             parts.append(" ▷▷▷")
-        elif direction == self.DIRECTION_UNLOAD:
+        elif direction == DIRECTION_UNLOAD:
             parts.append(" ◁◁◁")
 
         visual = "".join(parts)
@@ -906,22 +847,23 @@ class Panel(ScreenPanel, MmuMixin):
         if markup and gate >= 0:
             color = self.get_rgb_color(gate_color[gate])
             if color:
-                visual = self._add_path_markup(visual, color, line)
+                visual = self._add_color_markup(visual, color, line)
 
         return visual
 
 
-    def _add_path_markup(self, text, color, *chars):
+    def _add_color_markup(self, text, color, *chars):
         chars = set(chars)
 
         result = []
         in_markup = False
 
+        logging.info(f"PAUL: before: {text}")
         for ch in text:
             should_markup = ch in chars
 
             if should_markup and not in_markup:
-                result.append(f"<span color={color}>")
+                result.append(f"<span color='{color}'>")
                 in_markup = True
             elif not should_markup and in_markup:
                 result.append("</span>")
@@ -932,4 +874,5 @@ class Panel(ScreenPanel, MmuMixin):
         if in_markup:
             result.append("</span>")
 
+        logging.info(f"PAUL: colored: {''.join(result)}")
         return "".join(result)

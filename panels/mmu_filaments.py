@@ -15,8 +15,6 @@ from panels.spoolman import SpoolmanSpool
 from panels.mmu_mixin import *
 import threading, time
 
-COLOR_SWATCH = '⬤'
-EMPTY_SWATCH = '◯'
 
 class Panel(ScreenPanel, MmuMixin):
 
@@ -27,12 +25,6 @@ class Panel(ScreenPanel, MmuMixin):
         self.use_spoolman = self._printer.spoolman and self._config.get_main_config().getboolean("mmu_use_spoolman", False)
         self.spools = {}
 
-        self.COLOR_RED = Gdk.RGBA(1,0,0,1)
-        self.COLOR_GREEN = Gdk.RGBA(0,1,0,1)
-        self.COLOR_DARK_GREY = Gdk.RGBA(0.2,0.2,0.2,1)
-        self.COLOR_LIGHT_GREY = Gdk.RGBA(0.5,0.5,0.5,1)
-        self.COLOR_ORANGE = Gdk.RGBA(1,0.8,0,1)
-
         img_width = img_height = self._gtk.img_scale * self.bts * 1.5
         grid = Gtk.Grid()
         grid.set_column_homogeneous(True)
@@ -40,6 +32,8 @@ class Panel(ScreenPanel, MmuMixin):
 
         mmu = self._printer.get_stat("mmu")
         num_gates = len(mmu['gate_status'])
+
+        self.w3c_colors = list(sorted(W3C_COLORS))
 
         for i in range(num_gates):
             status_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
@@ -130,8 +124,8 @@ class Panel(ScreenPanel, MmuMixin):
         self.labels['save'].set_vexpand(False)
 
         self.labels['c_selector'].set_vexpand(False)
-        for i in range(len(self.W3C_COLORS)):
-            self.labels['c_selector'].append_text(self.W3C_COLORS[i])
+        for color_name in self.w3c_colors:
+            self.labels['c_selector'].append_text(color_name)
         self.labels['c_selector'].connect("changed", self.select_w3c_color)
         self.labels['c_selector'].get_style_context().add_class("mmu_combobox")
 
@@ -292,19 +286,19 @@ class Panel(ScreenPanel, MmuMixin):
         if gate_status == GATE_AVAILABLE:
             status_icon = 'available_icon'
             status_str = "Available"
-            status_color = self.COLOR_GREEN
+            status_color = COLOR_GREEN
         elif gate_status == GATE_AVAILABLE_FROM_BUFFER:
             status_icon = 'available_icon'
             status_str = "Buffered"
-            status_color = self.COLOR_GREEN
+            status_color = COLOR_GREEN
         elif gate_status == GATE_EMPTY:
             status_icon = 'empty_icon'
             status_str = "Empty"
-            status_color = self.COLOR_RED
+            status_color = COLOR_RED
         else: 
             status_icon = 'unknown_icon'
             status_str = "Unknown"
-            status_color = self.COLOR_LIGHT_GREY
+            status_color = COLOR_LIGHT_GREY
         return status_icon, status_str, status_color
 
 
@@ -373,8 +367,8 @@ class Panel(ScreenPanel, MmuMixin):
 
         self.labels['id_entry'].set_text(self._get_spool_id(self.ui_gate_spool_id, prefix=False))
         self.labels['m_entry'].set_text(self.ui_gate_material)
-        if self.ui_gate_color in self.W3C_COLORS:
-            self.labels['c_selector'].set_active(self.W3C_COLORS.index(self.ui_gate_color))
+        if self.ui_gate_color in self.w3c_colors:
+            self.labels['c_selector'].set_active(self.w3c_colors.index(self.ui_gate_color))
         else:
             self.labels['c_selector'].set_active(-1)
         self.labels['filament'].set_active(self.ui_gate_status in (GATE_AVAILABLE, GATE_AVAILABLE_FROM_BUFFER))
@@ -480,7 +474,7 @@ class Panel(ScreenPanel, MmuMixin):
     def select_save(self, widget):
         self._screen.remove_keyboard()
         self._screen.set_focus(None)
-        self._screen._ws.klippy.gcode_script(f"MMU_GATE_MAP GATE={self.ui_sel_gate} COLOR={self.ui_gate_color} MATERIAL={self.ui_gate_material} AVAILABLE={self.ui_gate_status} SPOOLID={self.ui_gate_spool_id} QUIET=1")
+        self._screen._ws.api.gcode_script(f"MMU_GATE_MAP GATE={self.ui_sel_gate} COLOR={self.ui_gate_color} MATERIAL={self.ui_gate_material} AVAILABLE={self.ui_gate_status} SPOOLID={self.ui_gate_spool_id} QUIET=1")
         self.labels['layers'].set_current_page(0) # Gate list layer
 
 

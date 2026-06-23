@@ -777,7 +777,7 @@ class Panel(ScreenPanel, MmuMixin):
             if state == "neutral":
                 if value is not None:
                     self._last_sync_feedback_bias_rounded = round(value, 1)
-                    return f"[{value: .1f}]"
+                    return f"[{f'{value:.1f}'.center(5)}]"
                 return "[  N  ]"
             return "[  ?  ]"
 

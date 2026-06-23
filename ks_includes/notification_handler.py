@@ -141,7 +141,7 @@ class NotificationHandler:
                 script,
             )
         elif data.startswith("// MMU"): # Happy Hare
-            if not data.startswith("// MMU [") and not data.startswith("// MMU BYPASS"):
+            if not data.startswith("// MMU [") and not data.startswith("// MMU BYPASS") and not data.startswith("// MMU: Happy Hare"):
                 self._screen.show_popup_message(data[3:], level=1, monospace=data.startswith("// MMU Statistics:"))
 
     def _active_spool_set(self, data):

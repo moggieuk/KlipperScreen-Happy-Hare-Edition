@@ -75,7 +75,7 @@ class Panel(ScreenPanel, MmuMixin):
             'select_bypass_img': self._gtk.Image('mmu_select_bypass'), # Alternative for tool
             'load_bypass_img': self._gtk.Image('mmu_load_bypass'),     # Alternative for picker
             'unload_bypass_img': self._gtk.Image('mmu_unload_bypass'), # Alternative for unload/eject
-            'eject_img': self._gtk.Image('mmu_eject'), # Alternative for unload button to fully eject
+            'eject_img': self._gtk.Image('mmu_eject'),                 # Alternative for unload button to fully eject
             'sync_drive_img': self._gtk.Image('mmu_synced_extruder', self._gtk.img_width * 0.8, self._gtk.img_height * 0.8), # Alternative for tool_icon
         }
         self.labels['unload_img'] = self.labels['unload'].get_image()
@@ -230,7 +230,6 @@ class Panel(ScreenPanel, MmuMixin):
 
     def process_update(self, action, data):
         if action == "notify_status_update" and data is not None:
-            logging.info(f"PAUL: mmu_main.process_update(). data={data.get('mmu')}\n")
             filament_status_updated = False
 
             try:
@@ -616,7 +615,7 @@ class Panel(ScreenPanel, MmuMixin):
             else:
                 self.labels['runout_layer'].set_current_page(1) # Clog display
 
-            if ("paused" not in ui_state and "pause_locked" not in ui_state) or "no_messsage" in ui_state:
+            if ("paused" not in ui_state and "pause_locked" not in ui_state) or "no_message" in ui_state:
                 self.labels['pause_layer'].set_current_page(0) # Pause button
             else:
                 self.labels['pause_layer'].set_current_page(1) # Recall last error
@@ -858,7 +857,6 @@ class Panel(ScreenPanel, MmuMixin):
         result = []
         in_markup = False
 
-        logging.info(f"PAUL: before: {text}")
         for ch in text:
             should_markup = ch in chars
 
@@ -874,5 +872,4 @@ class Panel(ScreenPanel, MmuMixin):
         if in_markup:
             result.append("</span>")
 
-        logging.info(f"PAUL: colored: {''.join(result)}")
         return "".join(result)

@@ -187,7 +187,6 @@ class Panel(ScreenPanel, MmuMixin):
         # v3.1 method... (assume similar units for now)
         mmu_machine = self._printer.get_stat("mmu_machine")
         unit0 = mmu_machine.get('unit_0', None)
-        logging.info(f"PAUL: mmu_machine={mmu_machine}, unit0={unit0}")
         if unit0 is not None:
             return unit0['selector_type']
 

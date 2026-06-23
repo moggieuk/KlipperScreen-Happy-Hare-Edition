@@ -224,23 +224,25 @@ class Panel(ScreenPanel, MmuMixin):
 
 
     def load_spools(self, *args):
-        logging.error("PAUL: mmu_filaments.load_spools()")
         hide_archived = self._config.get_config().getboolean(
             "spoolman", "hide_archived", fallback=True
         )
         self._screen.spoolman_api.load_all_spools(
             allow_archived=not hide_archived, callback=self._load_spools_cb
         )
+        return True
 
 
     def _load_spools_cb(self, spools):
         if not spools:
             self._screen.show_popup_message(_("Error trying to fetch spoolman spools"))
             return
+
         self.spools.clear()
         for spool in spools:
             spoolObject = SpoolmanSpool(**spool)
             self.spools[str(spoolObject.id)] = spoolObject
+
         self.refresh()
 
 

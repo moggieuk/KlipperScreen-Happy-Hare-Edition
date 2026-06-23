@@ -1265,28 +1265,13 @@ class KlipperScreen(Gtk.Window):
         self._ws.api.query_configfile(self.set_configfile, printer_info)
 
     def set_configfile(self, data, method, params, printer_info):
-        logging.error("PAUL: screen.set_configfile() data={data}")
         if "error" in data:
             self._init_printer("Error getting printer configuration")
             return
         self.printer.reinit(printer_info, data["result"]["status"])
         self._ws.api.get_printer_objects(self.set_objects)
 
-# PAUL figure out how to integrate. Not currently called
-    def set_legacy_configfile(self, data, method, params): # Happy Hare
-        # Happy Hare: Since around klipper v0.12.0-340 the configfile processing was re-written. Dynamic
-        # changes to configfile on startup are no longer in 'config' so we merge the critical dynamically
-        # created filament sensors from 'settings' to mimic prior behavior
-        logging.error("PAUL: set_legacy_configfile() called")
-        fs = {
-            key: value
-            for key, value in config['status']['configfile']['settings'].items()
-            if key.startswith("filament_switch_sensor ")
-        }
-        config['status']['configfile']['config'].update(fs)
-
     def set_objects(self, data, method, params):
-        logging.error("PAUL: set_objects() called")
         if "error" in data:
             self._init_printer("Error getting printer objects list")
             return

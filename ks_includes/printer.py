@@ -90,7 +90,6 @@ class Printer:
                 self.ledcount += 1
 
             if x == 'mmu': # Happy Hare
-                logging.error("PAUL: has_mmu set to True")
                 self.has_mmu = True
 
         self.tools = sorted(self.tools)
@@ -243,16 +242,14 @@ class Printer:
         return self.get_config_section_list("temperature_sensor")
 
     def get_filament_sensors(self):
-        logging.error("PAUL: get_filament_sensors()")
         mmu_gate_sensors = r"^filament_switch_sensor mmu_.*_\d+$" # Happy Hare - v3 legacy lookup
         if self.sensors is None:
-            self.sensors = [x for x in list(self.get_config_section_list("filament_switch_sensor ")) if not re.match(mmu_gate_sensors, x)] # Happy Hare" filter out "gate" sensors -- too many
+            # Happy Hare" filter out "gate" sensors -- too many and creates clutter in the UI
+            self.sensors = [x for x in list(self.get_config_section_list("filament_switch_sensor ")) if not re.match(mmu_gate_sensors, x)]
             self.sensors.extend(iter(self.get_config_section_list("filament_motion_sensor ")))
-        logging.error(f"PAUL: ********** get_filament_sensors() ==> {self.sensors}")
         return self.sensors
 
     def get_mmu_encoders(self): # Happy Hare - v3 legacy lookup
-        logging.error(f"PAUL: get_mmu_encoders() ==> {list(self.get_config_section_list('mmu_encoder'))}")
         return list(self.get_config_section_list("mmu_encoder"))
 
     def get_probe(self):

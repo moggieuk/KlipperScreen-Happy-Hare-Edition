@@ -299,6 +299,13 @@ class KlipperScreenConfig:
                 self.errors.append(f"Section [{section}] not recognized")
 
             for key in config[section]:
+
+                # Happy Hare added temporary upgrade hack (Not sure if this is needed anymore)
+                if section == "main" and key == "mmu_use_spoolman":
+                    self.config.remove_option(section, key)
+                    self.config.set(section, key, "True")
+                    continue
+
                 if key not in bools and key not in strs and key not in numbers:
                     msg = f'Option "{key}" not recognized for section "[{section}]"'
                     if section.startswith("menu"):
@@ -327,11 +334,6 @@ class KlipperScreenConfig:
                     or key in bools
                     and not self.is_bool(config[section][key])
                 ):
-                    if key == "mmu_use_spoolman": # Happy Hare added temporary upgrade hack (Not sure if this is needed anymore)
-                        logging.error("PAUL: *************** mmu_use_spoolman hook activated?")
-                        self.config.remove_option(section, key)
-                        self.config.set(section, key, "True")
-                        continue
                     msg = (
                         f'Unable to parse "{key}" from [{section}]\n'
                         f"Expected a "

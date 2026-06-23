@@ -116,7 +116,6 @@ class Panel(ScreenPanel, MmuMixin):
 
 
     def load_spools(self, *args):
-        logging.error("PAUL: mmu_spoolman.load_spools()")
         hide_archived = self._config.get_config().getboolean(
             "spoolman", "hide_archived", fallback=True
         )

@@ -80,6 +80,19 @@ button.color4 {
     border-radius: 1em;
 }
 
+button:focus,
+button.color1:focus,
+button.color2:focus,
+button.color3:focus,
+button.color4:focus,
+button.update:focus,
+button.invalid:focus,
+.dialog button:focus
+{
+    outline: .1em dashed @active;
+    outline-offset: .1em;
+}
+
 button.color1:active,
 button.color2:active,
 button.color3:active,
@@ -88,6 +101,8 @@ button.update:active,
 button.invalid:active,
 .dialog button:active {
     border-style: none;
+    margin-top: 0.6em;
+    box-shadow: 0 0;
 }
 
 button.active {

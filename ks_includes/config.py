@@ -7,16 +7,17 @@ import logging
 import os
 import pathlib
 import re
+import traceback  # noqa
 from io import StringIO
 
 SCREEN_BLANKING_OPTIONS = [
-    60,     # 1 Minute
-    120,    # 2 Minutes
-    300,    # 5 Minutes
-    900,    # 15 Minutes
-    1800,   # 30 Minutes
-    3600,   # 1 Hour
-    7200,   # 2 Hours
+    60,  # 1 Minute
+    120,  # 2 Minutes
+    300,  # 5 Minutes
+    900,  # 15 Minutes
+    1800,  # 30 Minutes
+    3600,  # 1 Hour
+    7200,  # 2 Hours
     14400,  # 4 Hours
 ]
 
@@ -43,37 +44,46 @@ class KlipperScreenConfig:
         self.config = configparser.ConfigParser()
         self.config_path = self.get_config_file_location(configfile)
         logging.debug(f"Config path location: {self.config_path}")
-        self.defined_config = None
+        self.user_cfg = None
         self.lang = None
         self.langs = {}
 
         try:
+            # parse defaults.conf
             self.config.read(self.default_config_path)
             includes = [i[8:] for i in self.config.sections() if i.startswith("include ")]
             for include in includes:
-                self._include_config("/".join(self.default_config_path.split("/")[:-1]), include, log=False)
-            # In case a user altered defaults.conf
-            self.validate_config(self.config)
+                directory = "/".join(self.default_config_path.split("/")[:-1])
+                self._include_config(self.config, directory, include, log=False)
+            self.validate_config(self.config)  # In case a user altered defaults
+            # parse KlipperScreen.conf
             if self.config_path != self.default_config_path:
                 user_def, saved_def = self.separate_saved_config(self.config_path)
-                self.defined_config = configparser.ConfigParser()
-                self.defined_config.read_string(user_def)
+                self.user_cfg = configparser.ConfigParser()
+                self.user_cfg.read_string(user_def)
 
-                includes = [i[8:] for i in self.defined_config.sections() if i.startswith("include ")]
+                includes = [i[8:] for i in self.user_cfg.sections() if i.startswith("include ")]
                 for include in includes:
-                    self._include_config("/".join(self.config_path.split("/")[:-1]), include)
+                    directory = "/".join(self.config_path.split("/")[:-1])
+                    self._include_config(self.user_cfg, directory, include)
 
-                self.exclude_from_config(self.defined_config)
+                if not self.user_cfg.getboolean("main", "use_default_menu", fallback=True):
+                    self.exclude_menu_from_config(self.config)
 
-                self.log_config(self.defined_config)
-                if self.validate_config(self.defined_config, string=user_def):
-                    self.config.read_string(user_def)
+                if any(sec.startswith("preheat") for sec in self.user_cfg.sections()):
+                    self.exclude_preheat_from_config(self.config)
+
+                self.log_config(self.user_cfg)
+                if self.validate_config(self.user_cfg, string=user_def):
+                    merged_user_text = self._build_config_string(self.user_cfg)
+                    self.config.read_string(merged_user_text)  # Merge user config
+                # Parse configs saved from the UI
                 if saved_def is not None:
                     auto_gen = configparser.ConfigParser()
                     auto_gen.read_string(saved_def)
                     if self.validate_config(auto_gen, string=saved_def, remove=True):
-                        self.config.read_string(saved_def)
-                        logging.info(f"====== Saved Def ======\n{saved_def}\n=======================")
+                        self.config.read_string(saved_def)  # Merge ui saved config
+                        logging.info(f"\n====== Saved ======\n{saved_def}\n")
 
             # Happy Hare: Allow for menus to be dual rooted without duplicating config
             for i in self.config.sections():
@@ -112,21 +122,32 @@ class KlipperScreenConfig:
         if not printers:
             printers.append("Printer Printer")
         self.printers = [
-            {printer[8:]: {
-                "moonraker_host": self.config.get(printer, "moonraker_host", fallback="127.0.0.1"),
-                "moonraker_port": self.config.get(printer, "moonraker_port", fallback="7125"),
-                "moonraker_path": self.config.get(printer, "moonraker_path", fallback='').strip('/'),
-                "moonraker_ssl": self.config.getboolean(printer, "moonraker_ssl", fallback=None),
-                "moonraker_api_key": self.config.get(printer, "moonraker_api_key", fallback="").replace('"', '')
-            }} for printer in printers
+            {
+                printer[8:]: {
+                    "moonraker_host": self.config.get(
+                        printer, "moonraker_host", fallback="127.0.0.1"
+                    ),
+                    "moonraker_port": self.config.get(printer, "moonraker_port", fallback="7125"),
+                    "moonraker_path": self.config.get(printer, "moonraker_path", fallback="").strip(
+                        "/"
+                    ),
+                    "moonraker_ssl": self.config.getboolean(
+                        printer, "moonraker_ssl", fallback=None
+                    ),
+                    "moonraker_api_key": self.config.get(
+                        printer, "moonraker_api_key", fallback=""
+                    ).replace('"', ""),
+                }
+            }
+            for printer in printers
         ]
 
         conf_printers_debug = copy.deepcopy(self.printers)
         for printer in conf_printers_debug:
             name = list(printer)[0]
             item = conf_printers_debug[conf_printers_debug.index(printer)]
-            if item[name]['moonraker_api_key'] != "":
-                item[name]['moonraker_api_key'] = "redacted"
+            if item[name]["moonraker_api_key"] != "":
+                item[name]["moonraker_api_key"] = "redacted"
         logging.debug(f"Configured printers: {json.dumps(conf_printers_debug, indent=2)}")
 
         self.create_translations()
@@ -134,10 +155,14 @@ class KlipperScreenConfig:
 
     def create_translations(self):
         lang_path = os.path.join(klipperscreendir, "ks_includes", "locales")
-        self.lang_list = [d for d in os.listdir(lang_path) if not os.path.isfile(os.path.join(lang_path, d))]
+        self.lang_list = [
+            d for d in os.listdir(lang_path) if not os.path.isfile(os.path.join(lang_path, d))
+        ]
         self.lang_list.sort()
         for lng in self.lang_list:
-            self.langs[lng] = gettext.translation('KlipperScreen', localedir=lang_path, languages=[lng], fallback=True)
+            self.langs[lng] = gettext.translation(
+                "KlipperScreen", localedir=lang_path, languages=[lng], fallback=True
+            )
 
         lang = self.get_main_config().get("language", "system_lang")
         logging.debug(f"Selected lang: {lang} OS lang: {locale.getlocale()[0]}")
@@ -160,7 +185,7 @@ class KlipperScreenConfig:
             lang = self.find_language(lang)
         logging.info(f"Using lang {lang}")
         self.lang = self.langs[lang]
-        self.lang.install(names=['gettext', 'ngettext'])
+        self.lang.install(names=["gettext", "ngettext"])
 
     def validate_config(self, config, string="", remove=False):
         valid = True
@@ -173,58 +198,113 @@ class KlipperScreenConfig:
 #                    self.errors.append(f'{msg}\n\n{line}')
 #                    return False
         for section in config:
-            if section == 'DEFAULT' or section.startswith('include '):
+            if section == "DEFAULT" or section.startswith("include "):
                 # Do not validate 'DEFAULT' or 'include*' sections
                 continue
             bools = strs = numbers = ()
-            if section == 'main':
+            if section == "main":
                 bools = (
-                    'invert_x', 'invert_y', 'invert_z', '24htime', 'only_heaters', 'show_cursor', 'confirm_estop',
-                    'autoclose_popups', 'use_dpms', 'use_default_menu', 'side_macro_shortcut', 'use-matchbox-keyboard',
-                    'show_heater_power', "show_scroll_steppers", "auto_open_extrude"
-                    'side_mmu_shortcut', 'mmu_color_gates', 'mmu_color_filament', 'mmu_bold_filament', "mmu_use_spoolman", # Happy Hare
+                    "invert_x",
+                    "invert_y",
+                    "invert_z",
+                    "24htime",
+                    "only_heaters",
+                    "show_cursor",
+                    "confirm_estop",
+                    "autoclose_popups",
+                    "use_dpms",
+                    "use_default_menu",
+                    "side_macro_shortcut",  # Deprecated
+                    "use-matchbox-keyboard",
+                    "show_heater_power",
+                    "show_scroll_steppers",
+                    "auto_open_extrude",
+                    "start_locked",
+                    "keyboard_navigation",
+                    'side_mmu_shortcut',  # Happy Hare
+                    'mmu_color_gates',    # Happy Hare
+                    'mmu_color_filament', # Happy Hare
+                    'mmu_bold_filament',  # Happy Hare
+                    "mmu_use_spoolman",   # Happy Hare
                 )
                 strs = (
-                    'default_printer', 'language', 'print_sort_dir', 'theme', 'screen_blanking_printing', 'font_size',
-                    'print_estimate_method', 'screen_blanking', "screen_on_devices", "screen_off_devices", 'print_view',
-                    'sticky_panel', # Happy Hare
-                    "lock_password"
+                    "default_printer",
+                    "language",
+                    "print_sort_dir",
+                    "theme",
+                    "screen_blanking_printing",
+                    "font_size",
+                    "print_estimate_method",
+                    "screen_blanking",
+                    "screen_on_devices",
+                    "screen_off_devices",
+                    "print_view",
+                    'sticky_panel',       # Happy Hare PAUL
+                    "lock_password",
+                    "side_shortcut_target",
                 )
                 numbers = (
-                    'job_complete_timeout', 'job_error_timeout', 'move_speed_xy', 'move_speed_z',
-                    'print_estimate_compensation', 'width', 'height',
+                    "job_complete_timeout",
+                    "job_error_timeout",
+                    "move_speed_xy",
+                    "move_speed_z",
+                    "print_estimate_compensation",
+                    "width",
+                    "height",
+                    "autolock_timeout",
+                    "screensaver_wake_delay",
                 )
-            elif section.startswith('printer '):
+            elif section.startswith("printer "):
                 bools = (
-                    'invert_x', 'invert_y', 'invert_z', 'moonraker_ssl',
+                    "invert_x",
+                    "invert_y",
+                    "invert_z",
+                    "moonraker_ssl",
                 )
                 strs = (
-                    'moonraker_api_key', 'moonraker_host', 'moonraker_path', 'titlebar_name_type',
-                    'screw_positions', 'power_devices', 'titlebar_items', 'z_babystep_values',
-                    'extrude_distances', 'extrude_speeds', 'move_distances', 'zcalibrate_custom_commands'
+                    "moonraker_api_key",
+                    "moonraker_host",
+                    "moonraker_path",
+                    "titlebar_name_type",
+                    "screw_positions",
+                    "power_devices",
+                    "titlebar_items",
+                    "hidden_sensors",
+                    "z_babystep_values",
+                    "extrude_distances",
+                    "extrude_speeds",
+                    "move_distances",
+                    "zcalibrate_custom_commands",
                 )
                 numbers = (
-                    'moonraker_port', 'move_speed_xy', 'move_speed_z', 'screw_rotation',
-                    'calibrate_x_position', 'calibrate_y_position',
+                    "moonraker_port",
+                    "move_speed_xy",
+                    "move_speed_z",
+                    "screw_rotation",
+                    "calibrate_x_position",
+                    "calibrate_y_position",
+                    "spool_low_limit",
                 )
-            elif section.startswith('preheat '):
-                strs = ('gcode', '')
-                numbers = [f'{option}' for option in config[section] if option != 'gcode']
-            elif section.startswith('menu '):
-                strs = ('name', 'icon', 'panel', 'method', 'params', 'enable', 'confirm', 'style', 'show_disabled', 'refresh_on') # Happy Hare: Added show_disabled, refresh_on
-            elif section.startswith('graph')\
-                    or section.startswith('displayed_macros')\
-                    or section.startswith('spoolman'):
-                bools = [f'{option}' for option in config[section]]
+            elif section.startswith("preheat "):
+                strs = ("gcode", "")
+                numbers = [f"{option}" for option in config[section] if option != "gcode"]
+            elif section.startswith("menu "):
+                strs = ("name", "icon", "panel", "method", "params", "enable", "confirm", "style", 'show_disabled', 'refresh_on') # Happy Hare: Added show_disabled, refresh_on
+            elif section.startswith("graph") or section.startswith("displayed_macros"):
+                bools = [f"{option}" for option in config[section]]
+            elif section.startswith("spoolman"):
+                numbers = ("sync_rate", "spool_low_limit")
+                bools = "hide_archived"
             else:
-                self.errors.append(f'Section [{section}] not recognized')
+                self.errors.append(f"Section [{section}] not recognized")
 
             for key in config[section]:
                 if key not in bools and key not in strs and key not in numbers:
                     msg = f'Option "{key}" not recognized for section "[{section}]"'
                     if section.startswith("menu"):
                         msg = (
-                            msg + "\n\n"
+                            msg
+                            + "\n\n"
                             + "KlipperScreen menu uses different options than Klipper\n"
                             + "Syntax meant for text/graphical LCDs (usually blue)\n"
                             + "will not work with KlipperScreen\n"
@@ -244,15 +324,25 @@ class KlipperScreenConfig:
                 elif key in numbers and not self.is_float(config[section][key]) \
                         or key in bools and not self.is_bool(config[section][key]):
                     if key == "mmu_use_spoolman": # Happy Hare added temporary upgrade hack
+                        logging.error("PAUL: mmu_use_spoolman hook activated?")
                         self.config.remove_option(section, key)
                         self.config.set(section, key, "True")
                         continue
+# PAUL current orig
+#                elif (
+#                    key in numbers
+#                    and not self.is_float(config[section][key])
+#                    or key in bools
+#                    and not self.is_bool(config[section][key])
+#                ):
                     msg = (
                         f'Unable to parse "{key}" from [{section}]\n'
-                        f'Expected a {"number" if key in numbers else "boolean"} but got: {config[section][key]}'
+                        f"Expected a "
+                        f"{'number' if key in numbers else 'boolean'} "
+                        f"but got: {config[section][key]}"
                     )
                     self.errors.append(msg)
-                    logging.error('Invalid configuration detected !!!')
+                    logging.error("Invalid configuration detected !!!")
                     valid = False
         return valid
 
@@ -269,104 +359,282 @@ class KlipperScreenConfig:
         return element in ["False", "false", "True", "true"]
 
     def get_errors(self):
-        return "".join(f'{error}\n\n' for error in self.errors)
+        return "".join(f"{error}\n\n" for error in self.errors)
 
     def _create_configurable_options(self, screen):
-
         self.configurable_options = [
-            {"theme": {
-                "section": "main", "name": _("Icon Theme"), "type": "dropdown",
-                "tooltip": _("Changes how the interface looks"),
-                "value": "z-bolt", "callback": screen.change_theme, "options": [
-                    {"name": "Z-bolt" + " " + _("(default)"), "value": "z-bolt"}]}},
-            {"print_estimate_method": {
-                "section": "main", "name": _("Estimated Time Method"), "type": "dropdown",
-                "tooltip": _("Changes how the time remaining is calculated"),
-                "value": "auto", "options": [
-                    {"name": _("Auto") + " " + _("(default)"), "value": "auto"},
-                    {"name": _("File"), "value": "file"},
-                    {"name": _("Filament Used"), "value": "filament"},
-                    {"name": _("Slicer"), "value": "slicer"}]}},
-            {"screen_blanking": {
-                "section": "main", "name": _("Screen Power Off Time"), "type": "dropdown",
-                "tooltip": _("Timeout for screen black-out or power-off"),
-                "value": "3600", "callback": screen.set_screenblanking_timeout, "options": [
-                    {"name": _("Never"), "value": "off"}]
-            }},
-            {"screen_blanking_printing": {
-                "section": "main", "name": _("Screen Power Off Time") + " (" + _("Printing") + ")",
-                "type": "dropdown",
-                "tooltip": _("Timeout for screen black-out or power-off during printing"),
-                "value": "3600", "callback": screen.set_screenblanking_printing_timeout, "options": [
-                    {"name": _("Never"), "value": "off"}]
-            }},
-            {"24htime": {"section": "main", "name": _("24 Hour Time"), "type": "binary",
-                         "tooltip": _("Disable for 12hs with am / pm"),
-                         "value": "True"}},
-            {"side_macro_shortcut": {
-                "section": "main", "name": _("Macro shortcut on sidebar"), "type": "binary",
-                "value": "True", "callback": screen.toggle_shortcut}},
-            {"side_mmu_shortcut": { # Happy Hare vvv
-                "section": "main", "name": _("MMU shortcut on sidebar"), "type": "binary",
-                "value": "True", "callback": screen.toggle_mmu_shortcut}},
-            {"mmu_color_gates": {
-                "section": "main", "name": _("MMU show color in gates"), "type": "binary",
-                "value": "True"}},
-            {"mmu_color_filament": {
-                "section": "main", "name": _("MMU show colored filament"), "type": "binary",
-                "value": "True"}},
-            {"mmu_bold_filament": {
-                "section": "main", "name": _("MMU show bold filament"), "type": "binary",
-                "value": "True"}},
-            {"mmu_use_spoolman": {
-                "section": "main", "name": _("MMU use SpoolMan for filaments"), "type": "binary",
-                "value": "False"}}, # Happy Hare ^^^
-            {"font_size": {
-                "section": "main", "name": _("Font Size"), "type": "dropdown",
-                "tooltip": _("Inversely affects the icon size"),
-                "value": "medium", "callback": screen.restart_ks, "options": [
-                    {"name": _("Small"), "value": "small"},
-                    {"name": _("Medium") + " " + _("(default)"), "value": "medium"},
-                    {"name": _("Large"), "value": "large"},
-                    {"name": _("Extra Large"), "value": "extralarge"},
-                    {"name": _("Maximum"), "value": "max"}]}},
-            {"confirm_estop": {"section": "main", "name": _("Confirm Emergency Stop"), "type": "binary",
-                               "tooltip": _("Asks for confirmation before stopping"),
-                               "value": "False"}},
-            {"only_heaters": {"section": "main", "name": _("Hide sensors in Temp."), "type": "binary",
-                              "tooltip": _("Show only devices that are able to be set"),
-                              "value": "False", "callback": screen.reload_panels}},
-            {"use_dpms": {"section": "main", "name": _("Screen DPMS"), "type": "binary",
-                          "tooltip": _("Enable screen power management") + "\n"
-                                     + _("Not all screens support this"),
-                          "value": "True", "callback": screen.set_dpms}},
-            {"autoclose_popups": {"section": "main", "name": _("Auto-close notifications"), "type": "binary",
-                                  "tooltip": _("Close messages after a timeout"),
-                                  "value": "True"}},
-            {"show_heater_power": {"section": "main", "name": _("Show Heater Power"), "type": "binary",
-                                   "tooltip": _("Current percentage and graph line"),
-                                   "value": "False", "callback": screen.reload_panels}},
-            {"show_scroll_steppers": {"section": "main", "name": _("Show Scrollbars Buttons"), "type": "binary",
-                                      "tooltip": _("Useful for un-responsive touchscreens"),
-                                      "value": "False", "callback": screen.reload_panels}},
-            {"auto_open_extrude": {"section": "main", "name": _("Auto-open Extrude On Pause"), "type": "binary",
-                                   "value": "True", "callback": screen.reload_panels}},
-            {"show_cursor": {"section": "main", "name": _("Show cursor"), "type": "binary",
-                             "tooltip": _("For mouse control or to verify touchscreen accuracy"),
-                             "value": "False", "callback": screen.update_cursor}},
+            {
+                "theme": {
+                    "section": "main",
+                    "name": _("Icon Theme"),
+                    "type": "dropdown",
+                    "tooltip": _("Changes how the interface looks"),
+                    "value": "z-bolt",
+                    "callback": screen.change_theme,
+                    "options": [{"name": "Z-bolt" + " " + _("(default)"), "value": "z-bolt"}],
+                }
+            },
+            {
+                "print_estimate_method": {
+                    "section": "main",
+                    "name": _("Estimated Time Method"),
+                    "type": "dropdown",
+                    "tooltip": _("Changes how the time remaining is calculated"),
+                    "value": "auto",
+                    "options": [
+                        {"name": _("Auto") + " " + _("(default)"), "value": "auto"},
+                        {"name": _("File"), "value": "file"},
+                        {"name": _("Filament Used"), "value": "filament"},
+                        {"name": _("Slicer"), "value": "slicer"},
+                    ],
+                }
+            },
+            {
+                "screen_blanking": {
+                    "section": "main",
+                    "name": _("Screen Power Off Time"),
+                    "type": "dropdown",
+                    "tooltip": _("Timeout for screen black-out or power-off"),
+                    "value": "3600",
+                    "callback": screen.set_screenblanking_timeout,
+                    "options": [{"name": _("Never"), "value": "off"}],
+                }
+            },
+            {
+                "screen_blanking_printing": {
+                    "section": "main",
+                    "name": _("Screen Power Off Time") + " (" + _("Printing") + ")",
+                    "type": "dropdown",
+                    "tooltip": _("Timeout for screen black-out or power-off during printing"),
+                    "value": "3600",
+                    "callback": screen.set_screenblanking_printing_timeout,
+                    "options": [{"name": _("Never"), "value": "off"}],
+                }
+            },
+            {
+                "24htime": {
+                    "section": "main",
+                    "name": _("24 Hour Time"),
+                    "type": "binary",
+                    "tooltip": _("Disable for 12hs with am / pm"),
+                    "value": "True",
+                }
+            },
+            { # Happy Hare vvv
+                "side_mmu_shortcut": {
+                    "section": "main", "name": _("MMU shortcut on sidebar"), "type": "binary",
+                    "value": "True", "callback": screen.toggle_mmu_shortcut,
+                }
+            },
+            {
+                "mmu_color_gates": {
+                    "section": "main", "name": _("MMU show color in gates"), "type": "binary",
+                    "value": "True",
+                }
+            },
+            {
+                "mmu_color_filament": {
+                    "section": "main", "name": _("MMU show colored filament"), "type": "binary",
+                    "value": "True",
+                }
+            },
+            {
+                "mmu_bold_filament": {
+                    "section": "main", "name": _("MMU show bold filament"), "type": "binary",
+                    "value": "True",
+                }
+            },
+            {
+                "mmu_use_spoolman": {
+                    "section": "main", "name": _("MMU use SpoolMan for filaments"), "type": "binary",
+                    "value": "False",
+                }
+            }, # Happy Hare ^^^
+            {
+                "side_shortcut_target": {
+                    "section": "main",
+                    "name": _("Action bar Shortcut"),
+                    "type": "dropdown",
+                    "value": "notifications",
+                    "callback": screen.update_shortcut,
+                    "options": [
+                        {"name": _("Notifications"), "value": "notifications"},
+                        {"name": _("Lock"), "value": "lock_screen"},
+                        {"name": _("Macros"), "value": "gcode_macros"},
+                        {"name": _("Camera"), "value": "camera"},
+                        {"name": _("LEDs"), "value": "led"},
+                    ],
+                }
+            },
+            {
+                "font_size": {
+                    "section": "main",
+                    "name": _("Font Size"),
+                    "type": "dropdown",
+                    "tooltip": _("Inversely affects the icon size"),
+                    "value": "medium",
+                    "callback": screen.restart_ks,
+                    "options": [
+                        {"name": _("Small"), "value": "small"},
+                        {"name": _("Medium") + " " + _("(default)"), "value": "medium"},
+                        {"name": _("Large"), "value": "large"},
+                        {"name": _("Extra Large"), "value": "extralarge"},
+                        {"name": _("Maximum"), "value": "max"},
+                    ],
+                }
+            },
+            {
+                "confirm_estop": {
+                    "section": "main",
+                    "name": _("Confirm Emergency Stop"),
+                    "type": "binary",
+                    "tooltip": _("Asks for confirmation before stopping"),
+                    "value": "False",
+                }
+            },
+            {
+                "only_heaters": {
+                    "section": "main",
+                    "name": _("Hide sensors in Temp."),
+                    "type": "binary",
+                    "tooltip": _("Show only devices that are able to be set"),
+                    "value": "False",
+                    "callback": screen.reload_panels,
+                }
+            },
+            {
+                "use_dpms": {
+                    "section": "main",
+                    "name": _("Screen DPMS"),
+                    "type": "binary",
+                    "tooltip": _("Enable screen power management")
+                    + "\n"
+                    + _("Not all screens support this"),
+                    "value": "True",
+                    "callback": screen.set_dpms,
+                }
+            },
+            {
+                "autoclose_popups": {
+                    "section": "main",
+                    "name": _("Auto-close notifications"),
+                    "type": "binary",
+                    "tooltip": _("Close messages after a timeout"),
+                    "value": "True",
+                }
+            },
+            {
+                "show_heater_power": {
+                    "section": "main",
+                    "name": _("Show Heater Power"),
+                    "type": "binary",
+                    "tooltip": _("Current percentage and graph line"),
+                    "value": "False",
+                    "callback": screen.reload_panels,
+                }
+            },
+            {
+                "show_scroll_steppers": {
+                    "section": "main",
+                    "name": _("Show Scrollbars Buttons"),
+                    "type": "binary",
+                    "tooltip": _("Useful for un-responsive touchscreens"),
+                    "value": "False",
+                    "callback": screen.reload_panels,
+                }
+            },
+            {
+                "auto_open_extrude": {
+                    "section": "main",
+                    "name": _("Auto-open Extrude On Pause"),
+                    "type": "binary",
+                    "value": "True",
+                    "callback": screen.reload_panels,
+                }
+            },
+            {
+                "show_cursor": {
+                    "section": "main",
+                    "name": _("Show cursor"),
+                    "type": "binary",
+                    "tooltip": _("For mouse control or to verify touchscreen accuracy"),
+                    "value": "False",
+                    "callback": screen.update_cursor,
+                }
+            },
+            {
+                "screensaver_wake_delay": {
+                    "section": "main",
+                    "name": _("Screen wake delay"),
+                    "type": "dropdown",
+                    "tooltip": _("Helps to prevent unwanted touchs during screen wake up"),
+                    "value": "0",
+                    "callback": screen.set_screensaver_wake_delay,
+                    "options": [
+                        {"name": "0 " + ngettext("second", "seconds", 0), "value": "0"},
+                        {"name": "1 " + ngettext("second", "seconds", 1), "value": "1"},
+                        {"name": "2 " + ngettext("second", "seconds", 2), "value": "2"},
+                        {"name": "3 " + ngettext("second", "seconds", 3), "value": "3"},
+                        {"name": "4 " + ngettext("second", "seconds", 4), "value": "4"},
+                        {"name": "5 " + ngettext("second", "seconds", 5), "value": "5"},
+                    ],
+                }
+            },
             # {"": {"section": "main", "name": _(""), "type": ""}}
         ]
 
         # Options that are in panels and shouldn't be added to the main settings
         panel_options = [
-            {"invert_x": {"section": "main", "name": _("Invert X"), "type": None, "value": "False"}},
-            {"invert_y": {"section": "main", "name": _("Invert Y"), "type": None, "value": "False"}},
-            {"invert_z": {"section": "main", "name": _("Invert Z"), "type": None, "value": "False"}},
-            {"move_speed_xy": {"section": "main", "name": _("XY Move Speed (mm/s)"), "type": None, "value": "50"}},
-            {"move_speed_z": {"section": "main", "name": _("Z Move Speed (mm/s)"), "type": None, "value": "10"}},
+            {
+                "invert_x": {
+                    "section": "main",
+                    "name": _("Invert X"),
+                    "type": None,
+                    "value": "False",
+                }
+            },
+            {
+                "invert_y": {
+                    "section": "main",
+                    "name": _("Invert Y"),
+                    "type": None,
+                    "value": "False",
+                }
+            },
+            {
+                "invert_z": {
+                    "section": "main",
+                    "name": _("Invert Z"),
+                    "type": None,
+                    "value": "False",
+                }
+            },
+            {
+                "move_speed_xy": {
+                    "section": "main",
+                    "name": _("XY Move Speed (mm/s)"),
+                    "type": None,
+                    "value": "50",
+                }
+            },
+            {
+                "move_speed_z": {
+                    "section": "main",
+                    "name": _("Z Move Speed (mm/s)"),
+                    "type": None,
+                    "value": "10",
+                }
+            },
             {"print_sort_dir": {"section": "main", "type": None, "value": "name_asc"}},
             {"print_view": {"section": "main", "type": None, "value": "thumbs"}},
-            {"language": {"section": "main", "name": _("Language"), "type": None, "value": "system_lang"}},
+            {
+                "language": {
+                    "section": "main",
+                    "name": _("Language"),
+                    "type": None,
+                    "value": "system_lang",
+                }
+            },
         ]
 
         self.configurable_options.extend(panel_options)
@@ -382,87 +650,122 @@ class KlipperScreenConfig:
             if i0 and i1 and i2:
                 break
 
-        t_path = os.path.join(klipperscreendir, 'styles')
+        t_path = os.path.join(klipperscreendir, "styles")
         themes = [
-            d for d in os.listdir(t_path)
-            if (not os.path.isfile(os.path.join(t_path, d))
-                and d not in ("z-bolt", "printers"))
+            d
+            for d in os.listdir(t_path)
+            if (not os.path.isfile(os.path.join(t_path, d)) and d not in ("z-bolt", "printers"))
         ]
         themes.sort()
 
         for theme in themes:
-            self.configurable_options[i0]['theme']['options'].append({"name": theme, "value": theme})
+            self.configurable_options[i0]["theme"]["options"].append(
+                {"name": theme, "value": theme}
+            )
 
         for num in SCREEN_BLANKING_OPTIONS:
             hour = num // 3600
             minute = num // 60
             if hour > 0:
-                name = f'{hour} ' + ngettext("hour", "hours", hour)
+                name = f"{hour} " + ngettext("hour", "hours", hour)
             else:
-                name = f'{minute} ' + ngettext("minute", "minutes", minute)
-            self.configurable_options[i1]['screen_blanking']['options'].append({
-                "name": name,
-                "value": f"{num}"
-            })
-            self.configurable_options[i2]['screen_blanking_printing']['options'].append({
-                "name": name,
-                "value": f"{num}"
-            })
+                name = f"{minute} " + ngettext("minute", "minutes", minute)
+            self.configurable_options[i1]["screen_blanking"]["options"].append(
+                {"name": name, "value": f"{num}"}
+            )
+            self.configurable_options[i2]["screen_blanking_printing"]["options"].append(
+                {"name": name, "value": f"{num}"}
+            )
+
+        # Migrate old side_macro_shortcut to side_shortcut_target
+        if self.config.getboolean("main", "side_macro_shortcut", fallback=False):
+            self.config.set("main", "side_shortcut_target", "gcode_macros")
 
         for item in self.configurable_options:
             name = list(item)[0]
             vals = item[name]
-            if vals['section'] not in self.config.sections():
-                self.config.add_section(vals['section'])
-            if name not in list(self.config[vals['section']]):
-                self.config.set(vals['section'], name, vals['value'])
+            if vals["section"] not in self.config.sections():
+                self.config.add_section(vals["section"])
+            if name not in list(self.config[vals["section"]]):
+                self.config.set(vals["section"], name, vals["value"])
 
-    def exclude_from_config(self, config):
-        exclude_list = ['preheat']
-        if self.defined_config and not self.defined_config.getboolean('main', "use_default_menu", fallback=True):
-            logging.info("Using custom menu, removing default menu entries.")
-            exclude_list.extend(('menu __main', 'menu __print', 'menu __splashscreen'))
-        for i in exclude_list:
-            for j in config.sections():
-                if j.startswith(i):
-                    for k in list(self.config.sections()):
-                        if k.startswith(i):
-                            del self.config[k]
+    def exclude_menu_from_config(self, config):
+        logging.info("Using custom menu, removing default menu entries.")
+        exclude_list = ("menu __main", "menu __print", "menu __splashscreen")
+        self.exclude_from_config(config, exclude_list)
 
-    def _include_config(self, directory, filepath, log=True):
-        full_path = filepath if filepath[0] == "/" else f"{directory}/{filepath}"
-        parse_files = []
+    def exclude_preheat_from_config(self, config):
+        exclude_list = ("preheat",)
+        self.exclude_from_config(config, exclude_list)
+
+    def exclude_from_config(self, config, exclude_list):
+        for prefix in exclude_list:
+            if any(sec.startswith(prefix) for sec in config.sections()):
+                for key in list(self.config.keys()):
+                    if key.startswith(prefix):
+                        del self.config[key]
+
+    def _include_config(
+        self,
+        config_to_integrate: configparser.ConfigParser,
+        base_dir: str,
+        filepath: str,
+        log: bool = True,
+    ) -> None:
+        # ---------- Resolve absolute path ----------
+        if os.path.isabs(filepath):
+            full_path = filepath
+        else:
+            full_path = os.path.join(base_dir, filepath)
+
+        files_to_process = []
 
         if "*" in full_path:
-            parent_dir = "/".join(full_path.split("/")[:-1])
-            file = full_path.split("/")[-1]
-            if not os.path.exists(parent_dir):
-                logging.error(f"Config Error: Directory {parent_dir} does not exist")
-                return
-            files = os.listdir(parent_dir)
-            regex = f"^{file.replace('*', '.*')}$"
-            parse_files.extend(os.path.join(parent_dir, file) for file in files if re.match(regex, file))
+            parent_dir = os.path.dirname(full_path)
+            pattern = re.escape(os.path.basename(full_path)).replace(r"\*", r".*")
+            regex = re.compile(f"^{pattern}$")
 
+            try:
+                for fname in os.listdir(parent_dir):
+                    if regex.match(fname):
+                        files_to_process.append(os.path.join(parent_dir, fname))
+            except Exception as e:
+                logging.error(f"Config Error: unable to list directory {parent_dir}: {e}")
+                return
         else:
-            if not os.path.exists(os.path.join(full_path)):
-                logging.error(f"Config Error: {full_path} does not exist")
+            if not os.path.isfile(full_path):
+                logging.error(f"Config Error: include file '{full_path}' does not exist")
                 return
-            parse_files.append(full_path)
+            files_to_process.append(full_path)
 
-        logging.info(f"Parsing files: {parse_files}")
-        for file in parse_files:
-            config = configparser.ConfigParser()
-            config.read(file)
-            includes = [i[8:] for i in config.sections() if i.startswith("include ")]
-            for include in includes:
-                self._include_config("/".join(full_path.split("/")[:-1]), include)
-            self.exclude_from_config(config)
-            if log:
-                self.log_config(config)
-            with open(file, 'r') as f:
-                string = f.read()
-                if self.validate_config(config, string=string):
-                    self.config.read(file)
+        for fp in files_to_process:
+            try:
+                with open(fp, "r", encoding="utf-8") as f:
+                    cfg_text = f.read()
+            except Exception as e:
+                logging.error(f"Config Error: failed to read '{fp}': {e}")
+                continue
+
+            temp_cfg = configparser.ConfigParser()
+            try:
+                temp_cfg.read_string(cfg_text)
+            except Exception as e:
+                logging.error(f"Config Error: failed to parse '{fp}': {e}")
+                continue
+
+            # nested includes
+            nested_includes = [s[8:] for s in temp_cfg.sections() if s.startswith("include ")]
+            for inc_file in nested_includes:
+                self._include_config(
+                    config_to_integrate=config_to_integrate,
+                    base_dir=os.path.dirname(fp),
+                    filepath=inc_file,
+                    log=False,
+                )
+            if self.validate_config(config_to_integrate, string=cfg_text):
+                config_to_integrate.read_string(cfg_text)
+                if log:
+                    self.log_config(config_to_integrate)
 
     def separate_saved_config(self, config_path):
         user_def = []
@@ -472,15 +775,15 @@ class KlipperScreenConfig:
             return ["", None]
         with open(config_path) as file:
             for line in file:
-                line = line.replace('\n', '')
+                line = line.replace("\n", "")
                 if line == self.do_not_edit_line:
                     found_saved = True
                     saved_def = []
                     continue
                 if found_saved is False:
-                    user_def.append(line.replace('\n', ''))
+                    user_def.append(line.replace("\n", ""))
                 elif line.startswith(self.do_not_edit_prefix):
-                    saved_def.append(line[(len(self.do_not_edit_prefix) + 1):])
+                    saved_def.append(line[(len(self.do_not_edit_prefix) + 1) :])
         return ["\n".join(user_def), None if saved_def is None else "\n".join(saved_def)]
 
     @staticmethod
@@ -518,13 +821,13 @@ class KlipperScreenConfig:
         return self.lang
 
     def get_main_config(self):
-        return self.config['main']
+        return self.config["main"]
 
     def get_menu_items(self, menu="__main", subsection=""):
         if subsection != "":
             subsection = f"{subsection} "
         index = f"menu {menu} {subsection}"
-        items = [i[len(index):] for i in self.config.sections() if i.startswith(index)]
+        items = [i[len(index) :] for i in self.config.sections() if i.startswith(index)]
         menu_items = []
         for item in items:
             split = item.split()
@@ -535,18 +838,21 @@ class KlipperScreenConfig:
 
     def get_menu_name(self, menu="__main", subsection=""):
         name = f"menu {menu} {subsection}" if subsection != "" else f"menu {menu}"
-        return False if name not in self.config else self.config[name].get('name')
+        return False if name not in self.config else self.config[name].get("name")
 
     def get_preheat_options(self):
         index = "preheat "
-        items = [i[len(index):] for i in self.config.sections() if i.startswith(index)]
+        items = [i[len(index) :] for i in self.config.sections() if i.startswith(index)]
         return {item: self._build_preheat_item(index + item) for item in items}
 
     def _build_preheat_item(self, name):
         if name not in self.config:
             return False
         cfg = self.config[name]
-        return {opt: cfg.get("gcode", None) if opt == "gcode" else cfg.getfloat(opt, None) for opt in cfg}
+        return {
+            opt: cfg.get("gcode", None) if opt == "gcode" else cfg.getfloat(opt, None)
+            for opt in cfg
+        }
 
     def get_printer_config(self, name):
         if not name.startswith("printer "):
@@ -562,24 +868,31 @@ class KlipperScreenConfig:
         for item in self.configurable_options:
             name = list(item)[0]
             opt = item[name]
-            curval = self.config[opt['section']].get(name)
+            curval = self.config[opt["section"]].get(name)
             if curval != opt["value"] or (
-                    self.defined_config is not None and opt['section'] in self.defined_config.sections() and
-                    self.defined_config[opt['section']].get(name, None) not in (None, curval)):
-                if opt['section'] not in save_config.sections():
-                    save_config.add_section(opt['section'])
-                save_config.set(opt['section'], name, str(curval))
+                self.user_cfg is not None
+                and opt["section"] in self.user_cfg.sections()
+                and self.user_cfg[opt["section"]].get(name, None) not in (None, curval)
+            ):
+                if opt["section"] not in save_config.sections():
+                    save_config.add_section(opt["section"])
+                save_config.set(opt["section"], name, str(curval))
 
         extra_sections = [i for i in self.config.sections() if i.startswith("displayed_macros")]
         extra_sections.extend([i for i in self.config.sections() if i.startswith("graph")])
         extra_sections.extend([i for i in self.config.sections() if i.startswith("spoolman")])
         for section in extra_sections:
             for item in self.config.options(section):
-                value = self.config[section].getboolean(item, fallback=True)
-                if value is False or (self.defined_config is not None and
-                                      section in self.defined_config.sections() and
-                                      self.defined_config[section].getboolean(item, fallback=True) is False and
-                                      self.defined_config[section].getboolean(item, fallback=True) != value):
+                try:
+                    value = self.config[section].getboolean(item, fallback=True)
+                except (ValueError, TypeError):
+                    value = self.config[section].get(item)
+                if value is False or (
+                    value is not None
+                    and self.user_cfg is not None
+                    and section in self.user_cfg.sections()
+                    and str(value) != self.user_cfg[section].get(item, str(value))
+                ):
                     if section not in save_config.sections():
                         save_config.add_section(section)
                     save_config.set(section, item, str(value))
@@ -594,11 +907,12 @@ class KlipperScreenConfig:
         else:
             user_def, saved_def = self.separate_saved_config(self.config_path)
 
-        contents = (f"{user_def}\n"
-                    f"{self.do_not_edit_line}\n"
-                    f"{self.do_not_edit_prefix}\n"
-                    + '\n'.join(save_output) + f"\n"
-                                               f"{self.do_not_edit_prefix}\n")
+        contents = (
+            f"{user_def}\n"
+            f"{self.do_not_edit_line}\n"
+            f"{self.do_not_edit_prefix}\n" + "\n".join(save_output) + f"\n"
+            f"{self.do_not_edit_prefix}\n"
+        )
 
         if self.config_path != self.default_config_path:
             filepath = self.config_path
@@ -613,9 +927,9 @@ class KlipperScreenConfig:
                 except Exception as e:
                     logging.error(e)
                     filepath = klipperscreendir
-            logging.info(f'Creating a new config file in {filepath}')
+            logging.info(f"Creating a new config file in {filepath}")
         try:
-            with open(filepath, 'w') as file:
+            with open(filepath, "w") as file:
                 file.write(contents)
         except Exception as e:
             logging.error(f"Error writing configuration file in {filepath}:\n{e}")
@@ -625,17 +939,13 @@ class KlipperScreenConfig:
 
     def log_config(self, config):
         sensitive_keys = [
-            r'(moonraker_api_key\s*(?:=|:)\s*)\S+',
-            r'(lock_password\s*(?:=|:)\s*)\S+',
+            r"(moonraker_api_key\s*(?:=|:)\s*)\S+",
+            r"(lock_password\s*(?:=|:)\s*)\S+",
         ]
         config_str = self._build_config_string(config)
         for pattern in sensitive_keys:
-            config_str = re.sub(pattern, r'\1[redacted]', config_str)
-        lines = [
-            "===== Config File =====",
-            config_str,
-            "======================="
-        ]
+            config_str = re.sub(pattern, r"\1[redacted]", config_str)
+        lines = ["===== Config File =====", config_str, "======================="]
         logging.info("\n".join(lines))
 
     @staticmethod
@@ -662,4 +972,4 @@ class KlipperScreenConfig:
             "refresh_on": cfg.get("refresh_on", None) # Happy Hare
         }
 
-        return {name[(len(menu) + 6):]: item}
+        return {name[(len(menu) + 6) :]: item}

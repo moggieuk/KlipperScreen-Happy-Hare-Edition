@@ -10,25 +10,20 @@ gi.require_version("Gtk", "3.0")
 
 from gi.repository import Gtk, GLib, Pango
 from ks_includes.screen_panel import ScreenPanel
+from panels.mmu_mixin import *
 
-class Panel(ScreenPanel):
-    TOOL_UNKNOWN = -1
-    TOOL_BYPASS = -2
+NOT_SET = -99
 
-    NOT_SET = -99
+class Panel(ScreenPanel, MmuMixin):
 
     def __init__(self, screen, title):
         super().__init__(screen, title)
 
         # We need to keep track of just a little bit of UI state
-        self.ui_sel_gate = self.NOT_SET
+        self.ui_sel_gate = NOT_SET
         self.ui_action_button_name = self.ui_action_button_label = None
 
-        self.has_bypass = False
-        self.min_gate = 0
-        self.has_bypass = self._printer.get_stat("mmu")['has_bypass']
-        if self.has_bypass:
-            self.min_gate = self.TOOL_BYPASS
+        self.min_gate = TOOL_BYPASS
 
         # btn_states: The "gaps" are what functionality the state takes away. Multiple states are combined
         self.btn_states = {
@@ -141,14 +136,16 @@ class Panel(ScreenPanel):
         scroll.add(grid)
         self.content.add(scroll)
 
-        self.ui_sel_gate = self.NOT_SET
+        self.ui_sel_gate = NOT_SET
         self.ui_action_button_name = None
         self.ui_action_button_label = ""
+
 
     def activate(self):
         self.init_gate_values()
         if self.ui_action_button_name != None:
             self.labels[self.ui_action_button_name].set_label(self.ui_action_button_label)
+
 
     def process_update(self, action, data):
         if action == "notify_status_update":
@@ -170,13 +167,15 @@ class Panel(ScreenPanel):
                             self.labels[self.ui_action_button_name].set_label(action) # Use button to convey action status
                 self.update_active_buttons()
 
+
     def init_gate_values(self):
         # Get starting values
         mmu = self._printer.get_stat("mmu")
-        if self.ui_sel_gate == self.NOT_SET and mmu['gate'] != self.TOOL_UNKNOWN:
+        if self.ui_sel_gate == NOT_SET and mmu['gate'] != TOOL_UNKNOWN:
             self.ui_sel_gate = mmu['gate']
         else:
             self.ui_sel_gate = 0
+
 
     def _get_selector_type(self):
         # v3.1 method... (assume similar units for now)
@@ -192,32 +191,35 @@ class Panel(ScreenPanel):
         # Prior to v3.0
         return 'LinearSelector'
 
+
     def select_gate(self, widget, param=0):
         mmu = self._printer.get_stat("mmu")
         num_gates = len(mmu['gate_status'])
 
         if param < 0 and self.ui_sel_gate > self.min_gate:
             self.ui_sel_gate -= 1
-            if self.ui_sel_gate == self.TOOL_UNKNOWN:
-                self.ui_sel_gate = self.TOOL_BYPASS
+            if self.ui_sel_gate == TOOL_UNKNOWN:
+                self.ui_sel_gate = TOOL_BYPASS
         elif param > 0 and self.ui_sel_gate < num_gates - 1:
             self.ui_sel_gate += 1
-            if self.ui_sel_gate == self.TOOL_UNKNOWN:
+            if self.ui_sel_gate == TOOL_UNKNOWN:
                 self.ui_sel_gate = 0
         elif param == 0:
             self.ui_action_button_name = 'gate'
             self.ui_action_button_label = self.labels[self.ui_action_button_name].get_label()
-            if self.ui_sel_gate == self.TOOL_BYPASS:
+            if self.ui_sel_gate == TOOL_BYPASS:
                 self._screen._ws.klippy.gcode_script(f"MMU_SELECT_BYPASS")
             elif mmu['filament'] != "Loaded":
                 self._screen._ws.klippy.gcode_script(f"MMU_SELECT GATE={self.ui_sel_gate}")
             return
         self.update_gate_buttons()
 
+
     def select_gatebutton(self, widget):
         self.ui_action_button_name = 'gate'
         self.ui_action_button_label = self.labels[self.ui_action_button_name].get_label()
         self._screen._ws.klippy.gcode_script(f"MMU_SELECT GATE={self.ui_sel_gate}")
+
 
     def select_checkgate(self, widget):
         self.ui_action_button_name = 'checkgate'
@@ -226,16 +228,20 @@ class Panel(ScreenPanel):
         current_gate = mmu['gate']
         self._screen._ws.klippy.gcode_script(f"MMU_CHECK_GATE GATE={current_gate} QUIET=1")
 
+
     def select_sync(self, widget):
         self._screen._ws.klippy.gcode_script("MMU_SYNC_GEAR_MOTOR SYNC=1")
 
+
     def select_unsync(self, widget):
         self._screen._ws.klippy.gcode_script("MMU_SYNC_GEAR_MOTOR SYNC=0")
+
 
     def select_load(self, widget):
         self.ui_action_button_name = 'load'
         self.ui_action_button_label = self.labels[self.ui_action_button_name].get_label()
         self._screen._ws.klippy.gcode_script(f"MMU_LOAD")
+
 
     def select_unload_eject(self, widget):
         self.ui_action_button_name = 'unload'
@@ -247,10 +253,12 @@ class Panel(ScreenPanel):
         else:
             self._screen._ws.klippy.gcode_script(f"MMU_EJECT")
 
+
     def select_home(self, widget):
         self.ui_action_button_name = 'home'
         self.ui_action_button_label = self.labels[self.ui_action_button_name].get_label()
         self._screen._ws.klippy.gcode_script(f"MMU_HOME")
+
 
     def select_motors_off(self, widget):
         self._screen._confirm_send_action(
@@ -260,30 +268,38 @@ class Panel(ScreenPanel):
             {'script': "MMU_MOTORS_OFF"}
         )
 
+
     def select_servo_up(self, widget):
         self._screen._ws.klippy.gcode_script(f"MMU_SERVO POS=up")
+
 
     def select_servo_move(self, widget):
         self._screen._ws.klippy.gcode_script(f"MMU_SERVO POS=move")
 
+
     def select_servo_down(self, widget):
         self._screen._ws.klippy.gcode_script(f"MMU_SERVO POS=down")
+
 
     def select_grip(self, widget):
         self._screen._ws.klippy.gcode_script(f"MMU_GRIP")
 
+
     def select_release(self, widget):
         self._screen._ws.klippy.gcode_script(f"MMU_RELEASE")
+
 
     def select_load_extruder(self, widget):
         self.ui_action_button_name = 'load_ext'
         self.ui_action_button_label = self.labels[self.ui_action_button_name].get_label()
         self._screen._ws.klippy.gcode_script(f"MMU_LOAD EXTRUDER_ONLY=1")
 
+
     def select_unload_extruder(self, widget):
         self.ui_action_button_name = 'unload_ext'
         self.ui_action_button_label = self.labels[self.ui_action_button_name].get_label()
         self._screen._ws.klippy.gcode_script(f"MMU_UNLOAD EXTRUDER_ONLY=1")
+
 
     # Dynamically update button sensitivity based on state
     def update_active_buttons(self):
@@ -301,7 +317,7 @@ class Panel(ScreenPanel):
         if enabled:
             ui_state.append("homed" if is_homed else "not_homed")
 
-            if tool == self.TOOL_BYPASS:
+            if tool == TOOL_BYPASS:
                 if filament == "Loaded":
                     ui_state.append("bypass_loaded")
                 elif filament == "Unloaded":
@@ -358,13 +374,14 @@ class Panel(ScreenPanel):
                 gate_sensitive = sensitive
         self.update_gate_buttons(gate_sensitive)
 
+
     def update_gate_buttons(self, gate_sensitive=True):
         mmu = self._printer.get_stat("mmu")
         gate = mmu['gate']
         filament = mmu['filament']
         num_gates = len(mmu['gate_status'])
         action = mmu['action']
-        if (gate == self.TOOL_BYPASS and filament != "Unloaded") or not gate_sensitive:
+        if (gate == TOOL_BYPASS and filament != "Unloaded") or not gate_sensitive:
             self.labels['g_decrease'].set_sensitive(False)
             self.labels['g_increase'].set_sensitive(False)
         else:
@@ -385,7 +402,7 @@ class Panel(ScreenPanel):
                     self.labels['gate'].set_sensitive(False)
                 else:
                     self.labels['gate'].set_sensitive(gate_sensitive)
-            elif self.ui_sel_gate == self.TOOL_BYPASS:
+            elif self.ui_sel_gate == TOOL_BYPASS:
                 self.labels['gate'].set_label(f"Bypass")
                 if mmu['gate'] == self.ui_sel_gate:
                     self.labels['gate'].set_sensitive(False)
@@ -397,7 +414,7 @@ class Panel(ScreenPanel):
             self.labels['gate'].set_label(action)
             self.labels['gate'].set_sensitive(False)
 
-        if self.ui_sel_gate == self.TOOL_BYPASS:
+        if self.ui_sel_gate == TOOL_BYPASS:
             self.labels['checkgate'].set_sensitive(False)
         elif gate_sensitive:
             self.labels['checkgate'].set_sensitive(True)

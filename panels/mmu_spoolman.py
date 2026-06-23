@@ -12,17 +12,10 @@ from gi.repository import Gtk, GLib, Pango, Gdk, GdkPixbuf, GObject
 from ks_includes.screen_panel import ScreenPanel
 from ks_includes.KlippyRest import KlippyRest
 from panels.spoolman import SpoolmanSpool
+from panels.mmu_mixin import *
 import threading, time
 
-class Panel(ScreenPanel):
-    apiClient: KlippyRest
-    TOOL_UNKNOWN = -1
-    TOOL_BYPASS = -2
-
-    GATE_UNKNOWN = -1
-    GATE_EMPTY = 0
-    GATE_AVAILABLE = 1
-    GATE_AVAILABLE_FROM_BUFFER = 2
+class Panel(ScreenPanel, MmuMixin):
 
     def __init__(self, screen, title):
         super().__init__(screen, title)
@@ -33,8 +26,6 @@ class Panel(ScreenPanel):
         self.COLOR_DARK_GREY = Gdk.RGBA(0.2,0.2,0.2,1)
         self.COLOR_LIGHT_GREY = Gdk.RGBA(0.5,0.5,0.5,1)
         self.COLOR_ORANGE = Gdk.RGBA(1,0.8,0,1)
-
-        self.apiClient = screen.apiclient
 
         self.spools={}
         SpoolmanSpool.theme_path = screen.theme
@@ -116,31 +107,43 @@ class Panel(ScreenPanel):
 
         self.content.add(layers)
 
-    def async_spools_refresh(self):
-        while self.is_running:
-            self.load_spools()
-            GLib.timeout_add_seconds(2, self.refresh)
-            time.sleep(10)
-
-    def load_spools(self):
-        hide_archived=False
-        spools = self.apiClient.post_request("server/spoolman/proxy", json={
-            "request_method": "GET",
-            "path": f"/v1/spool?allow_archived={not hide_archived}",
-        })
-        if not spools or "result" not in spools:
-            logging.error("Exception when trying to fetch spools")
-            return
-        self.spools.clear()
-        for spool in spools["result"]:
-            spoolObject = SpoolmanSpool(**spool)
-            self.spools[str(spoolObject.id)]=spoolObject
 
     def activate(self):
-        self.is_running=True
-        self.timer=threading.Timer(10,self.async_spools_refresh)
-        self.timer.start()
+        self.is_running = True
+        self._spool_refresh_timer_id = GLib.timeout_add_seconds(10, self.load_spools)
+        self.load_spools()
+
+
+    def deactivate(self):
+        self.is_running = False
+        if getattr(self, "_spool_refresh_timer_id", None):
+            GLib.source_remove(self._spool_refresh_timer_id)
+            self._spool_refresh_timer_id = None
+
+
+    def load_spools(self, *args):
+        logging.error("PAUL: mmu_spoolman.load_spools()")
+        hide_archived = self._config.get_config().getboolean(
+            "spoolman", "hide_archived", fallback=True
+        )
+        self._screen.spoolman_api.load_all_spools(
+            allow_archived=not hide_archived, callback=self._load_spools_cb
+        )
+        return True
+
+
+    def _load_spools_cb(self, spools):
+        if not spools:
+            self._screen.show_popup_message(_("Error trying to fetch spoolman spools"))
+            return
+
+        self.spools.clear()
+        for spool in spools:
+            spoolObject = SpoolmanSpool(**spool)
+            self.spools[str(spoolObject.id)] = spoolObject
+
         self.refresh()
+
 
     def refresh(self):
         self.gate_tool_map = self.build_gate_tool_map()
@@ -236,19 +239,17 @@ class Panel(ScreenPanel):
 
         self.labels['layers'].set_current_page(0) # Gate list layer
 
-    def deactivate(self):
-        self.is_running=False
 
     def get_status_details(self, gate_status):
-        if gate_status == self.GATE_AVAILABLE:
+        if gate_status == GATE_AVAILABLE:
             status_icon = 'available_icon'
             status_str = "Available"
             status_color = self.COLOR_GREEN
-        elif gate_status == self.GATE_AVAILABLE_FROM_BUFFER:
+        elif gate_status == GATE_AVAILABLE_FROM_BUFFER:
             status_icon = 'available_icon'
             status_str = "Buffered"
             status_color = self.COLOR_GREEN
-        elif gate_status == self.GATE_EMPTY:
+        elif gate_status == GATE_EMPTY:
             status_icon = 'empty_icon'
             status_str = "Empty"
             status_color = self.COLOR_RED
@@ -258,12 +259,14 @@ class Panel(ScreenPanel):
             status_color = self.COLOR_LIGHT_GREY
         return status_icon, status_str, status_color
 
+
     def get_tool_details(self, tools):
         tool_str = ''
         if len(tools) > 0:
             tool_str = 'T' + ', '.join(map(str, tools[:1]))
             tool_str += '..' if len(tools) > 1 else ''
         return tool_str
+
 
     def get_color_details(self, gate_color):
         if gate_color == None:
@@ -272,6 +275,7 @@ class Panel(ScreenPanel):
         if not Gdk.RGBA.parse(color, gate_color):
             Gdk.RGBA.parse(color, '#' + gate_color)
         return color
+
 
     # gate_tool_map = [ { 'tools': <list of tools mapped to this gate> } ]
     def build_gate_tool_map(self):
@@ -286,6 +290,7 @@ class Panel(ScreenPanel):
                     tools.append(tool)
             gate_tool_map.append({ 'tools': tools })
         return gate_tool_map
+
 
     def process_update(self, action, data):
         if action == "notify_status_update":

@@ -5,10 +5,10 @@
 #
 msgid ""
 msgstr ""
-"Project-Id-Version: PACKAGE VERSION\n"
+"Project-Id-Version: \n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2024-11-26 12:31-0300\n"
-"PO-Revision-Date: 2025-11-15 19:51+0000\n"
+"POT-Creation-Date: 2026-06-10 20:07-0300\n"
+"PO-Revision-Date: 2026-04-23 15:17-0300\n"
 "Last-Translator: Pouriya Zolghadry <merdasss@yahoo.com>\n"
 "Language-Team: Persian <https://hosted.weblate.org/projects/klipperscreen/"
 "klipperscreen/fa/>\n"
@@ -16,89 +16,36 @@ msgstr ""
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"Plural-Forms: nplurals=2; plural=n > 1;\n"
-"X-Generator: Weblate 5.15-dev\n"
+"Plural-Forms: nplurals=2; plural=(n==0 || n==1);\n"
+"X-Generator: Poedit 3.8\n"
 
-#, python-format
-msgid "%s will be updated to version"
-msgstr "به ورژن %s به روز رسانی خواهد شد"
+#, fuzzy
+msgid "Main Menu"
+msgstr "منوی اصلی"
 
-msgid "(default)"
-msgstr "(پیشفرض)"
+#, fuzzy
+msgid "Move"
+msgstr "حرکت"
 
-msgid "24 Hour Time"
-msgstr "بازه زمانی 24 ساعته"
+#, fuzzy
+msgid "Temperature"
+msgstr "دما"
 
-msgid "A FIRMWARE_RESTART may fix the issue."
-msgstr "شاید ریستارت_فریمور مشکل را حل نماید."
+#, fuzzy
+msgid "Extrude"
+msgstr "بیرون‌کشیدن"
 
-msgid "ADXL Not Configured"
-msgstr "ADXL تنظیم نشده است"
+#, fuzzy
+msgid "More"
+msgstr "بیشتر"
 
-msgid "Abort"
-msgstr "لغو"
+#, fuzzy
+msgid "Print"
+msgstr "چاپ"
 
-msgid "Acceleration:"
-msgstr "شتاب:"
-
-msgid "Accept"
-msgstr "پذیرش"
-
-msgid "Add profile"
-msgstr "اضافه کردن پروفایل"
-
-msgid "All"
-msgstr "همگی"
-
-msgid "Apply"
-msgstr "اعمال"
-
-#, python-format
-msgid "Apply %s%.3f offset to Endstop?"
-msgstr "میزان آفست %s%.3f به سوئیچ انتهایی اعمال شود؟"
-
-#, python-format
-msgid "Apply %s%.3f offset to Probe?"
-msgstr "میزان آفست %s%.3f به پراب اعمال شود؟"
-
-msgid "Archived"
-msgstr "آرشیو شد"
-
-msgid "Are you sure do you want to exclude the object?"
-msgstr "مطمئنید میخواهید این شی را مستثنی کنید؟"
-
-msgid "Are you sure you want to run Emergency Stop?"
-msgstr "مطمئنید میخواهید توقف اضطراری را فعال نمایید؟"
-
-msgid "Are you sure you wish to cancel this print?"
-msgstr "مطمئنید میخواهید فرایند چاپ را لغو نمایید؟"
-
-msgid "Are you sure you wish to disable motors?"
-msgstr "آیا مطمئنید میخواهید موتور ها را غیرفعال نمایید؟"
-
-msgid "Are you sure you wish to reboot the system?"
-msgstr "آیا مطمئنید میخواهید سیستم را مجددا راه اندازی نمایید؟"
-
-msgid "Are you sure you wish to shutdown the system?"
-msgstr "مطمئنید میخواهید سیستم را خاموش نمایید؟"
-
-msgid "Asks for confirmation before stopping"
-msgstr "قبل از توقف عملکرد ها تاییده میگیرد"
-
-msgid "Auto"
-msgstr "اتوماتیک"
-
-msgid "Auto-calibrate"
-msgstr "کالیبراسیون اتوماتیک"
-
-msgid "Auto-close notifications"
-msgstr "بستن اتوماتیک اعلانات"
-
-msgid "Auto-open Extrude On Pause"
-msgstr "باز کردن اتوماتیک اکسترود در هنگام توقف"
-
-msgid "Auto-scroll"
-msgstr "چرخش اتوماتیک"
+#, fuzzy
+msgid "Gcodes"
+msgstr "کدهای G"
 
 msgid "Bed Level"
 msgstr "تراز سازی بستر چاپ"
@@ -106,911 +53,1330 @@ msgstr "تراز سازی بستر چاپ"
 msgid "Bed Mesh"
 msgstr "مش بستر چاپ"
 
-msgid "Both"
-msgstr "هر دو"
+#, fuzzy
+msgid "Z Calibrate"
+msgstr "کالیبراسیون Z"
 
-msgid "Calibrate"
-msgstr "کالیبراسیون"
+#, fuzzy
+msgid "Limits"
+msgstr "محدودیت‌ها"
 
-msgid "Calibrated"
-msgstr "کالیبره شد"
+#, fuzzy
+msgid "Fan"
+msgstr "فن"
 
-msgid "Calibrating"
-msgstr "در حال کالیبره کردن"
+#, fuzzy
+msgid "Leds"
+msgstr "چراغ‌ها"
+
+#, fuzzy
+msgid "Macros"
+msgstr "مکروها"
+
+#, fuzzy
+msgid "Pins"
+msgstr "پین‌ها"
+
+#, fuzzy
+msgid "Power"
+msgstr "برق"
 
 msgid "Camera"
 msgstr "دوربین"
 
-msgid "Can't set above the maximum:"
-msgstr "نمیتوان بیشتر از حد ماکزیمم تعیین نمود:"
+msgid "Console"
+msgstr "کنسول"
 
-msgid "Cancel"
-msgstr "لغو"
+#, fuzzy
+msgid "Update"
+msgstr "به‌روزرسانی"
 
-msgid "Cancel Print"
-msgstr "لغو چاپ"
+#, fuzzy
+msgid "Input Shaper"
+msgstr "شکل‌دهی ورودی"
 
-msgid "Cancelled"
-msgstr "لغو شد"
+#, fuzzy
+msgid "Save Config"
+msgstr "ذخیره پیکربندی"
 
-msgid "Cancelling"
-msgstr "در حال لغو کردن"
+#, fuzzy
+msgid "Network"
+msgstr "شبکه"
 
-msgid "Cannot connect to Moonraker"
-msgstr "اتصال به Moonraker میسر نیست"
+#, fuzzy
+msgid "Notifications"
+msgstr "اعلان‌ها"
+
+#, fuzzy
+msgid "System"
+msgstr "سیستم"
+
+#, fuzzy
+msgid "Fine Tuning"
+msgstr "تنظیمات ظریف"
+
+#, fuzzy
+msgid "Home X"
+msgstr "خانه‌ی X"
+
+#, fuzzy
+msgid "Home Y"
+msgstr "خانه‌ی Y"
+
+#, fuzzy
+msgid "Home Z"
+msgstr "خانه‌ی Z"
+
+#, fuzzy
+msgid "Home All"
+msgstr "خانه‌ی همه"
+
+#, fuzzy
+msgid "Home XY"
+msgstr "خانه‌ی XY"
+
+#, fuzzy
+msgid "Quad Gantry Level"
+msgstr "تراز کردن چهارگانه گانتری"
+
+#, fuzzy
+msgid "Z Tilt"
+msgstr "کج‌شدگی Z"
+
+#, fuzzy
+msgid "Print Control"
+msgstr "کنترل چاپ"
+
+#, fuzzy
+msgid "Lock"
+msgstr "قفل"
+
+#, fuzzy
+msgid "Menu"
+msgstr "منو"
+
+#, fuzzy
+msgid "Icon Theme"
+msgstr "تم آیکون"
 
 msgid "Changes how the interface looks"
-msgstr "نحوه نمایش رابط کاربری را تغییر میدهد"
+msgstr "تغییر ظاهر رابط کاربری"
+
+msgid "(default)"
+msgstr "(پیشفرض)"
+
+#, fuzzy
+msgid "Estimated Time Method"
+msgstr "روش زمان تخمینی"
 
 msgid "Changes how the time remaining is calculated"
 msgstr "نحوه محاسبه زمان باقی مانده را تغییر میدهد"
 
-msgid "Channel"
-msgstr "کانال"
+msgid "Auto"
+msgstr "اتوماتیک"
 
-msgid "Check ADXL Wiring"
-msgstr "بررسی سیم کشی ADXL"
+#, fuzzy
+msgid "File"
+msgstr "فایل"
 
-msgid "Checking for updates, please wait..."
-msgstr "در حال بررسی به روزرسانی ها، لطفا صبر کنید..."
+#, fuzzy
+msgid "Filament Used"
+msgstr "فیلامنت مصرفی"
 
-msgid "Clear"
-msgstr "پاکسازی"
+#, fuzzy
+msgid "Slicer"
+msgstr "اسلایسر"
 
-msgid "Close"
-msgstr "بستن"
+#, fuzzy
+msgid "Screen Power Off Time"
+msgstr "زمان خاموشی صفحه"
 
-msgid "Close messages after a timeout"
-msgstr "بعد از گذر زمان معینی پیام ها را میبندد."
+#, fuzzy
+msgid "Timeout for screen black-out or power-off"
+msgstr "مهلت زمانی برای سیاه شدن یا خاموش شدن صفحه"
 
-msgid "Complete"
-msgstr "کامل شد"
+#, fuzzy
+msgid "Never"
+msgstr "هرگز"
+
+#, fuzzy
+msgid "Printing"
+msgstr "در حال چاپ"
+
+#, fuzzy
+msgid "Timeout for screen black-out or power-off during printing"
+msgstr "مهلت زمانی برای سیاه شدن یا خاموش شدن صفحه در حین چاپ"
+
+msgid "24 Hour Time"
+msgstr "بازه زمانی 24 ساعته"
+
+msgid "Disable for 12hs with am / pm"
+msgstr "فعال‌سازی فرمت ۱۲ ساعته (AM/PM)"
+
+#, fuzzy
+msgid "Action bar Shortcut"
+msgstr "میانبر نوار عملیات"
+
+#, fuzzy
+msgid "LEDs"
+msgstr "LEDs"
+
+#, fuzzy
+msgid "Font Size"
+msgstr "اندازه فونت"
+
+#, fuzzy
+msgid "Inversely affects the icon size"
+msgstr "به‌صورت معکوس بر اندازه آیکون‌ها تأثیر می‌گذارد"
+
+#, fuzzy
+msgid "Small"
+msgstr "کوچک"
+
+#, fuzzy
+msgid "Medium"
+msgstr "متوسط"
+
+#, fuzzy
+msgid "Large"
+msgstr "بزرگ"
+
+#, fuzzy
+msgid "Extra Large"
+msgstr "خیلی بزرگ"
+
+#, fuzzy
+msgid "Maximum"
+msgstr "حداکثر"
 
 msgid "Confirm Emergency Stop"
 msgstr "تایید توقف اضطراری"
 
-msgid "Connected"
-msgstr "متصل شد"
+msgid "Asks for confirmation before stopping"
+msgstr "دریافت تایید قبل از توقف"
 
-msgid "Connecting"
-msgstr "در حال اتصال"
+#, fuzzy
+msgid "Hide sensors in Temp."
+msgstr "مخفی کردن سنسورها در دما."
 
-#, python-format
-msgid "Connecting to %s"
-msgstr "در حال اتصال به %s"
+#, fuzzy
+msgid "Show only devices that are able to be set"
+msgstr "نمایش فقط دستگاه‌هایی که قابل تنظیم هستند"
 
-msgid "Connection failed"
-msgstr "فرایند اتصال ناموفق بود"
+#, fuzzy
+msgid "Screen DPMS"
+msgstr "DPMS صفحه نمایش"
 
-msgid "Console"
-msgstr "کنسول"
+msgid "Enable screen power management"
+msgstr "فعال سازی کنترل برق صفحه نمایشگر"
 
-msgid "Cooldown"
-msgstr "خنک شدن"
+#, fuzzy
+msgid "Not all screens support this"
+msgstr "همه صفحه‌ها از این پشتیبانی نمی‌کنند"
 
-msgid "Couldn't add network"
-msgstr "اضافه کردن شبکه ناموفق بود"
+msgid "Auto-close notifications"
+msgstr "بستن اتوماتیک اعلانات"
 
-msgid "Current"
-msgstr "جریان"
+msgid "Close messages after a timeout"
+msgstr "بعد از گذر زمان معینی پیام ها را میبندد."
+
+#, fuzzy
+msgid "Show Heater Power"
+msgstr "نمایش قدرت بخاری"
 
 msgid "Current percentage and graph line"
 msgstr "درصد کنونی و خط گراف"
 
-msgid "DPMS has failed to load and has been disabled"
-msgstr "بارگذاری DPMS ناموفق بوده و فعال سازی آن لغو شد"
+#, fuzzy
+msgid "Show Scrollbars Buttons"
+msgstr "نمایش دکمه‌های نوار پیمایش"
 
-msgid "Date"
-msgstr "تاریخ"
+#, fuzzy
+msgid "Useful for un-responsive touchscreens"
+msgstr "برای صفحه‌های لمسی غیرحساس مفید است"
 
-msgid "Delete"
-msgstr "حذف"
+msgid "Auto-open Extrude On Pause"
+msgstr "باز کردن اتوماتیک اکسترود در هنگام توقف"
 
-msgid "Delete Directory?"
-msgstr "پوشه حذف شود؟"
+#, fuzzy
+msgid "Show cursor"
+msgstr "نمایش نشانگر"
 
-msgid "Delete File?"
-msgstr "فایل حذف شود؟"
+#, fuzzy
+msgid "For mouse control or to verify touchscreen accuracy"
+msgstr "برای کنترل ماوس یا بررسی دقت صفحه لمسی"
+
+#, fuzzy
+msgid "Screen wake delay"
+msgstr "تاخیر بیدار شدن صفحه"
+
+#, fuzzy
+msgid "Helps to prevent unwanted touchs during screen wake up"
+msgstr "به جلوگیری از لمس‌های ناخواسته هنگام بیدار شدن صفحه کمک می‌کند"
+
+#, fuzzy
+msgid "second"
+msgid_plural "seconds"
+msgstr[0] "ثانیه"
+msgstr[1] "ثانیه‌ها"
+
+#, fuzzy
+msgid "Invert X"
+msgstr "معکوس X"
+
+#, fuzzy
+msgid "Invert Y"
+msgstr "معکوس Y"
+
+#, fuzzy
+msgid "Invert Z"
+msgstr "معکوس Z"
+
+#, fuzzy
+msgid "XY Move Speed (mm/s)"
+msgstr "سرعت حرکت XY (میلی‌متر/ثانیه)"
+
+#, fuzzy
+msgid "Z Move Speed (mm/s)"
+msgstr "سرعت حرکت Z (میلی‌متر/ثانیه)"
+
+#, fuzzy
+msgid "Language"
+msgstr "زبان"
+
+#, fuzzy
+msgid "hour"
+msgid_plural "hours"
+msgstr[0] "ساعت"
+msgstr[1] "ساعت‌ها"
+
+#, fuzzy
+msgid "minute"
+msgid_plural "minutes"
+msgstr[0] "دقیقه"
+msgstr[1] "دقیقه‌ها"
+
+#, fuzzy
+msgid "Temperature too low to extrude"
+msgstr "دما برای اکسترود پایین است"
+
+#, fuzzy
+msgid "Klipper will reboot"
+msgstr "Klipper بازنشانی خواهد شد"
+
+#, fuzzy
+msgid "Save configuration?"
+msgstr "ذخیره پیکربندی؟"
+
+msgid "Are you sure you want to run Emergency Stop?"
+msgstr "مطمئنید میخواهید توقف اضطراری را فعال نمایید؟"
+
+#, fuzzy
+msgid "day"
+msgid_plural "days"
+msgstr[0] "روز"
+msgstr[1] "روزها"
+
+#, fuzzy
+msgid "Network not found"
+msgstr "شبکه پیدا نشد"
+
+#, fuzzy
+msgid "Unknown security type"
+msgstr "نوع امنیت ناشناس"
+
+#, fuzzy
+msgid "Insufficient privileges"
+msgstr "امتیازات ناکافی"
+
+#, fuzzy
+msgid "Invalid password"
+msgstr "رمز عبور نامعتبر"
+
+msgid "Couldn't add network"
+msgstr "اضافه کردن شبکه ناموفق بود"
+
+#, fuzzy
+msgid "Failed to delete connection"
+msgstr "حذف اتصال ناموفق بود"
+
+#, fuzzy
+msgid "Starting WiFi Association"
+msgstr "شروع اتصال WiFi"
+
+msgid "Connecting"
+msgstr "در حال اتصال"
+
+#, fuzzy
+msgid "Getting IP address"
+msgstr "دریافت آدرس IP"
+
+#, fuzzy
+msgid "Network connected"
+msgstr "شبکه متصل شد"
+
+#, fuzzy
+msgid "Network disconnected"
+msgstr "شبکه قطع شد"
+
+msgid "Connection failed"
+msgstr "فرایند اتصال ناموفق بود"
+
+#, fuzzy
+msgid "No mesh has been loaded"
+msgstr "هیچ مشی بارگذاری نشده است"
+
+#, fuzzy
+msgid "Invalid Number"
+msgstr "عدد نامعتبر"
+
+#, fuzzy
+msgid "Password"
+msgstr "رمز عبور"
+
+#, fuzzy
+msgid "Unlock"
+msgstr "باز کردن قفل"
+
+#, fuzzy
+msgid "Unlock failed"
+msgstr "باز کردن قفل ناموفق بود"
+
+msgid "Are you sure do you want to exclude the object?"
+msgstr "مطمئنید میخواهید این شی را مستثنی کنید؟"
+
+#, fuzzy
+msgid "Finish"
+msgstr "پایان"
+
+#, fuzzy
+msgid "Updating"
+msgstr "در حال به‌روزرسانی"
 
 msgid "Disable Motors"
 msgstr "غیر فعال سازی موتورها"
 
-msgid "Disable for 12hs with am / pm"
-msgstr "در باز 12 ساعته قبل/بعد از ظهر غیر فعال شود"
+#, fuzzy
+msgid "Screws Adjust"
+msgstr "تنظیم پیچ‌ها"
 
-msgid "Disconnect"
-msgstr "قطع اتصال"
+#, fuzzy
+msgid "Rotation invalid"
+msgstr "چرخش نامعتبر است"
+
+#, fuzzy
+msgid "This panel supports up-to 9 screws in a 3x3 Grid"
+msgstr "این پنل از حداکثر ۹ پیچ در یک شبکه ۳x۳ پشتیبانی می‌کند"
+
+#, fuzzy
+msgid "It's possible that the configuration is not correct"
+msgstr "ممکن است پیکربندی درست نباشد"
+
+#, fuzzy
+msgid "Screws not used:"
+msgstr "پیچ‌های استفاده نشده:"
+
+#, fuzzy
+msgid "Reference"
+msgstr "مرجع"
+
+msgid "Add profile"
+msgstr "اضافه کردن پروفایل"
+
+msgid "Calibrate"
+msgstr "کالیبراسیون"
+
+msgid "Clear"
+msgstr "پاکسازی"
+
+#, fuzzy
+msgid "Profile Name:"
+msgstr "نام پروفایل:"
+
+#, fuzzy
+msgid "Save"
+msgstr "ذخیره"
+
+msgid "Calibrating"
+msgstr "در حال کالیبره کردن"
+
+#, fuzzy
+msgid "WebRTC is not supported by the backend trying Stream"
+msgstr "WebRTC توسط بک‌اند پشتیبانی نمی‌شود، تلاش برای استریم"
+
+msgid "Auto-scroll"
+msgstr "چرخش اتوماتیک"
+
+#, fuzzy
+msgid "Send"
+msgstr "ارسال"
+
+#, fuzzy
+msgid "Example"
+msgstr "مثال"
+
+#, fuzzy
+msgid "Exclude Object"
+msgstr "حذف شیء"
+
+msgid "Are you sure you wish to cancel this print?"
+msgstr "مطمئنید میخواهید فرایند چاپ را لغو نمایید؟"
+
+#, fuzzy
+msgid "Load"
+msgstr "بارگذاری"
+
+#, fuzzy
+msgid "Unload"
+msgstr "خالی کردن"
+
+#, fuzzy
+msgid "Retract"
+msgstr "بازگشت"
+
+#, fuzzy
+msgid "Pressure Advance"
+msgstr "پیش‌رانش فشار"
+
+#, fuzzy
+msgid "Retraction"
+msgstr "بازگشت"
+
+#, fuzzy
+msgid "Extruders"
+msgstr "اکسترودرها"
 
 msgid "Distance (mm)"
 msgstr "فاصله (mm)"
+
+#, fuzzy
+msgid "Speed (mm/s)"
+msgstr "سرعت (میلی‌متر/ثانیه)"
+
+#, fuzzy
+msgid "Part Fan"
+msgstr "فن قطعه"
+
+#, fuzzy
+msgid "Max"
+msgstr "حداکثر"
+
+#, fuzzy
+msgid "mm"
+msgstr "میلی‌متر"
+
+#, fuzzy
+msgid "Speed +"
+msgstr "سرعت +"
+
+#, fuzzy
+msgid "Speed -"
+msgstr "سرعت -"
+
+#, fuzzy
+msgid "Extrusion +"
+msgstr "اکستروژن +"
+
+#, fuzzy
+msgid "Extrusion -"
+msgstr "اکستروژن -"
+
+#, fuzzy
+msgid "Name"
+msgstr "نام"
+
+#, fuzzy
+msgid "Settings"
+msgstr "تنظیمات"
+
+msgid "Date"
+msgstr "تاریخ"
+
+#, fuzzy
+msgid "Size"
+msgstr "اندازه"
+
+#, fuzzy
+msgid "Loading..."
+msgstr "در حال بارگذاری..."
+
+msgid "Delete File?"
+msgstr "فایل حذف شود؟"
+
+msgid "Delete Directory?"
+msgstr "پوشه حذف شود؟"
+
+#, fuzzy
+msgid "Start"
+msgstr "شروع"
+
+msgid "Delete"
+msgstr "حذف"
+
+msgid "Cancel"
+msgstr "لغو"
+
+#, fuzzy
+msgid "Modified"
+msgstr "تغییر یافته"
+
+#, fuzzy
+msgid "Layer Height"
+msgstr "ارتفاع لایه"
+
+#, fuzzy
+msgid "Filament"
+msgstr "فیلامنت"
+
+#, fuzzy
+msgid "Estimated Time"
+msgstr "زمان تخمینی"
+
+#, fuzzy
+msgid "g"
+msgstr "گرم"
+
+#, fuzzy
+msgid "Nozzle diameter"
+msgstr "قطر نازل"
+
+#, fuzzy
+msgid "Last Duration"
+msgstr "مدت زمان آخرین"
+
+#, fuzzy
+msgid "Rename/Move:"
+msgstr "تغییر نام/انتقال:"
+
+#, fuzzy
+msgid "Finding ADXL"
+msgstr "یافتن ADXL"
+
+#, fuzzy
+msgid "Measure X"
+msgstr "اندازه‌گیری X"
+
+#, fuzzy
+msgid "Measure Y"
+msgstr "اندازه‌گیری Y"
+
+#, fuzzy
+msgid "Measure Both"
+msgstr "اندازه‌گیری هر دو"
+
+msgid "Check ADXL Wiring"
+msgstr "بررسی سیم کشی ADXL"
+
+msgid "ADXL Not Configured"
+msgstr "ADXL تنظیم نشده است"
+
+msgid "Auto-calibrate"
+msgstr "کالیبراسیون اتوماتیک"
+
+msgid "Calibrated"
+msgstr "کالیبره شد"
+
+#, fuzzy
+msgid "Job Status"
+msgstr "وضعیت کار"
+
+#, fuzzy
+msgid "mm/s"
+msgstr "میلی‌متر/ثانیه"
+
+#, fuzzy
+msgid "mm/s²"
+msgstr "میلی‌متر/ثانیه²"
+
+#, fuzzy
+msgid "mm³/s"
+msgstr "میلی‌متر³/ثانیه"
+
+#, fuzzy
+msgid "Left:"
+msgstr "چپ:"
+
+msgid "Elapsed:"
+msgstr "زمان گذر شده:"
+
+#, fuzzy
+msgid "Total:"
+msgstr "کل:"
+
+#, fuzzy
+msgid "Slicer:"
+msgstr "اسلایسر:"
+
+#, fuzzy
+msgid "File:"
+msgstr "فایل:"
+
+#, fuzzy
+msgid "Filament:"
+msgstr "فیلامنت:"
+
+#, fuzzy
+msgid "Speed:"
+msgstr "سرعت:"
+
+msgid "Acceleration:"
+msgstr "شتاب:"
+
+#, fuzzy
+msgid "Flow:"
+msgstr "جریان:"
+
+#, fuzzy
+msgid "Z offset:"
+msgstr "آفست Z:"
+
+#, fuzzy
+msgid "Filament used:"
+msgstr "فیلامنت مصرفی:"
+
+#, fuzzy
+msgid "Filament total:"
+msgstr "فیلامنت کل:"
+
+#, fuzzy
+msgid "Pressure Advance:"
+msgstr "پیش‌رانش فشار:"
+
+#, fuzzy
+msgid "Flowrate:"
+msgstr "دبی جریان:"
+
+#, fuzzy
+msgid "Height:"
+msgstr "ارتفاع:"
+
+#, fuzzy
+msgid "Layer:"
+msgstr "لایه:"
+
+#, fuzzy
+msgid "Pause"
+msgstr "توقف"
+
+#, fuzzy
+msgid "Restart"
+msgstr "دوباره شروع"
+
+#, fuzzy
+msgid "Resume"
+msgstr "ادامه"
+
+#, fuzzy
+msgid "Save Z"
+msgstr "ذخیره Z"
+
+#, python-brace-format
+msgid "Apply {sign}{offset:.3f} offset to Probe?"
+msgstr "اعمال جابجایی {sign}{offset:.3f} به Probe؟"
+
+#, python-brace-format
+msgid "Apply {sign}{offset:.3f} offset to Endstop?"
+msgstr "اعمال جابجایی {sign}{offset:.3f} به Endstop؟"
+
+#, python-format
+msgid "Saved offset: %s"
+msgstr "جابجایی ذخیره شده: %s"
+
+msgid "Apply"
+msgstr "اعمال"
+
+msgid "Restart Print"
+msgstr "بازچاپ"
+
+#, fuzzy
+msgid "Go Back"
+msgstr "بازگشت"
+
+msgid "Are you sure you wish to restart this print?"
+msgstr "آیا مطمئن هستید که می‌خواهید این چاپ را از نو شروع کنید؟"
+
+msgid "Cancel Print"
+msgstr "لغو چاپ"
+
+#, fuzzy
+msgid "Working"
+msgstr "در حال کار"
+
+msgid "Complete"
+msgstr "کامل شد"
+
+#, fuzzy
+msgid "Error"
+msgstr "خطا"
+
+msgid "Cancelling"
+msgstr "در حال لغو کردن"
+
+msgid "Cancelled"
+msgstr "لغو شد"
+
+#, fuzzy
+msgid "Paused"
+msgstr "متوقف"
+
+#, fuzzy
+msgid "Standby"
+msgstr "آماده به کار"
+
+#, fuzzy
+msgid "Max Acceleration"
+msgstr "شتاب حداکثر"
+
+#, fuzzy
+msgid "Minimum Cruise Ratio"
+msgstr "نسبت حداقل کروز"
+
+#, fuzzy
+msgid "Max Velocity"
+msgstr "سرعت حداکثر"
+
+#, fuzzy
+msgid "Square Corner Velocity"
+msgstr "سرعت گوشه مربع"
+
+#, fuzzy
+msgid "Unknown Heater"
+msgstr "گرم‌کن ناشناس"
+
+msgid "Can't set above the maximum:"
+msgstr "نمیتوان بیشتر از حد ماکزیمم تعیین نمود:"
+
+#, fuzzy
+msgid "Initiate a PID calibration for:"
+msgstr "شروع کالیبراسیون PID برای:"
+
+#, fuzzy
+msgid "It may take more than 5 minutes depending on the heater power."
+msgstr "بسته به توان گرم‌کن ممکن است بیش از ۵ دقیقه طول بکشد."
+
+#, fuzzy
+msgid "Temp (°C)"
+msgstr "دما (°C)"
+
+#, fuzzy
+msgid "Invalid temperature"
+msgstr "دما نامعتبر است"
+
+#, fuzzy
+msgid "Home"
+msgstr "خانه"
+
+msgid "Are you sure you wish to disable motors?"
+msgstr "آیا مطمئنید میخواهید موتور ها را غیرفعال نمایید؟"
+
+#, fuzzy
+msgid "Move Distance (mm)"
+msgstr "جابجایی فاصله (میلی‌متر)"
+
+#, fuzzy
+msgid "This will affect screw positions and mesh graph"
+msgstr "این بر موقعیت‌های پیچ و نمودار مش تأثیر می‌گذارد"
+
+#, fuzzy
+msgid "Swaps buttons if they are on top of each other, affects other panels"
+msgstr "دکمه‌ها را جابجا می‌کند اگر روی هم باشند، بر پنل‌های دیگر تأثیر می‌گذارد"
+
+#, fuzzy
+msgid "XY Speed (mm/s)"
+msgstr "سرعت XY (میلی‌متر/ثانیه)"
+
+#, fuzzy
+msgid "Only for the move panel"
+msgstr "فقط برای پنل جابجایی"
+
+#, fuzzy
+msgid "Z Speed (mm/s)"
+msgstr "سرعت Z (میلی‌متر/ثانیه)"
+
+#, fuzzy
+msgid "Advanced Move"
+msgstr "حرکت پیشرفته"
+
+#, fuzzy
+msgid "Query Endstops"
+msgstr "بررسی ان‌ستاپ‌ها"
+
+#, fuzzy
+msgid "Invalid position"
+msgstr "موقعیت نامعتبر"
+
+#, fuzzy
+msgid "Failed to initialize"
+msgstr "شکست در راه‌اندازی"
+
+#, fuzzy
+msgid "Interface"
+msgstr "رابط کاربری"
+
+#, fuzzy
+msgid "No network devices have been found"
+msgstr "هیچ دستگاه شبکه‌ای یافت نشد"
+
+#, fuzzy
+msgid "No network devices available"
+msgstr "هیچ دستگاه شبکه‌ای در دسترس نیست"
+
+msgid "Connected"
+msgstr "متصل شد"
+
+msgid "Channel"
+msgstr "کانال"
 
 #, python-format
 msgid "Do you want to forget or disconnect %s?"
 msgstr "میخواهید اتصال %s فراموش و یا قطع شود؟"
 
-#, python-format
-msgid "Do you want to recover %s?"
-msgstr "میخواهید %s بازیابی شود؟"
+#, fuzzy
+msgid "Forget"
+msgstr "فراموش"
 
-msgid "Elapsed:"
-msgstr "زمان گذر شده:"
+msgid "Disconnect"
+msgstr "قطع اتصال"
+
+#, fuzzy
+msgid "Remove network"
+msgstr "حذف شبکه"
+
+#, fuzzy
+msgid "User"
+msgstr "کاربر"
+
+#, python-format
+msgid "Connecting to %s"
+msgstr "در حال اتصال به %s"
+
+#, fuzzy
+msgid "Hostname"
+msgstr "نام میزبان"
+
+#, fuzzy
+msgid "Notification log empty"
+msgstr "لاگ اعلان‌ها خالی است"
+
+#, fuzzy
+msgid "Pressure advance"
+msgstr "پیشرفت فشار"
+
+msgid "Current"
+msgstr "جریان"
+
+#, fuzzy
+msgid "Smooth time"
+msgstr "زمان صاف‌سازی"
+
+#, fuzzy
+msgid "s"
+msgstr "ثانیه"
+
+#, fuzzy
+msgid "Printer Select"
+msgstr "انتخاب پرینتر"
+
+#, fuzzy
+msgid "Please wait"
+msgstr "لطفاً صبر کنید"
+
+#, fuzzy
+msgid "Retraction Length"
+msgstr "طول بازداشت"
+
+#, fuzzy
+msgid "Retraction Speed"
+msgstr "سرعت بازداشت"
+
+#, fuzzy
+msgid "Unretract Extra Length"
+msgstr "طول اضافی بازگشت"
+
+#, fuzzy
+msgid "Unretract Speed"
+msgstr "سرعت بازگشت"
+
+#, fuzzy
+msgid "Printer Connections"
+msgstr "اتصالات پرینتر"
+
+#, fuzzy
+msgid "Shutdown"
+msgstr "خاموش کردن"
 
 msgid "Emergency Stop"
 msgstr "توقف اضطراری"
 
-msgid "Enable screen power management"
-msgstr "فعال سازی کنترل برق صفحه نمایشگر"
+msgid "Are you sure you wish to reboot the system?"
+msgstr "آیا مطمئنید میخواهید سیستم را مجددا راه اندازی نمایید؟"
 
-msgid "Error"
-msgstr ""
+msgid "Are you sure you wish to shutdown the system?"
+msgstr "مطمئنید میخواهید سیستم را خاموش نمایید؟"
 
-msgid "Error clearing active spool"
-msgstr ""
+msgid "Accept"
+msgstr "پذیرش"
 
-msgid "Error getting active spool"
-msgstr ""
-
-msgid "Error setting active spool"
-msgstr ""
-
-msgid "Error trying to fetch spools"
-msgstr ""
-
-msgid "Error: Couldn't get a position to probe"
-msgstr ""
-
-msgid "Estimated Time"
-msgstr ""
-
-msgid "Estimated Time Method"
-msgstr ""
-
-msgid "Example"
-msgstr ""
-
-msgid "Exclude Object"
-msgstr ""
-
-msgid "Extra Large"
-msgstr ""
-
-msgid "Extrude"
-msgstr ""
-
-msgid "Extruders"
-msgstr ""
-
-msgid "Extrusion +"
-msgstr ""
-
-msgid "Extrusion -"
-msgstr ""
-
-msgid "Failed to delete connection"
-msgstr ""
-
-msgid "Failed to initialize"
-msgstr ""
-
-msgid "Failed, adjust position first"
-msgstr ""
-
-msgid "Fan"
-msgstr ""
-
-msgid "Filament"
-msgstr ""
-
-msgid "Filament Used"
-msgstr ""
-
-msgid "Filament total:"
-msgstr ""
-
-msgid "Filament used:"
-msgstr ""
-
-msgid "Filament:"
-msgstr ""
-
-msgid "File"
-msgstr ""
-
-msgid "File:"
-msgstr ""
-
-msgid "Filter"
-msgstr ""
-
-msgid "Finding ADXL"
-msgstr ""
-
-msgid "Fine Tuning"
-msgstr ""
-
-msgid "Finish"
-msgstr ""
-
-msgid "Firmware Restart"
-msgstr ""
-
-msgid "Flow:"
-msgstr ""
-
-msgid "Flowrate:"
-msgstr ""
-
-msgid "Font Size"
-msgstr ""
-
-msgid "For mouse control or to verify touchscreen accuracy"
-msgstr ""
-
-msgid "Forget"
-msgstr ""
-
-msgid "Full Update"
-msgstr ""
-
-msgid "Gcodes"
-msgstr ""
-
-msgid "Getting IP address"
-msgstr ""
-
-msgid "Go Back"
-msgstr ""
-
-msgid "Height:"
-msgstr ""
-
-msgid "Hide"
-msgstr ""
-
-msgid "Hide sensors in Temp."
-msgstr ""
-
-msgid "Home"
-msgstr ""
-
-msgid "Home All"
-msgstr ""
-
-msgid "Home X"
-msgstr ""
-
-msgid "Home XY"
-msgstr ""
-
-msgid "Home Y"
-msgstr ""
-
-msgid "Home Z"
-msgstr ""
-
+#, fuzzy
 msgid "Host"
-msgstr ""
+msgstr "میزبان"
 
-msgid "Hostname"
-msgstr ""
+#, fuzzy
+msgid "Printer"
+msgstr "پرینتر"
 
-msgid "ID"
-msgstr ""
+msgid "Both"
+msgstr "هر دو"
 
-msgid "Icon Theme"
-msgstr ""
-
+#, fuzzy
 msgid "Initializing printer..."
-msgstr ""
+msgstr "در حال راه‌اندازی پرینتر..."
 
-msgid "Initiate a PID calibration for:"
-msgstr ""
-
-msgid "Input Shaper"
-msgstr ""
-
-msgid "Insufficient privileges"
-msgstr ""
-
-msgid "Interface"
-msgstr ""
-
-msgid "Invalid"
-msgstr ""
-
-msgid "Invalid password"
-msgstr ""
-
-msgid "Invalid temperature"
-msgstr ""
-
-msgid "Inversely affects the icon size"
-msgstr ""
-
-msgid "Invert X"
-msgstr ""
-
-msgid "Invert Y"
-msgstr ""
-
-msgid "Invert Z"
-msgstr ""
-
-msgid "It may take more than 5 minutes depending on the heater power."
-msgstr ""
-
-msgid "It's possible that the configuration is not correct"
-msgstr ""
-
-msgid "Job Status"
-msgstr ""
-
+#, fuzzy
 msgid "Klipper Restart"
-msgstr ""
+msgstr "راه‌اندازی مجدد کلیپر"
 
-msgid "Klipper has disconnected"
-msgstr ""
+#, fuzzy
+msgid "Firmware Restart"
+msgstr "راه‌اندازی مجدد فریمور"
 
-msgid "Klipper has encountered an error."
-msgstr ""
+#, fuzzy
+msgid "System Restart"
+msgstr "راه‌اندازی مجدد سیستم"
 
-msgid "Klipper has shutdown"
-msgstr ""
+#, fuzzy
+msgid "System Shutdown"
+msgstr "خاموش کردن سیستم"
 
-msgid "Klipper is attempting to start"
-msgstr ""
+#, fuzzy
+msgid "Retry"
+msgstr "تلاش مجدد"
 
-msgid "Klipper will reboot"
-msgstr ""
+#, fuzzy
+msgid "Power On Printer"
+msgstr "روشن کردن پرینتر"
 
-msgid ""
-"LOAD_FILAMENT/UNLOAD_FILAMENT are hidden and should be used from extrude"
-msgstr ""
+#, fuzzy
+msgid "Spool editor"
+msgstr "ویرایشگر رول"
 
-msgid "Language"
-msgstr ""
+#, fuzzy
+msgid "No spool selected"
+msgstr "هیچ رولی انتخاب نشده است"
 
-msgid "Large"
-msgstr ""
+#, fuzzy
+msgid "Measured weight"
+msgstr "وزن اندازه‌گیری شده"
 
-msgid "Last Duration"
-msgstr ""
+#, fuzzy
+msgid "Remaining weight"
+msgstr "وزن باقی‌مانده"
 
-msgid "Last Used"
-msgstr ""
+#, fuzzy
+msgid "Initial weight"
+msgstr "وزن اولیه"
 
-msgid "Layer Height"
-msgstr ""
+#, fuzzy
+msgid "Empty weight"
+msgstr "وزن خالی"
 
-msgid "Layer:"
-msgstr ""
+#, fuzzy
+msgid "Invalid weight"
+msgstr "وزن نامعتبر"
 
-msgid "Leds"
-msgstr ""
+#, fuzzy
+msgid "Restore"
+msgstr "بازیابی"
 
-msgid "Left:"
-msgstr ""
+#, fuzzy
+msgid "No"
+msgstr "خیر"
 
-msgid "Limits"
-msgstr ""
+#, fuzzy
+msgid "Yes"
+msgstr "بله"
 
-msgid "Load"
-msgstr ""
+#, fuzzy
+msgid "Vendor"
+msgstr "تولیدکننده"
 
-msgid "Loading..."
-msgstr ""
-
-msgid "Lock"
-msgstr ""
-
-msgid "Lost Connection to Moonraker"
-msgstr ""
-
-msgid "Lower Nozzle"
-msgstr ""
-
-msgid "Macro shortcut on sidebar"
-msgstr ""
-
-msgid "Macros"
-msgstr ""
-
-msgid "Main Menu"
-msgstr ""
-
+#, fuzzy
 msgid "Material"
-msgstr ""
+msgstr "جنس"
 
-msgid "Max"
-msgstr ""
+#, fuzzy
+msgid "Used"
+msgstr "استفاده شده"
 
-msgid "Max Acceleration"
-msgstr ""
+#, fuzzy
+msgid "Location"
+msgstr "مکان"
 
-msgid "Max Velocity"
-msgstr ""
+msgid "Archived"
+msgstr "آرشیو شد"
 
-msgid "Max:"
-msgstr ""
+#, fuzzy
+msgid "Price"
+msgstr "قیمت"
 
-msgid "Maximum"
-msgstr ""
+#, fuzzy
+msgid "Comment"
+msgstr "توضیح"
 
-msgid "Measure Both"
-msgstr ""
+#, fuzzy
+msgid "Measured weight is below empty spool weight"
+msgstr "وزن اندازه‌گیری شده کمتر از وزن رول خالی است"
 
-msgid "Measure X"
-msgstr ""
+#, fuzzy
+msgid "Value must be positive"
+msgstr "مقدار باید مثبت باشد"
 
-msgid "Measure Y"
-msgstr ""
+#, fuzzy
+msgid "Error updating filament weight"
+msgstr "خطا در به‌روزرسانی وزن فیلامنت"
 
-msgid "Medium"
-msgstr ""
+#, fuzzy
+msgid "Filament weight updated"
+msgstr "وزن فیلامنت به‌روز شد"
 
-msgid "Memory"
-msgstr ""
+#, fuzzy
+msgid "ID"
+msgstr "شناسه"
 
-msgid "Menu"
-msgstr ""
+#, fuzzy
+msgid "Filter"
+msgstr "فیلتر"
 
-msgid "Minimum Cruise Ratio"
-msgstr ""
+#, fuzzy
+msgid "Remaining length"
+msgstr "طول باقی‌مانده"
 
-msgid "Minimum:"
-msgstr ""
+#, fuzzy
+msgid "Error trying to fetch spools"
+msgstr "خطا در دریافت استوانه‌ها"
 
-msgid "Modified"
-msgstr ""
+msgid "All"
+msgstr "همگی"
 
-msgid "Moonraker: connected"
-msgstr ""
+#, fuzzy
+msgid "Error clearing active spool"
+msgstr "خطا در پاک‌سازی استوانه فعال"
 
-msgid "More"
-msgstr ""
+#, fuzzy
+msgid "Error setting active spool"
+msgstr "خطا در تنظیم استوانه فعال"
 
-msgid "Move"
-msgstr ""
-
-msgid "Move Distance (mm)"
-msgstr ""
-
-msgid "Name"
-msgstr ""
-
-msgid "Network"
-msgstr ""
-
-msgid "Network connected"
-msgstr ""
-
-msgid "Network disconnected"
-msgstr ""
-
-msgid "Network not found"
-msgstr ""
-
-msgid "Never"
-msgstr ""
-
-msgid "New"
-msgstr ""
-
-msgid "No elegible macros:"
-msgstr ""
-
+#, fuzzy
 msgid "No info available"
-msgstr ""
+msgstr "اطلاعاتی موجود نیست"
 
-msgid "No mesh has been loaded"
-msgstr ""
+#, fuzzy
+msgid "IP Address"
+msgstr "آدرس IP"
 
-msgid "No wireless interface has been found"
-msgstr ""
+#, fuzzy
+msgid "Memory"
+msgstr "حافظه"
 
-msgid "Not all screens support this"
-msgstr ""
+msgid "Cooldown"
+msgstr "خنک شدن"
 
-msgid "Not working or not configured"
-msgstr ""
-
+#, fuzzy
 msgid "Nothing selected"
-msgstr ""
+msgstr "چیزی انتخاب نشده"
 
-msgid "Notification log empty"
-msgstr ""
+#, fuzzy
+msgid "Set Temp"
+msgstr "تنظیم دما"
 
-msgid "Notifications"
-msgstr ""
+#, fuzzy
+msgid "Show"
+msgstr "نمایش"
 
-msgid "Nozzle diameter"
-msgstr ""
+#, fuzzy
+msgid "Hide"
+msgstr "مخفی"
 
-msgid "Only for the move panel"
-msgstr ""
+#, fuzzy
+msgid "Full Update"
+msgstr "بروزرسانی کامل"
+
+#, fuzzy
+msgid "Refresh"
+msgstr "بروزرسانی"
+
+msgid "Checking for updates, please wait..."
+msgstr "در حال بررسی به روزرسانی ها، لطفا صبر کنید..."
+
+#, fuzzy
+msgid "Not working or not configured"
+msgstr "کار نمی‌کند یا پیکربندی نشده"
+
+#, fuzzy
+msgid "Are you sure?"
+msgstr "مطمئنید؟"
+
+#, fuzzy
+msgid "Perform a full upgrade?"
+msgstr "آیا می‌خواهید ارتقای کامل انجام دهید؟"
+
+#, python-format
+msgid "Do you want to recover %s?"
+msgstr "میخواهید %s بازیابی شود؟"
+
+#, fuzzy
+msgid "Recover Hard"
+msgstr "بازیابی سخت"
+
+#, fuzzy
+msgid "Recover Soft"
+msgstr "بازیابی نرم"
+
+#, fuzzy
+msgid "Recover"
+msgstr "بازیابی"
 
 #, python-format
 msgid "Outdated by %d"
-msgstr ""
+msgstr "%d قدیمی‌تر"
 
-msgid "Package will be updated"
-msgid_plural "Packages will be updated"
-msgstr[0] ""
-msgstr[1] ""
-
-msgid "Part Fan"
-msgstr ""
-
-msgid "Password"
-msgstr ""
-
-msgid "Password saved"
-msgstr ""
-
-msgid "Pause"
-msgstr ""
-
-msgid "Paused"
-msgstr ""
-
-msgid "Perform a full upgrade?"
-msgstr ""
-
-msgid "Pins"
-msgstr ""
-
-msgid "Please recompile and flash the micro-controller."
-msgstr ""
-
-msgid "Please wait"
-msgstr ""
-
-msgid "Power"
-msgstr ""
-
-msgid "Power On Printer"
-msgstr ""
-
-msgid "Pressure Advance"
-msgstr ""
-
-msgid "Pressure Advance:"
-msgstr ""
-
-msgid "Pressure advance"
-msgstr ""
-
-msgid "Print"
-msgstr ""
-
-msgid "Print Control"
-msgstr ""
-
-msgid "Printer"
-msgstr ""
-
-msgid "Printer Connections"
-msgstr ""
-
-msgid "Printer Select"
-msgstr ""
-
-msgid "Printing"
-msgstr ""
-
-msgid "Probe Offset"
-msgstr ""
-
-msgid "Profile Name:"
-msgstr ""
-
-msgid "Provide KlipperScreen.log when asking for help.\n"
-msgstr ""
-
-msgid "Quad Gantry Level"
-msgstr ""
-
-msgid "Raise Nozzle"
-msgstr ""
-
-msgid "Recover"
-msgstr ""
-
-msgid "Recover Hard"
-msgstr ""
-
-msgid "Recover Soft"
-msgstr ""
-
-msgid "Reference"
-msgstr ""
-
-msgid "Refresh"
-msgstr ""
-
-msgid "Remove network"
-msgstr ""
-
-msgid "Rename/Move:"
-msgstr ""
-
-msgid "Restart"
-msgstr ""
-
-msgid "Resume"
-msgstr ""
-
-msgid "Retract"
-msgstr ""
-
-msgid "Retraction"
-msgstr ""
-
-msgid "Retraction Length"
-msgstr ""
-
-msgid "Retraction Speed"
-msgstr ""
-
-msgid "Retry"
-msgstr ""
-
-msgid "Retrying"
-msgstr ""
-
-msgid "Rotation invalid"
-msgstr ""
-
-msgid "Save"
-msgstr ""
-
-msgid "Save Config"
-msgstr ""
-
-msgid "Save Z"
-msgstr ""
-
-msgid "Save configuration?"
-msgstr ""
-
-msgid "Saved"
-msgstr ""
-
-#, python-format
-msgid "Saved offset: %s"
-msgstr ""
-
-msgid "Screen DPMS"
-msgstr ""
-
-msgid "Screen Power Off Time"
-msgstr ""
-
-msgid "Screws Adjust"
-msgstr ""
-
-msgid "Screws not used:"
-msgstr ""
-
-msgid "Send"
-msgstr ""
-
-msgid "Set Temp"
-msgstr ""
-
-msgid "Settings"
-msgstr ""
-
-msgid "Show"
-msgstr ""
-
-msgid "Show Heater Power"
-msgstr ""
-
-msgid "Show Scrollbars Buttons"
-msgstr ""
-
-msgid "Show cursor"
-msgstr ""
-
-msgid "Show only devices that are able to be set"
-msgstr ""
-
-msgid "Shutdown"
-msgstr ""
-
-msgid "Size"
-msgstr ""
-
-msgid "Slicer"
-msgstr ""
-
-msgid "Slicer:"
-msgstr ""
-
-msgid "Small"
-msgstr ""
-
-msgid "Smooth time"
-msgstr ""
-
-msgid "Speed (mm/s)"
-msgstr ""
-
-msgid "Speed +"
-msgstr ""
-
-msgid "Speed -"
-msgstr ""
-
-msgid "Speed:"
-msgstr ""
-
-msgid "Square Corner Velocity"
-msgstr ""
-
-msgid "Standby"
-msgstr ""
-
-msgid "Start"
-msgstr ""
-
-msgid "Starting recovery for"
-msgstr ""
-
-msgid "Starting update for"
-msgstr ""
-
-msgid "Swaps buttons if they are on top of each other, affects other panels"
-msgstr ""
-
-msgid "System"
-msgstr ""
-
-msgid "System Restart"
-msgstr ""
-
-msgid "System Shutdown"
-msgstr ""
-
-msgid "System:"
-msgstr ""
-
-msgid "Temp (°C)"
-msgstr ""
-
-msgid "Temperature"
-msgstr ""
-
-msgid "Temperature too low to extrude"
-msgstr ""
-
-msgid "The system doesn't meet the minimum requirement"
-msgstr ""
-
-msgid "This panel supports up-to 9 screws in a 3x3 Grid"
-msgstr ""
-
-msgid "This will affect screw positions and mesh graph"
-msgstr ""
-
-msgid "Timeout for screen black-out or power-off"
-msgstr ""
-
-msgid "Timeout for screen black-out or power-off during printing"
-msgstr ""
-
-msgid "Total:"
-msgstr ""
-
-msgid "Unknown Heater"
-msgstr ""
-
-msgid "Unknown security type"
-msgstr ""
-
-msgid "Unload"
-msgstr ""
-
-msgid "Unlock"
-msgstr ""
-
-msgid "Unlock failed"
-msgstr ""
-
-msgid "Unretract Extra Length"
-msgstr ""
-
-msgid "Unretract Speed"
-msgstr ""
-
-msgid "Up To Date"
-msgstr ""
-
-msgid "Update"
-msgstr ""
-
-msgid "Updating"
-msgstr ""
-
-msgid "Useful for un-responsive touchscreens"
-msgstr ""
-
-msgid "User"
-msgstr ""
-
-msgid "WebRTC is not supported by the backend trying Stream"
-msgstr ""
-
-msgid "Working"
-msgstr ""
-
-msgid "XY Move Speed (mm/s)"
-msgstr ""
-
-msgid "XY Speed (mm/s)"
-msgstr ""
-
-msgid "Z Calibrate"
-msgstr ""
-
-msgid "Z Move Speed (mm/s)"
-msgstr ""
-
-msgid "Z Speed (mm/s)"
-msgstr ""
-
-msgid "Z Tilt"
-msgstr ""
-
-msgid "Z offset:"
-msgstr ""
-
+#, fuzzy
 msgid "commit"
 msgid_plural "commits"
-msgstr[0] ""
-msgstr[1] ""
+msgstr[0] "تعهد"
+msgstr[1] "تعهدات"
 
-msgid "day"
-msgid_plural "days"
-msgstr[0] ""
-msgstr[1] ""
+#, fuzzy
+msgid "Package will be updated"
+msgid_plural "Packages will be updated"
+msgstr[0] "بسته بروزرسانی خواهد شد"
+msgstr[1] "بسته‌ها بروزرسانی خواهند شد"
 
-msgid "g"
-msgstr ""
+#, python-format
+msgid "%s will be updated to version"
+msgstr "به ورژن %s به روز رسانی خواهد شد"
 
-msgid "hour"
-msgid_plural "hours"
-msgstr[0] ""
-msgstr[1] ""
+#, fuzzy
+msgid "Starting recovery for"
+msgstr "شروع بازیابی برای"
 
-msgid "macros that use 'rename_existing' are hidden"
-msgstr ""
+#, fuzzy
+msgid "Starting update for"
+msgstr "شروع بروزرسانی برای"
 
-msgid "macros with a name starting with '_' are hidden"
-msgstr ""
+#, fuzzy
+msgid "Invalid"
+msgstr "نامعتبر"
 
-msgid "minute"
-msgid_plural "minutes"
-msgstr[0] ""
-msgstr[1] ""
+#, fuzzy
+msgid "Up To Date"
+msgstr "به‌روز"
 
-msgid "mm"
-msgstr ""
+#, fuzzy
+msgid "Probe Offset"
+msgstr "آفست پروب"
 
-msgid "mm/s"
-msgstr ""
+#, fuzzy
+msgid "Saved"
+msgstr "ذخیره شد"
 
-msgid "mm/s²"
-msgstr ""
+#, fuzzy
+msgid "New"
+msgstr "جدید"
 
-msgid "mm³/s"
-msgstr ""
+#, fuzzy
+msgid "Raise Nozzle"
+msgstr "بالا بردن نوزل"
 
-msgid "s"
-msgstr ""
+#, fuzzy
+msgid "Lower Nozzle"
+msgstr "پایین آوردن نوزل"
 
-msgid "second"
-msgid_plural "seconds"
-msgstr[0] ""
-msgstr[1] ""
+msgid "Abort"
+msgstr "لغو"
+
+#, fuzzy
+msgid "Calibration commands not available yet"
+msgstr "دستورات کالیبراسیون هنوز در دسترس نیستند"
+
+#, fuzzy
+msgid "Error: Couldn't get a position to probe"
+msgstr "خطا: نمی‌توان موقعیت پروب را دریافت کرد"
+
+#, fuzzy
+msgid "Failed, adjust position first"
+msgstr "ناموفق، ابتدا موقعیت را تنظیم کنید"
+
+#, fuzzy
+msgid "The system doesn't meet the minimum requirement"
+msgstr "سیستم حداقل نیازها را برآورده نمی‌کند"
+
+#, fuzzy
+msgid "Minimum:"
+msgstr "حداقل:"
+
+#, fuzzy
+msgid "System:"
+msgstr "سیستم:"
+
+#, fuzzy
+msgid "Initializing KlipperScreen"
+msgstr "در حال راه‌اندازی KlipperScreen"
+
+#, fuzzy
+msgid "Provide KlipperScreen.log when asking for help.\n"
+msgstr "هنگام درخواست کمک، KlipperScreen.log را ارائه دهید.\n"
+
+msgid "Close"
+msgstr "بستن"
+
+#, fuzzy
+msgid "DPMS has failed and has been disabled"
+msgstr "DPMS شکست خورد و غیرفعال شد"
+
+#, fuzzy
+msgid "Moonraker Connected"
+msgstr "Moonraker متصل شد"
+
+#, fuzzy
+msgid "Retrying"
+msgstr "تلاش مجدد"
+
+#, fuzzy
+msgid "Klipper has disconnected"
+msgstr "Klipper قطع شد"
+
+#, fuzzy
+msgid "Klipper has encountered an error."
+msgstr "Klipper با خطا مواجه شد."
+
+msgid "A FIRMWARE_RESTART may fix the issue."
+msgstr "شاید ریستارت_فریمور مشکل را حل نماید."
+
+#, fuzzy
+msgid "Please recompile and flash the micro-controller."
+msgstr "لطفاً میکروکنترلر را مجدداً کامپایل و فلش کنید."
+
+#, fuzzy
+msgid "Klipper is attempting to start"
+msgstr "Klipper در حال تلاش برای شروع است"
+
+#, fuzzy
+msgid "Klipper has shutdown"
+msgstr "Klipper خاموش شد"
+
+#, fuzzy
+msgid "Waiting for Moonraker Websocket to close"
+msgstr "در انتظار بستن Websocket Moonraker"
+
+#, fuzzy
+msgid "Moonraker: connected"
+msgstr "Moonraker: متصل"
+
+#, fuzzy
+msgid "Initializing Klipper Connection"
+msgstr "در حال راه‌اندازی اتصال Klipper"
+
+#, fuzzy
+msgid "Klipper not responding after multiple attempts"
+msgstr "Klipper پس از چندین تلاش پاسخ نمی‌دهد"

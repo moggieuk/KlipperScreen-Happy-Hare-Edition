@@ -5,6 +5,7 @@ import gi
 
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gtk, Pango
+
 from ks_includes.screen_panel import ScreenPanel
 
 
@@ -42,9 +43,7 @@ class Panel(ScreenPanel):
         top_box.pack_start(self.buttons["update_all"], True, True, 0)
         top_box.pack_start(self.buttons["refresh"], True, True, 0)
 
-        self.update_msg = Gtk.Label(
-            label=_("Checking for updates, please wait..."), vexpand=True
-        )
+        self.update_msg = Gtk.Label(label=_("Checking for updates, please wait..."), vexpand=True)
 
         self.scroll = self._gtk.ScrolledWindow()
         self.scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
@@ -70,9 +69,7 @@ class Panel(ScreenPanel):
 
             self.buttons[f"{prog}_status"] = self._gtk.Button()
             self.buttons[f"{prog}_status"].set_hexpand(False)
-            self.buttons[f"{prog}_status"].connect(
-                "clicked", self.show_update_info, prog
-            )
+            self.buttons[f"{prog}_status"].connect("clicked", self.show_update_info, prog)
 
             try:
                 if prog in self._printer.system_info["available_services"]:
@@ -83,9 +80,7 @@ class Panel(ScreenPanel):
                         position=Gtk.PositionType.LEFT,
                         scale=self.bts,
                     )
-                    self.buttons[f"{prog}_restart"].connect(
-                        "clicked", self.restart, prog
-                    )
+                    self.buttons[f"{prog}_restart"].connect("clicked", self.restart, prog)
                     infogrid.attach(self.buttons[f"{prog}_restart"], 0, i, 1, 1)
             except Exception as e:
                 logging.exception(e)
@@ -105,9 +100,7 @@ class Panel(ScreenPanel):
         self.scroll.add(self.update_msg)
         self._gtk.Button_busy(widget, True)
         logging.info("Sending machine.update.refresh")
-        self._screen._ws.send_method(
-            "machine.update.refresh", callback=self.get_updates
-        )
+        self._screen._ws.send_method("machine.update.refresh", callback=self.get_updates)
 
     def get_updates(self, response, method, params):
         self._gtk.Button_busy(self.buttons["refresh"], False)
@@ -117,14 +110,10 @@ class Panel(ScreenPanel):
             self.clear_scroll()
             if "error" in response:
                 self.scroll.add(
-                    Gtk.Label(
-                        label=f"Moonraker: {response['error']['message']}", vexpand=True
-                    )
+                    Gtk.Label(label=f"Moonraker: {response['error']['message']}", vexpand=True)
                 )
             else:
-                self.scroll.add(
-                    Gtk.Label(label=_("Not working or not configured"), vexpand=True)
-                )
+                self.scroll.add(Gtk.Label(label=_("Not working or not configured"), vexpand=True))
         else:
             self.update_status = response["result"]
             self.buttons["update_all"].set_sensitive(True)
@@ -135,14 +124,12 @@ class Panel(ScreenPanel):
         if self._printer.state in ("printing", "paused"):
             self._screen._confirm_send_action(
                 widget,
-                f'{_("Are you sure?")}\n\n' f'{_("Restart")}: {program}',
+                f"{_('Are you sure?')}\n\n{_('Restart')}: {program}",
                 "machine.services.restart",
                 {"service": program},
             )
         else:
-            self._screen._send_action(
-                widget, "machine.services.restart", {"service": program}
-            )
+            self._screen._send_action(widget, "machine.services.restart", {"service": program})
 
     def show_update_info(self, widget, program):
         info = (
@@ -180,9 +167,7 @@ class Panel(ScreenPanel):
                         "style": "dialog-error",
                     },
                 ]
-                self._gtk.Dialog(
-                    _("Recover"), recoverybuttons, label, self.reset_confirm, program
-                )
+                self._gtk.Dialog(_("Recover"), recoverybuttons, label, self.reset_confirm, program)
                 return
             else:
                 if info["version"] == info["remote_version"]:
@@ -211,7 +196,7 @@ class Panel(ScreenPanel):
         elif "package_count" in info:
             label.set_markup(
                 (
-                    f'<b>{info["package_count"]} '
+                    f"<b>{info['package_count']} "
                     + ngettext(
                         "Package will be updated",
                         "Packages will be updated",
@@ -230,9 +215,7 @@ class Panel(ScreenPanel):
             )
             i = 0
             for j, c in enumerate(info["package_list"]):
-                label = Gtk.Label(
-                    halign=Gtk.Align.START, ellipsize=Pango.EllipsizeMode.END
-                )
+                label = Gtk.Label(halign=Gtk.Align.START, ellipsize=Pango.EllipsizeMode.END)
                 label.set_markup(f"  {c}  ")
                 pos = j % 3
                 grid.attach(label, pos, i, 1, 1)
@@ -279,21 +262,19 @@ class Panel(ScreenPanel):
             self.reset_repo(self, program, False)
 
     def reset_repo(self, widget, program, hard):
-        if self._screen.updating:
+        if self._screen.state.updating:
             return
         self._screen.base_panel.show_update_dialog()
         msg = _("Starting recovery for") + f" {program}..."
-        self._screen._websocket_callback(
+        self._screen._notification_handler.handle(
             "notify_update_response",
             {"application": {program}, "message": msg, "complete": False},
         )
         logging.info(f"Sending machine.update.recover name: {program} hard: {hard}")
-        self._screen._ws.send_method(
-            "machine.update.recover", {"name": program, "hard": hard}
-        )
+        self._screen._ws.send_method("machine.update.recover", {"name": program, "hard": hard})
 
     def update_program(self, widget, program):
-        if self._screen.updating or not self.update_status:
+        if self._screen.state.updating or not self.update_status:
             return
 
         if program in self.update_status["version_info"]:
@@ -307,12 +288,8 @@ class Panel(ScreenPanel):
             ):
                 return
         self._screen.base_panel.show_update_dialog()
-        msg = (
-            _("Updating")
-            if program == "full"
-            else _("Starting update for") + f" {program}..."
-        )
-        self._screen._websocket_callback(
+        msg = _("Updating") if program == "full" else _("Starting update for") + f" {program}..."
+        self._screen._notification_handler.handle(
             "notify_update_response",
             {"application": {program}, "message": msg, "complete": False},
         )
@@ -325,7 +302,6 @@ class Panel(ScreenPanel):
             self._screen._ws.send_method("machine.update.client", {"name": program})
 
     def update_program_info(self, p):
-
         if not self.update_status or p not in self.update_status["version_info"]:
             logging.info(f"Unknown version: {p}")
             return
@@ -350,9 +326,7 @@ class Panel(ScreenPanel):
                 if info["version"] == info["remote_version"]:
                     self.labels[p].set_markup(f"<b>{p}</b>\n{info['version']}")
                     self._already_updated(p)
-                    self.buttons[f"{p}_status"].get_style_context().remove_class(
-                        "invalid"
-                    )
+                    self.buttons[f"{p}_status"].get_style_context().remove_class("invalid")
                 else:
                     self.labels[p].set_markup(
                         f"<b>{p}</b>\n{info['version']} -> {info['remote_version']}"
@@ -368,9 +342,7 @@ class Panel(ScreenPanel):
             self.labels[p].set_markup(f"<b>{p}</b>\n{info['version']}")
             self._already_updated(p)
         else:
-            self.labels[p].set_markup(
-                f"<b>{p}</b>\n{info['version']} -> {info['remote_version']}"
-            )
+            self.labels[p].set_markup(f"<b>{p}</b>\n{info['version']} -> {info['remote_version']}")
             self._needs_update(p, info["version"], info["remote_version"])
 
     def _already_updated(self, p):

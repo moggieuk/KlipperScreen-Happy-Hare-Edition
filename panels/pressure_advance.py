@@ -4,6 +4,7 @@ import gi
 
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gtk
+
 from ks_includes.screen_panel import ScreenPanel
 
 # TODO multi-extruder support
@@ -14,9 +15,7 @@ class Panel(ScreenPanel):
         title = title or _("Pressure advance")
         super().__init__(screen, title)
         self.current_extruder = "extruder"
-        self.current_extruder_label = Gtk.Label(
-            label=_("Current") + f": {self.current_extruder}"
-        )
+        self.current_extruder_label = Gtk.Label(label=_("Current") + f": {self.current_extruder}")
         self.grid = Gtk.Grid()
         self.grid.attach(self.current_extruder_label, 0, 0, 1, 1)
         self.values = {}
@@ -108,32 +107,24 @@ class Panel(ScreenPanel):
     def set_opt_value(self, widget, event, opt):
         value = self.list[opt]["scale"].get_value()
         if opt == "pressure_advance":
-            self._screen._ws.klippy.gcode_script(
+            self._screen._ws.api.gcode_script(
                 f"SET_PRESSURE_ADVANCE EXTRUDER={self.current_extruder} ADVANCE={value}"
             )
         if opt == "smooth_time":
-            self._screen._ws.klippy.gcode_script(
+            self._screen._ws.api.gcode_script(
                 f"SET_PRESSURE_ADVANCE EXTRUDER={self.current_extruder} SMOOTH_TIME={value}"
             )
 
     def process_update(self, action, data):
         if action != "notify_status_update":
             return
-        if (
-            "toolhead" in data
-            and "extruder" in data["toolhead"]
-            and data["toolhead"]["extruder"]
-        ):
+        if "toolhead" in data and "extruder" in data["toolhead"] and data["toolhead"]["extruder"]:
             self.current_extruder = data["toolhead"]["extruder"]
             logging.debug(f"Changing to {self.current_extruder}")
-            self.current_extruder_label.set_label(
-                _("Current") + f": {self.current_extruder}"
-            )
+            self.current_extruder_label.set_label(_("Current") + f": {self.current_extruder}")
             for opt in self.list:
                 if opt in self._printer.data[self.current_extruder]:
-                    self.update_option(
-                        opt, self._printer.data[self.current_extruder][opt]
-                    )
+                    self.update_option(opt, self._printer.data[self.current_extruder][opt])
         if self.current_extruder in data:
             for opt in self.list:
                 if opt in data[self.current_extruder]:
@@ -158,6 +149,4 @@ class Panel(ScreenPanel):
                 break
         self.list[option]["scale"].set_value(self.values[option])
         self.list[option]["scale"].disconnect_by_func(self.set_opt_value)
-        self.list[option]["scale"].connect(
-            "button-release-event", self.set_opt_value, option
-        )
+        self.list[option]["scale"].connect("button-release-event", self.set_opt_value, option)

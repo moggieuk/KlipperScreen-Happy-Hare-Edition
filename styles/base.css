@@ -33,7 +33,7 @@ window {
 }
 
 treeview.view{
-    padding-right: 0.25em;
+    padding: 1em .25em;
 }
 
 junction {
@@ -71,6 +71,7 @@ button {
     border-radius: 0;
     border: 0;
     -gtk-icon-shadow: none;
+    transition: padding 0s;
 }
 
 .active image,
@@ -150,15 +151,18 @@ combobox button {
 
 combobox arrow {
     min-width: 1em;
-    background-color: @bg;
 }
 
 combobox arrow:disabled {
 -gtk-icon-source: None;
 }
 
+combobox window.popup arrow {
+    background-color: transparent;
+}
+
 cellview {
-    padding: 0.5em 0.25em 0.5em 0;
+    padding: 0.2em 0.25em 0.2em 0.1em;
     font-size: 0.91em;
 }
 
@@ -290,13 +294,21 @@ trough {
     min-height: 2em;
 }
 
+.spoolman_low {
+    color: @warning;
+}
+
 .content {
     margin: 0 .1em;
 }
 
+.prompt {
+    padding: 0.25em 2.5em;
+}
+
 .dialog {
     border: .1em solid @text-inv;
-    padding: 2.5em;
+    padding: 0.25em 2.5em;
     background-color: @text-inv;
     margin: 1em;
 }
@@ -497,6 +509,11 @@ trough {
     font-weight: bold;
 }
 
+.printing-thumbnail {
+    margin-left: .5em;
+    margin-right: .5em;
+}
+
 .printing-progress-text {
     font-size: 1.25em;
     font-weight: bold;
@@ -665,6 +682,40 @@ flowbox button {
 
 keyboard_box {
     padding: 0 20em;
+}
+
+.spool_title {
+    padding: .5em;
+}
+
+.spool_icon {
+    padding-right: .5em;
+}
+
+.endstop {
+    padding: 0.5em;
+    border-radius: .5em;
+    margin: 0.5em 1em;
+}
+
+.endstop-open {
+    background-color: @echo;
+}
+
+.endstop-triggered {
+    background-color: @error;
+}
+
+.no-margin {
+    margin: 0;
+}
+
+.no-padding {
+    padding: 0;
+}
+
+.monospaced {
+    font-family: monospace;
 }
 
 /* vvv Happy Hare added vvv */

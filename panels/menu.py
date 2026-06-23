@@ -6,12 +6,12 @@ import gi
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gtk
 from jinja2 import Template
+
 from ks_includes.screen_panel import ScreenPanel
 from ks_includes.widgets.autogrid import AutoGrid
 
 
 class Panel(ScreenPanel):
-
     def __init__(self, screen, title, items=None):
         super().__init__(screen, title)
         self.menu_callbacks = {} # Happy Hare
@@ -86,14 +86,21 @@ class Panel(ScreenPanel):
         enabled = []
         for item in items:
             key = list(item)[0]
+
+            # Happy Hare vvv
             show_disabled = item[key].get('show_disabled', "False").strip().lower() == "true"
             is_enabled = self.evaluate_enable(item[key]['enable'])
             if show_disabled:
                 self.labels[key].set_sensitive(is_enabled)
             else:
-                if not self.evaluate_enable(item[key]['enable']):
+                if not self.evaluate_enable(item[key]["enable"]):
                     logging.debug(f"X > {key}")
                     continue
+            # Happy Hare ^^^
+
+            if item[key]["panel"] and self._is_shortcut_item(item[key]):
+                continue
+
             enabled.append(self.labels[key])
         self.autogrid.__init__(enabled, columns, expand_last, self._screen.vertical_mode)
         return self.autogrid
@@ -113,9 +120,17 @@ class Panel(ScreenPanel):
             key = list(self.items[i])[0]
             item = self.items[i][key]
 
-            name = self._screen.env.from_string(item['name']).render(self.j2_data)
-            icon = self._screen.env.from_string(item['icon']).render(self.j2_data) if item['icon'] else None
-            style = self._screen.env.from_string(item['style']).render(self.j2_data) if item['style'] else None
+            name = self._screen.env.from_string(item["name"]).render(self.j2_data)
+            icon = (
+                self._screen.env.from_string(item["icon"]).render(self.j2_data)
+                if item["icon"]
+                else None
+            )
+            style = (
+                self._screen.env.from_string(item["style"]).render(self.j2_data)
+                if item["style"]
+                else None
+            )
 
             if icon == "notifications" and (
                 bool(self._screen.server_info["warnings"])
@@ -127,23 +142,29 @@ class Panel(ScreenPanel):
 
             b = self._gtk.Button(icon, name, style or f"color{i % 4 + 1}", scale=scale)
 
-            if item['panel']:
+            if item["panel"]:
                 b.connect("clicked", self.menu_item_clicked, item)
-            elif item['method'] == "ks_confirm_save":
+            elif item["method"] == "ks_confirm_save":
                 b.connect("clicked", self._screen.confirm_save)
-            elif item['method']:
+            elif item["method"]:
                 params = {}
 
-                if item['params'] is not False:
+                if item["params"] is not False:
                     try:
-                        p = self._screen.env.from_string(item['params']).render(self.j2_data)
+                        p = self._screen.env.from_string(item["params"]).render(self.j2_data)
                         params = json.loads(p)
                     except Exception as e:
                         logging.exception(f"Unable to parse parameters for [{name}]:\n{e}")
                         params = {}
 
-                if item['confirm'] is not None:
-                    b.connect("clicked", self._screen._confirm_send_action, item['confirm'], item['method'], params)
+                if item["confirm"] is not None:
+                    b.connect(
+                        "clicked",
+                        self._screen._confirm_send_action,
+                        item["confirm"],
+                        item["method"],
+                        params,
+                    )
                 else:
                     params['show_disabled'] = item.get('show_disabled', "False").strip().lower() == "true" # Happy Hare: Need to know if dynamic sensitivity
                     b.connect("clicked", self._screen._send_action, item['method'], params)
@@ -158,14 +179,20 @@ class Panel(ScreenPanel):
 
     def evaluate_enable(self, enable):
         if enable == "{{ moonraker_connected }}":
-            logging.info(f"moonraker connected {self._screen._ws.connected}")
-            return self._screen._ws.connected
-        self.j2_data["klipperscreen"] = { # Happy Hare: to allow for menu button rather than side bar navigation
-                "side_mmu_shortcut": self._config.get_main_config().getboolean("side_mmu_shortcut")
+            logging.info(f"moonraker connected {self._screen.state.connected}")
+            return self._screen.state.connected
+        self.j2_data["klipperscreen"] = { # Happy Hare: injected data to allow for menu button rather than side bar navigation
+                "side_mmu_shortcut": self._screen._config.get_main_config().getboolean("side_mmu_shortcut")
                 }
         try:
             j2_temp = Template(enable, autoescape=True)
-            return j2_temp.render(self.j2_data) == 'True'
+            return j2_temp.render(self.j2_data) == "True"
         except Exception as e:
             logging.debug(f"Error evaluating enable statement: {enable}\n{e}")
             return False
+
+    def _is_shortcut_item(self, item):
+        shortcut_target = self._screen._config.get_main_config().get(
+            "side_shortcut_target", fallback="notifications"
+        )
+        return item.get("panel") == shortcut_target

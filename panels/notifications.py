@@ -2,8 +2,8 @@ import gi
 
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gtk
-from ks_includes.screen_panel import ScreenPanel
 
+from ks_includes.screen_panel import ScreenPanel
 
 COLORS = {
     "time": "DarkGrey",
@@ -14,7 +14,7 @@ COLORS = {
 
 
 def remove_newlines(msg: str) -> str:
-    return msg.replace('\n', ' ')
+    return msg.replace("\n", " ")
 
 
 class Panel(ScreenPanel):
@@ -30,7 +30,9 @@ class Panel(ScreenPanel):
         scroll = Gtk.ScrolledWindow(hexpand=True, vexpand=True)
         scroll.add(tv)
 
-        clear_button = self._gtk.Button("refresh", _('Clear') + " ", None, self.bts, Gtk.PositionType.RIGHT, 1)
+        clear_button = self._gtk.Button(
+            "refresh", _("Clear") + " ", None, self.bts, Gtk.PositionType.RIGHT, 1
+        )
         clear_button.get_style_context().add_class("buttons_slim")
         clear_button.set_vexpand(False)
         clear_button.connect("clicked", self.clear)
@@ -59,7 +61,7 @@ class Panel(ScreenPanel):
             self.tb.get_end_iter(),
             f'\n<span color="{COLORS["time"]}">{log["time"]}</span> '
             f'<span color="{color}"><b>{remove_newlines(log["message"])}</b></span>',
-            -1
+            -1,
         )
 
     def clear(self, widget):
@@ -68,7 +70,7 @@ class Panel(ScreenPanel):
 
     def refresh(self):
         self.tb.set_text("")
-        for log in self._screen.notification_log:
+        for log in self._screen.state.notification_log:
             self.add_notification(log)
 
     def process_update(self, action, data):

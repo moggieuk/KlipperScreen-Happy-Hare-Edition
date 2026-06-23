@@ -2,6 +2,30 @@
 This just tracks the most notable changes, if you want all the details checkout the commit history.
 Probably all versions contain changes regarding documentation, translation, fixes and other minor refactors
 
+## Current master
+
+* add support to use Unix socket for lower overhead on local instances
+* improve the gcode file list load speed (tests show 100x faster on remote instances)
+* show z in bed_level
+* panel to query_endstops and move to absolute positions
+* configurable action-bar shortcut (instead of just macros)
+* network interface selector includes wired connections
+* add a shortcut from titlebar item to respective panels (temp/spoolman)
+* add a configurable screensaver delay for slow to wake displays
+
+## v0.4.7  (May 13, 2026)
+
+* add a spool edit panel for spoolman
+* add option to add spool weight into the titlebar (spoolman required)
+* add a wifi interface selector in the network panel
+* option to use keyboard navigation
+* allow starting in locked state
+* option to auto-lock the screen
+* if printer power_devices in ks config add shortcut to shutdown panel
+* change default value on macro shortcut to false
+* rotate the move buttons according to screw_rotation
+* add caching of some resources for perfomance
+
 ## v0.4.6  (Jul 2, 2025)
 
 * basic lockscreen for shows or kids

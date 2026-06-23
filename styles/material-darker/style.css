@@ -52,7 +52,22 @@ button.color4 {
     background-color: #252525;
     border-color: #252525;
     border-radius: .25em;
-    padding-top: 0.4em;
+    padding-top: 0.5em;
+    padding-bottom: 0.5em;
+}
+
+
+button:focus,
+button.color1:focus,
+button.color2:focus,
+button.color3:focus,
+button.color4:focus,
+button.update:focus,
+button.invalid:focus,
+.dialog button:focus
+{
+    background-color: #424242;
+    border-color: #424242;
 }
 
 button.color1:active,
@@ -64,6 +79,7 @@ button.invalid:active,
 .dialog button:active {
     border-style: none;
     background-color: #424242;
+    margin-top: 0.55em;
 }
 
 .active image,
@@ -86,7 +102,6 @@ button.invalid {
 menu,
 menuitem,
 combobox button,
-combobox arrow,
 combobox menuitem {
     background-color: #252525;
     border-color: #121212;
@@ -163,19 +178,19 @@ textview .time {
 }
 
 .dialog-info {
-    border-bottom-color: @color4;
+    border-bottom-color: @color_4;
 }
 
 .dialog-default {
-    border-bottom-color: @color3;
+    border-bottom-color: @color_3;
 }
 
 .dialog-secondary {
-     border-bottom-color: @color2;
+     border-bottom-color: @color_2;
 }
 
 .dialog-primary {
-     border-bottom-color: @color1;
+     border-bottom-color: @color_1;
 }
 
 .horizontal_togglebuttons  {

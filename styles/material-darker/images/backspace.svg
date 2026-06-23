@@ -6,7 +6,7 @@
    viewBox="0 0 24 24"
    id="svg4"
    sodipodi:docname="backspace.svg"
-   inkscape:version="1.1 (c4e8f9ed74, 2021-05-24)"
+   inkscape:version="1.4.4 (dcaf3e7d9e, 2026-05-05)"
    xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
    xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
    xmlns="http://www.w3.org/2000/svg"
@@ -22,17 +22,19 @@
      inkscape:pageopacity="0"
      inkscape:pagecheckerboard="1"
      showgrid="false"
-     inkscape:zoom="26"
-     inkscape:cx="12"
-     inkscape:cy="12.019231"
-     inkscape:window-width="1600"
-     inkscape:window-height="826"
+     inkscape:zoom="13"
+     inkscape:cx="7.6153846"
+     inkscape:cy="22.730769"
+     inkscape:window-width="1536"
+     inkscape:window-height="792"
      inkscape:window-x="0"
      inkscape:window-y="0"
      inkscape:window-maximized="1"
-     inkscape:current-layer="svg4" />
+     inkscape:current-layer="svg4"
+     inkscape:showpageshadow="2"
+     inkscape:deskcolor="#d1d1d1" />
   <path
-     d="M19,15.59L17.59,17L14,13.41L10.41,17L9,15.59L12.59,12L9,8.41L10.41,7L14,10.59L17.59,7L19,8.41L15.41,12L19,15.59M22,3A2,2 0 0,1 24,5V19A2,2 0 0,1 22,21H7C6.31,21 5.77,20.64 5.41,20.11L0,12L5.41,3.88C5.77,3.35 6.31,3 7,3H22M22,5H7L2.28,12L7,19H22V5Z"
-     id="path2"
-     style="fill:#e2e2e2" />
+     id="path3"
+     style="fill:#e2e2e2"
+     d="M 7 3 C 6.31 3 5.7701562 3.3508594 5.4101562 3.8808594 L 0 12 L 5.4101562 20.109375 C 5.7701562 20.639375 6.31 21 7 21 L 22 21 A 2 2 0 0 0 24 19 L 24 5 A 2 2 0 0 0 22 3 L 7 3 z M 10.410156 7 L 14 10.589844 L 17.589844 7 L 19 8.4101562 L 15.410156 12 L 19 15.589844 L 17.589844 17 L 14 13.410156 L 10.410156 17 L 9 15.589844 L 12.589844 12 L 9 8.4101562 L 10.410156 7 z " />
 </svg>

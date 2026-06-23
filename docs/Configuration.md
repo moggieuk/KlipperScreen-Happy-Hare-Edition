@@ -40,6 +40,19 @@ The options listed here are not editable from within the user interface.
 # it will be redacted from the logs.
 # default is no password
 # lock_password: example_password
+
+# Auto-lock the screen after a period of inactivity (in seconds)
+# 0 means disabled
+# autolock_timeout: 0
+
+# Start KlipperScreen with the screen locked
+# start_locked: False
+
+# Allow button focus to navigate with the keyboard
+# a scroll wheel mapped to tab/shift+tab and enter button can work
+# Beware that the UI is coded to be touchscreen controlled, this is
+# not recommended as the only way to control
+# keyboard_navigation: False
 ```
 
 !!! tip
@@ -57,7 +70,7 @@ moonraker_port: 7125
 # moonraker_ssl: False
 # If you're using the route_prefix option in your moonraker config, specify it here.
 # This can be useful for running multiple printers behind a path-based reverse proxy.
-# Most installs will not need this. 
+# Most installs will not need this.
 # moonraker_path: printer1
 # Moonraker API key if this host is not connecting from a trusted client IP
 # moonraker_api_key: False
@@ -74,7 +87,8 @@ moonraker_port: 7125
 # Define what items should be shown in titlebar besides the extruder and bed
 # the name must be the same as defined in the klipper config
 # valid options are temperature_sensors or temperature_fans, or heater_generic
-# titlebar_items: chamber, MCU, Pi
+# There is a special item named "spool" that depends on Spoolman data provided through Moonraker
+# titlebar_items: chamber, MCU, Pi, spool
 
 # The style of the user defined items in the titlebar
 # Can be 'full' indicating that the full name is shown, 'short' for the first letter, or None (default) for no name
@@ -89,7 +103,10 @@ moonraker_port: 7125
 
 # Custom commands for zcalibrate
 # the zcalibrate panel provides quick access to test_z, accept and cancel commands
-# zcalibrate_custom_commands: CUSTOM_CALIBRATE, CUSTOM_CALIBRATE method=manual, CUSTOM_TEST
+# if you have a command that makes use of this functions and it's not in the main klipper repository
+# add it to this list.
+# examples:
+# zcalibrate_custom_commands: MYCUSTOMPROBE_CALIBRATE, CUSTOM_CALIBRATE method=manual, CUSTOM_TEST
 
 # Rotation is useful if the screen is not directly in front of the machine.
 # It will affect the bed mesh visualization.
@@ -105,6 +122,21 @@ moonraker_port: 7125
 
 # Camera needs to be configured in moonraker:
 # https://moonraker.readthedocs.io/en/latest/configuration/#webcam
+
+# Low limit for remaining spool weight in the title bar, in grams.
+# When the active spool drops below this value, the spool icon and weight turn red.
+# Note: if you want a global option use the [spoolman] section
+# spool_low_limit: 20
+```
+
+## Spoolman Options
+```ini
+[spoolman]
+# Low limit for remaining spool weight in the title bar, in grams.
+# When the active spool drops below this value, the spool icon and weight turn red.
+# spool_low_limit: 20
+# Time in seconds between Spoolman syncs.
+# sync_rate: 20
 ```
 
 ## Preheat Options

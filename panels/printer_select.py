@@ -4,9 +4,10 @@ import gi
 
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gtk
+
+from ks_includes.KlippyGtk import find_widget
 from ks_includes.screen_panel import ScreenPanel
 from ks_includes.widgets.autogrid import AutoGrid
-from ks_includes.KlippyGtk import find_widget
 
 
 class Panel(ScreenPanel):
@@ -16,12 +17,18 @@ class Panel(ScreenPanel):
         printers = self._config.get_printers()
 
         self.printer_buttons = []
+        scale = 3
+        image_scale = scale * self._gtk.img_scale
+        if len(printers) == 2:
+            image_scale *= 2
+        elif len(printers) == 3:
+            image_scale *= 1.6
+        elif 4 <= len(printers) <= 6:
+            image_scale *= 1.4
         for i, printer in enumerate(printers):
             name = list(printer)[0]
-            scale = 3
             self.labels[name] = self._gtk.Button("printer", name, f"color{1 + i % 4}", scale=scale)
-            scale *= self._gtk.img_scale
-            pixbuf = self._gtk.PixbufFromIcon(f"../../printers/{name}", scale, scale)
+            pixbuf = self._gtk.PixbufFromIcon(f"../../printers/{name}", image_scale, image_scale)
             if pixbuf is not None:
                 image = find_widget(self.labels[name], Gtk.Image)
                 image.set_from_pixbuf(pixbuf)
@@ -38,8 +45,8 @@ class Panel(ScreenPanel):
         self._screen.connect_printer(name)
 
     def activate(self):
-        if self._screen._ws and self._screen._ws.connected:
-            self._screen.close_websocket()
+        if self._screen._ws and self._screen.state.connected:
+            self._screen.close_connection()
             logging.debug("Waiting for disconnect")
             self._screen.base_panel.set_title(_("Please wait"))
             b: Gtk.Button

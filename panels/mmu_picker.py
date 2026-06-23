@@ -10,17 +10,10 @@ gi.require_version("Gtk", "3.0")
 
 from gi.repository import Gtk, GLib, Pango, Gdk
 from ks_includes.screen_panel import ScreenPanel
+from panels.mmu_mixin import *
 
-class Panel(ScreenPanel):
-    TOOL_UNKNOWN = -1
-    TOOL_BYPASS = -2
 
-    GATE_UNKNOWN = -1
-    GATE_EMPTY = 0
-    GATE_AVAILABLE = 1
-    GATE_AVAILABLE_FROM_BUFFER = 2
-
-    DUMMY = -99
+class Panel(ScreenPanel, MmuMixin):
 
     COLOR_SWATCH = '⬤'
     EMPTY_SWATCH = '◯'
@@ -85,6 +78,7 @@ class Panel(ScreenPanel):
         scroll.add(grid)
         self.content.add(scroll)
 
+
     def activate(self):
         mmu = self._printer.get_stat("mmu")
         endless_spool = mmu['endless_spool']
@@ -119,7 +113,7 @@ class Panel(ScreenPanel):
             self.labels[f'status_{i}'].set_from_pixbuf(self.labels[f'{status_icon}'])
             self.labels[f'available_{i}'].set_label(status_str)
             self.labels[f'available_{i}'].override_color(Gtk.StateType.NORMAL, status_color)
-            self.labels[f'tool_{i}'].set_sensitive(gate_status[i] in (self.GATE_AVAILABLE, self.GATE_AVAILABLE_FROM_BUFFER))
+            self.labels[f'tool_{i}'].set_sensitive(gate_status[i] in (GATE_AVAILABLE, GATE_AVAILABLE_FROM_BUFFER))
             if gate_color[i] != '':
                 self.labels[f'color_{i}'].set_text(self.COLOR_SWATCH)
             else:
@@ -129,16 +123,17 @@ class Panel(ScreenPanel):
             self.labels[f'gate_{i}'].set_label(gate_str)
             self.labels[f'alt_gates_{i}'].set_label(alt_gate_str)
 
+
     def get_status_details(self, gate_status):
-        if gate_status == self.GATE_AVAILABLE:
+        if gate_status == GATE_AVAILABLE:
             status_icon = 'available_icon'
             status_str = "Available"
             status_color = self.COLOR_GREEN
-        elif gate_status == self.GATE_AVAILABLE_FROM_BUFFER:
+        elif gate_status == GATE_AVAILABLE_FROM_BUFFER:
             status_icon = 'available_icon'
             status_str = "Buffered"
             status_color = self.COLOR_GREEN
-        elif gate_status == self.GATE_EMPTY:
+        elif gate_status == GATE_EMPTY:
             status_icon = 'empty_icon'
             status_str = "Empty"
             status_color = self.COLOR_RED
@@ -147,6 +142,7 @@ class Panel(ScreenPanel):
             status_str = "Unknown"
             status_color = self.COLOR_LIGHT_GREY
         return status_icon, status_str, status_color
+
 
     # Structure is:
     # tool_map = [ { 'gate': <gate>, 'alt_gates': <alternative_gates> }, ... ]
@@ -166,6 +162,7 @@ class Panel(ScreenPanel):
             tool_map.append({ 'gate': ttg_map[tool], 'alt_gates': alt_gates })
         return tool_map
 
+
     def process_update(self, action, data):
         if action == "notify_status_update":
             if 'configfile' in data:
@@ -175,11 +172,12 @@ class Panel(ScreenPanel):
                 if 'tool' in e_data or 'gate' in e_data or 'gate_status' in e_data or 'gate_material' in e_data or 'gate_color' in e_data:
                     self.activate()
 
+
     def select_tool(self, widget, selected_tool):
         mmu = self._printer.get_stat("mmu")
         tool = mmu['tool']
         filament = mmu['filament']
-        if tool == self.TOOL_BYPASS and filament == "Loaded":
+        if tool == TOOL_BYPASS and filament == "Loaded":
             # Should not of got here but do nothing for safety
             pass
         else:

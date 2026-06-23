@@ -10,8 +10,9 @@ gi.require_version("Gtk", "3.0")
 
 from gi.repository import Gtk, GLib, Pango, Gdk
 from ks_includes.screen_panel import ScreenPanel
+from panels.mmu_mixin import *
 
-class Panel(ScreenPanel):
+class Panel(ScreenPanel, MmuMixin):
 
     #        0    1    2    3    4    5    6    7    8    9   10   11   12   13   14   15
     box =  [' ', '╵', '╶', '└', '╷', '│', '┌', '├', '╴', '┘', '─', '┴', '┐', '┤', '┬', '┼']
@@ -153,6 +154,7 @@ class Panel(ScreenPanel):
         scroll.add(grid)
         self.content.add(scroll)
 
+
     def activate(self):
         mmu = self._printer.get_stat("mmu")
         self.ui_ttg_map = mmu['ttg_map']
@@ -164,11 +166,13 @@ class Panel(ScreenPanel):
         self.update_map()
         self.update_es_group()
 
+
     def map_unique_groups(self, groups):
         unique_groups = list(set(groups))
         unique_groups.sort()
         mapping = {group: index for index, group in enumerate(unique_groups)}
         return [mapping[group] for group in groups]
+
 
     def first_empty_groups(self, groups):
         unique_groups = list(set(groups))
@@ -178,11 +182,13 @@ class Panel(ScreenPanel):
             group += 1
         return group
 
+
     def convert_number_to_letter(self, number):
         if number >= 0:
             return chr(ord('A') + number)
         else:
             return '?'
+
 
     def build_es_spool_gate_group(self, es_group):
         gates = []
@@ -190,6 +196,7 @@ class Panel(ScreenPanel):
             if self.ui_endless_spool_groups[g] == es_group:
                 gates.append(g)
         return gates
+
 
     def gen_map(self, htool=-1, hgate=-1):
         num_gates = len(self.ui_ttg_map)
@@ -221,6 +228,7 @@ class Panel(ScreenPanel):
             tool_map[num_gates+3][gate] |= 257 | (bold >> 3)
         return tool_map
 
+
     def update_map(self):
         tool = self.ui_sel_tool
         gate = self.ui_ttg_map[tool]
@@ -246,6 +254,7 @@ class Panel(ScreenPanel):
         self.labels['tool'].set_label(f"T{tool}")
         self.labels['gate'].set_label(f"Gate #{gate}")
 
+
     def update_es_group(self):
         gates_in_group = self.build_es_spool_gate_group(self.ui_sel_es_group)
         for g in range(len(self.ui_ttg_map)):
@@ -260,6 +269,7 @@ class Panel(ScreenPanel):
         self.labels['es_decrease'].set_sensitive(self.ui_es_enabled == 1 and self.ui_sel_es_group > 0)
         self.labels['es_increase'].set_sensitive(self.ui_es_enabled == 1 and self.ui_sel_es_group < len(self.ui_ttg_map) - 1)
 
+
     def process_update(self, action, data):
         if action == "notify_status_update":
             if 'configfile' in data:
@@ -268,6 +278,7 @@ class Panel(ScreenPanel):
                 e_data = data['mmu']
                 if 'ttg_map' in e_data or 'endless_spool_groups' in e_data or 'endless_spool' in e_data:
                     self.activate()
+
 
     def select_toolgate(self, widget, toolgate, param=0):
         mmu = self._printer.get_stat("mmu")
@@ -288,6 +299,7 @@ class Panel(ScreenPanel):
         self.update_map()
         self.update_es_group()
 
+
     def select_es(self, widget, param=0):
         mmu = self._printer.get_stat("mmu")
         max_grp_number = len(mmu['ttg_map'])
@@ -299,6 +311,7 @@ class Panel(ScreenPanel):
 
         self.update_es_group()
 
+
     def select_es_gate(self, widget, gate):
         if self.ui_endless_spool_groups[gate] == self.ui_sel_es_group:
             self.ui_endless_spool_groups[gate] = self.first_empty_groups(self.ui_endless_spool_groups)
@@ -308,6 +321,7 @@ class Panel(ScreenPanel):
         self.update_map()
         self.update_es_group()
 
+
     def select_es_toggle(self, widget, param=0):
         if self.labels['endless_spool'].get_active():
             self.ui_es_enabled = 1
@@ -315,6 +329,7 @@ class Panel(ScreenPanel):
             self.ui_es_enabled = 0
 
         self.update_es_group()
+
 
     def select_reset_save(self, widget, action):
         label = Gtk.Label()
@@ -338,6 +353,7 @@ class Panel(ScreenPanel):
         ]
         dialog = self._gtk.Dialog(self._screen, buttons, grid, self.reset_save_confirm, action)
         dialog.set_title(_("Confirm TTG/EndlessSpool Reset"))
+
 
     def reset_save_confirm(self, dialog, response_id, action):
         self._gtk.remove_dialog(dialog)

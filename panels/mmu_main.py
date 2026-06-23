@@ -771,9 +771,9 @@ class Panel(ScreenPanel, MmuMixin):
             if state == "inactive":
                 return "[  -  ]"
             if state == "compressed":
-                return "[▶ C ◀]"
+                return "[▷ C ◁]"
             if state == "tension":
-                return " [◀T▶] "
+                return " [◁T▷] "
             if state == "neutral":
                 if value is not None:
                     self._last_sync_feedback_bias_rounded = round(value, 1)

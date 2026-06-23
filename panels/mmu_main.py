@@ -214,19 +214,23 @@ class Panel(ScreenPanel, MmuMixin):
         self.init_tool_value()
         self.config_update()
 
+
     def activate(self):
         self.config_update()
         self.update_status()
         self.update_filament_status()
 
+
     def post_attach(self):
         # Gtk Notebook will only change layer after show_all() hence this extra callback to fix state
         self.update_active_buttons()
+
 
     def config_update(self):
         self.markup_status = self._config.get_main_config().getboolean("mmu_color_gates", True)
         self.markup_filament = self._config.get_main_config().getboolean("mmu_color_filament", False)
         self.bold_filament = self._config.get_main_config().getboolean("mmu_bold_filament", False)
+
 
     def process_update(self, action, data):
         if action == "notify_status_update" and data is not None:
@@ -797,7 +801,8 @@ class Panel(ScreenPanel, MmuMixin):
             tool_text,
             past(FILAMENT_POS_UNLOADED) * 2,
 
-            optional_sensor(V3_SENSOR_GATE, FILAMENT_POS_HOMED_GATE),
+            # This represents mmu_exit or mmu_shared_exit (whichever is used for gate homing)
+            optional_sensor(gate_homing_endstop, FILAMENT_POS_HOMED_GATE),
 
             (
                 "En" + past(encoder_ref_pos) * 2

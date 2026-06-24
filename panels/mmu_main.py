@@ -115,15 +115,27 @@ class Panel(ScreenPanel, MmuMixin):
         self.labels['sensor_state'].set_xalign(0)
         self.labels['sensor_state'].get_style_context().add_class("mmu_sensor_text")
 
-        encoder_gauge = DialGauge()
+        # In print Encoder guage ---------
+        encoder_gauge = EncoderDialGauge()
         self.labels['encoder_gauge'] = encoder_gauge
 
-        runout_frame = Gtk.Frame()
-        self.labels['runout_frame'] = runout_frame
-        runout_frame.set_label("FlowGuard")
-        runout_frame.set_label_align(0.5, 0)
-        runout_frame.add(encoder_gauge)
+        encoder_frame = Gtk.Frame()
+        self.labels['encoder_frame'] = encoder_frame
+        encoder_frame.set_label("FlowGuard")
+        encoder_frame.set_label_align(0.5, 0)
+        encoder_frame.add(encoder_gauge)
 
+        # In print sync-feedback flowguard  guage ---------
+        flowguard_gauge = FlowGuardDialGauge()
+        self.labels['flowguard_gauge'] = flowguard_gauge
+
+        flowguard_frame = Gtk.Frame()
+        self.labels['flowguard_frame'] = flowguard_frame
+        flowguard_frame.set_label("FlowGuard")
+        flowguard_frame.set_label_align(0.5, 0)
+        flowguard_frame.add(flowguard_gauge)
+
+        # MMU Manage screen ---------
         manage_grid = Gtk.Grid()
         manage_grid.set_column_homogeneous(True)
 
@@ -135,12 +147,17 @@ class Panel(ScreenPanel, MmuMixin):
         else:
             manage_grid.attach(self.labels['manage'], 0, 0, 3, 3)
 
-        runout_layer = Gtk.Notebook()
-        self.labels['runout_layer'] = runout_layer
-        runout_layer.set_show_tabs(False)
-        runout_layer.insert_page(manage_grid, None, 0)
-        runout_layer.insert_page(runout_frame, None, 1)
-        runout_layer.set_current_page(0)
+        # Notebook layers for three possible uses of top right corner ----------
+        notebook_corner = Gtk.Notebook()
+        self.labels['notebook_corner'] = notebook_corner
+        notebook_corner.set_show_tabs(False)
+#PAUL        notebook_corner.insert_page(manage_grid, None, 0)
+#PAUL        notebook_corner.insert_page(encoder_frame, None, 1)
+#PAUL        notebook_corner.insert_page(flowguard_frame, None, 2)
+        notebook_corner.insert_page(self._clickable_page(manage_grid), None, 0)
+        notebook_corner.insert_page(self._clickable_page(encoder_frame), None, 1)
+        notebook_corner.insert_page(self._clickable_page(flowguard_frame), None, 2)
+        notebook_corner.set_current_page(0)
 
         # TextView has problems in this use case so use 5 separate labels... Simple!
         status_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
@@ -171,7 +188,7 @@ class Panel(ScreenPanel, MmuMixin):
         top_grid.set_vexpand(False)
         top_grid.set_column_homogeneous(True)
         top_grid.attach(top_box,                0, 0,  9, 1)
-        top_grid.attach(runout_layer,           9, 0,  3, 3)
+        top_grid.attach(notebook_corner,           9, 0,  3, 3)
         top_grid.attach(status_box,             0, 1, 10, 1)
         top_grid.attach(self.labels['status5'], 0, 2, 12, 1)
 
@@ -206,6 +223,22 @@ class Panel(ScreenPanel, MmuMixin):
         self.ui_sel_tool = NOT_SET
         self.init_tool_value()
         self.config_update()
+
+
+    def _next_notebook_corner_page(self, widget, event):
+        notebook = self.labels["notebook_corner"]
+        page = notebook.get_current_page()
+        pages = notebook.get_n_pages()
+
+        notebook.set_current_page((page + 1) % pages)
+        return True
+
+
+    def _clickable_page(self, child):
+        event_box = Gtk.EventBox()
+        event_box.add(child)
+        event_box.connect("button-press-event", self._next_notebook_corner_page)
+        return event_box
 
 
     def activate(self):
@@ -255,6 +288,16 @@ class Panel(ScreenPanel, MmuMixin):
                         elif 'sync_feedback_bias_modelled' in e_data and self._should_update_proportional():
                             self.update_filament_status()
                             filament_status_updated = True
+
+                    # Flowguard
+                    if (
+                        self.has_buffer()
+                        and any(
+                            key in e_data
+                            for key in ('sync_feedback_flow_rate', 'flowguard')
+                        )
+                    ):
+                        self.update_flowguard(mmu['flowguard'])
 
                     if any(
                         key in e_data
@@ -483,9 +526,29 @@ class Panel(ScreenPanel, MmuMixin):
             self.labels['tool'].set_image(self.labels['tool_img'])
 
 
+    def update_flowguard(self, data):
+# PAUL temp
+#        if self._printer.get_stat("print_stats")['state'] != "printing":
+#            return
+
+        mmu = self._printer.get_stat("mmu")
+        flowrate = mmu["sync_feedback_flow_rate"]
+
+        gauge = self.labels['flowguard_gauge']
+        gauge.update(data, flowrate)
+
+        # Update frame heading
+        enabled = data['enabled']
+        active = data['active']
+        mode_str = "Disabled" if not enabled else "FlowGuard Active" if active else "FlowGuard Inactive"
+        self.labels['flowguard_frame'].set_label(f'{mode_str}')
+        self.labels['flowguard_frame'].set_sensitive(enabled)
+
+
     def update_encoder(self, data):
-        if self._printer.get_stat("print_stats")['state'] != "printing":
-            return
+# PAUL temp
+#        if self._printer.get_stat("print_stats")['state'] != "printing":
+#            return
 
         gauge = self.labels['encoder_gauge']
         gauge.update(
@@ -495,21 +558,20 @@ class Panel(ScreenPanel, MmuMixin):
             data['headroom'],
             data['flow_rate']
         )
-        self.update_runout_mode(data)
-        self.update_movement(data['encoder_pos'])
 
-
-    def update_runout_mode(self, data):
+        # Update frame heading
         detection_mode = data['detection_mode']
         enabled = data['enabled']
-        detection_mode_str = "Disabled" if not enabled else "FlowGuard (Auto)" if detection_mode == 2 else "FlowGuard (Man)" if detection_mode == 1 else "FlowGuard Off"
-        self.labels['runout_frame'].set_label(f'{detection_mode_str}')
-        self.labels['runout_frame'].set_sensitive(detection_mode and enabled)
+        mode_str = "Disabled" if not enabled else "FlowGuard (Auto)" if detection_mode == 2 else "FlowGuard (Man)" if detection_mode == 1 else "FlowGuard Off"
+        self.labels['encoder_frame'].set_label(f'{mode_str}')
+        self.labels['encoder_frame'].set_sensitive(detection_mode and enabled)
+
+        # Encoder pos is displayed in filament position status
+        self.update_movement(data['encoder_pos'])
 
 
     def update_movement(self, encoder_position=None):
         mmu = self._printer.get_stat("mmu")
-
         print_state = mmu["print_state"]
         action = mmu["action"]
         filament = mmu["filament"]
@@ -612,9 +674,9 @@ class Panel(ScreenPanel, MmuMixin):
                 ui_state.append("no_message")
 
             if "printing" in ui_state and self.has_encoder():
-                self.labels['runout_layer'].set_current_page(1) # Clog display
+                self.labels['notebook_corner'].set_current_page(1) # Clog display
             else:
-                self.labels['runout_layer'].set_current_page(0) # Manage recovery button
+                self.labels['notebook_corner'].set_current_page(0) # Manage recovery button
 
             if ("paused" not in ui_state and "pause_locked" not in ui_state) or "no_message" in ui_state:
                 self.labels['pause_layer'].set_current_page(0) # Pause button
@@ -625,7 +687,7 @@ class Panel(ScreenPanel, MmuMixin):
                 ui_state.append("busy")
         else:
             ui_state.append("disabled")
-            self.labels['runout_layer'].set_current_page(0) # Manage recovery button
+            self.labels['notebook_corner'].set_current_page(0) # Manage recovery button
             self.labels['t_increase'].set_sensitive(False)
             self.labels['t_decrease'].set_sensitive(False)
 
@@ -892,11 +954,12 @@ class Panel(ScreenPanel, MmuMixin):
         return "".join(result)
 
 
+
 # -------------------------------------------------------------------------------------------
-# ENCODER FLOWGUARD METER
+# ENCODER DIAL GUAGE
 # -------------------------------------------------------------------------------------------
 
-class DialGauge(Gtk.DrawingArea):
+class EncoderDialGauge(Gtk.DrawingArea):
     def __init__(self):
         super().__init__()
 
@@ -950,7 +1013,7 @@ class DialGauge(Gtk.DrawingArea):
         self._arc(cr, cx, cy, r, start, end)
         cr.stroke()
 
-    def _point_on_arc(self, cx, cy, radius, value): # PAUL
+    def _point_on_arc(self, cx, cy, radius, value):
         a = self._angle(value)
         return (
             cx + radius * math.cos(a),
@@ -964,13 +1027,13 @@ class DialGauge(Gtk.DrawingArea):
         # Shape of arc (circle center and radius)
         cx = w * 0.5
         cy = h * 0.62 # 62% down
-        r = min(w * 0.41, h * 0.50)
+        r = min(w * 0.40, h * 0.50)
 
 # PAUL vvv
-#        # Debug background
-#        cr.set_source_rgba(1.0, 0.0, 0.0, 0.25)
-#        cr.rectangle(0, 0, w, h)
-#        cr.fill()
+        # Debug background
+        cr.set_source_rgba(1.0, 0.0, 0.0, 0.25)
+        cr.rectangle(0, 0, w, h)
+        cr.fill()
 # PAUL ^^^
 
         cr.set_line_width(10)
@@ -1074,7 +1137,6 @@ class DialGauge(Gtk.DrawingArea):
         # Flowrate, top right
         cr.set_font_size(14)
         cr.set_source_rgb(*white)
-        self.flowrate = 100 # PAUL
         text = f"{int(self.flowrate)}%"
         ext = cr.text_extents(text)
         cr.move_to(w - ext.width - 10, 10 - ext.y_bearing)
@@ -1086,5 +1148,197 @@ class DialGauge(Gtk.DrawingArea):
         ext = cr.text_extents(text)
         cr.move_to(cx - ext.width / 2, cy - ext.y_bearing + 14)
         cr.show_text(text)
+
+        return False
+
+
+
+# -------------------------------------------------------------------------------------------
+# FLOWGUARD TANGLE / CLOG METER
+# -------------------------------------------------------------------------------------------
+
+class FlowGuardDialGauge(Gtk.DrawingArea):
+    def __init__(self):
+        super().__init__()
+
+        self.level = 0.0
+        self.max_clog = 0.0
+        self.max_tangle = 0.0
+        self.active = False
+        self.enabled = False
+        self.trigger = ""
+        self.flowrate = 0.0
+
+        self.set_size_request(50, 30)
+        self.set_hexpand(True)
+        self.set_vexpand(True)
+
+        self.connect("draw", self._draw)
+
+    def update(self, flowguard_status, new_flowrate):
+        new_level = self._clamp(float(flowguard_status.get("level", 0.0)))
+        new_max_clog = self._clamp(float(flowguard_status.get("max_clog", 0.0)))
+        new_max_tangle = self._clamp(float(flowguard_status.get("max_tangle", 0.0)))
+        new_active = bool(flowguard_status.get("active", False))
+        new_enabled = bool(flowguard_status.get("enabled", False))
+        new_trigger = flowguard_status.get("trigger", "")
+
+        changed = (
+            abs(self.level - new_level) > 0.01 or
+            abs(self.max_clog - new_max_clog) > 0.01 or
+            abs(self.max_tangle - new_max_tangle) > 0.01 or
+            self.active != new_active or
+            self.enabled != new_enabled or
+            self.trigger != new_trigger or
+            self.flowrate != new_flowrate
+        )
+
+        if not changed:
+            return
+
+        self.level = new_level
+        self.max_clog = new_max_clog
+        self.max_tangle = new_max_tangle
+        self.active = new_active
+        self.enabled = new_enabled
+        self.trigger = new_trigger
+        self.flowrate = new_flowrate
+
+        self.queue_draw()
+
+    def _clamp(self, value):
+        return max(-1.0, min(1.0, value))
+
+    def _angle(self, value):
+        # value -1 = left, 0 = straight up, 1 = right
+        fraction = (self._clamp(value) + 1.0) / 2.0
+        degrees = -160.0 + 140.0 * fraction
+        return math.radians(degrees)
+
+    def _point_on_arc(self, cx, cy, radius, value):
+        a = self._angle(value)
+        return (
+            cx + radius * math.cos(a),
+            cy + radius * math.sin(a)
+        )
+
+    def _draw_arc(self, cr, cx, cy, r, start, end, color):
+        cr.set_source_rgb(*color)
+        cr.arc(cx, cy, r, self._angle(start), self._angle(end))
+        cr.stroke()
+
+    def _color_for_value(self, value):
+        abs_value = abs(value)
+
+        if abs_value > 0.9:
+            return (0.70, 0.20, 0.20)   # red
+
+        if abs_value > 0.5:
+            return (0.78, 0.55, 0.16)   # amber
+
+        return (0.25, 0.60, 0.32)       # green
+
+    def _draw_marker(self, cr, cx, cy, r, value):
+        color = self._color_for_value(value)
+
+        x1, y1 = self._point_on_arc(cx, cy, r + 7, value)
+        x2, y2 = self._point_on_arc(cx, cy, r + 12, value)
+
+        cr.set_source_rgb(*color)
+        cr.set_line_width(4)
+        cr.set_line_cap(1)
+        cr.move_to(x1, y1)
+        cr.line_to(x2, y2)
+        cr.stroke()
+
+    def _draw_text_centered(self, cr, text, x, y):
+        ext = cr.text_extents(text)
+        cr.move_to(x - ext.width / 2, y)
+        cr.show_text(text)
+
+    def _draw(self, widget, cr):
+        w = self.get_allocated_width()
+        h = self.get_allocated_height()
+
+        cx = w * 0.5
+        cy = h * 0.62
+        r = min(w * 0.40, h * 0.50)
+
+        green = (0.25, 0.60, 0.32)
+        amber = (0.78, 0.55, 0.16)
+        red = (0.70, 0.20, 0.20)
+        white = (0.95, 0.95, 0.95)
+        grey = (0.45, 0.45, 0.45)
+
+        cr.set_line_width(10)
+        cr.set_line_cap(1)
+
+        # Colored zones:
+        self._draw_arc(cr, cx, cy, r, -0.5,  0.5, green)
+        self._draw_arc(cr, cx, cy, r, -0.9, -0.5, amber)
+        self._draw_arc(cr, cx, cy, r, -1.0, -0.9, red)
+        self._draw_arc(cr, cx, cy, r,  0.5,  0.9, amber)
+        self._draw_arc(cr, cx, cy, r,  0.9,  1.0, red)
+
+        # End labels
+        cr.set_source_rgb(*white)
+        cr.select_font_face("Sans", cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_NORMAL)
+        cr.set_font_size(14)
+
+        x, y = self._point_on_arc(cx, cy, r, -1.0)
+        self._draw_text_centered(cr, "Tangle", x + 2, y + 24)
+
+        x, y = self._point_on_arc(cx, cy, r, 1.0)
+        self._draw_text_centered(cr, "Clog", x - 2, y + 24)
+
+        # Max tangle / clog markers
+        self._draw_marker(cr, cx, cy, r, self.max_tangle)
+        self._draw_marker(cr, cx, cy, r, self.max_clog)
+
+        # Needle
+        a = self._angle(self.level)
+        nx = cx + (r - 12) * math.cos(a)
+        ny = cy + (r - 12) * math.sin(a)
+
+        cr.set_source_rgb(*self._color_for_value(self.level))
+        cr.set_line_width(4)
+        cr.set_line_cap(1)
+        cr.move_to(cx, cy)
+        cr.line_to(nx, ny)
+        cr.stroke()
+
+        cr.arc(cx, cy, 6, 0, 2 * math.pi)
+        cr.fill()
+
+        # Main value
+        cr.set_source_rgb(*white)
+        cr.select_font_face("Sans", cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_BOLD)
+        cr.set_font_size(16)
+
+        value_y = h * 0.40
+        self._draw_text_centered(cr, f"{self.level:+.2f}", cx, value_y)
+
+        # Status below value
+        cr.select_font_face("Sans", cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_NORMAL)
+        cr.set_font_size(12)
+
+        if not self.enabled:
+            status_text = "Disabled"
+            cr.set_source_rgb(*grey)
+        elif self.active:
+            status_text = "Active"
+            cr.set_source_rgb(*self._color_for_value(self.level))
+        else:
+            status_text = "FlowGuard"
+            cr.set_source_rgb(*white)
+
+        self._draw_text_centered(cr, status_text, cx, value_y + 14)
+
+        # Text under display
+        cr.set_font_size(14)
+        cr.set_source_rgb(*white)
+
+        bottom_text = self.trigger or "FlowGuard"
+        self._draw_text_centered(cr, bottom_text, cx, cy - cr.text_extents(bottom_text).y_bearing + 14)
 
         return False

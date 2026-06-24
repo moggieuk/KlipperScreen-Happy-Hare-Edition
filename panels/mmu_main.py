@@ -238,7 +238,7 @@ class Panel(ScreenPanel, MmuMixin):
 
             try:
                 # v3 encoder
-                if 'mmu_encoder mmu_encoder' in data: # There is only one mmu_encoder
+                if self.has_encoder() and 'mmu_encoder mmu_encoder' in data: # There is only one mmu_encoder on v3
                     ee_data = data['mmu_encoder mmu_encoder']
                     self.update_encoder(ee_data)
 
@@ -248,7 +248,8 @@ class Panel(ScreenPanel, MmuMixin):
 
                     # v4 encoder
                     if self.has_encoder() and 'encoder' in e_data:
-                        self.update_encoder(e_data['encoder'])
+                        mmu = self._printer.get_stat("mmu")
+                        self.update_encoder(mmu['encoder'])
 
                     # v4 buffer
                     if (
@@ -276,6 +277,7 @@ class Panel(ScreenPanel, MmuMixin):
                         )
                     ):
                         self.update_filament_status()
+                        filament_status_updated = True
 
                     if any(
                         key in e_data
@@ -312,7 +314,7 @@ class Panel(ScreenPanel, MmuMixin):
                 msg += "\nprinter, then make sure you restart Klipper."
                 msg += "\n\nI'll bet this will work out for you :-)"
                 self._screen.show_popup_message(msg, 3, save=True)
-                logging.info("Happy Hare: %s" % str(ke))
+                logging.info("Happy Hare: KeyError: %s" % str(ke))
 
 
     def init_tool_value(self):
@@ -493,28 +495,21 @@ class Panel(ScreenPanel, MmuMixin):
 
     def update_encoder(self, data):
         scale = self.labels['scale']
-        if 'desired_headroom' in data:
-            desired_headroom = data['desired_headroom']
-            if self.ui_runout_mark != desired_headroom:
-                self.ui_runout_mark = desired_headroom
-                scale.clear_marks()
-                scale.add_mark(-desired_headroom, Gtk.PositionType.RIGHT, f"{desired_headroom}")
-        if 'detection_length' in data:
-            scale.set_range(-data['detection_length'], 0.)
-        if 'min_headroom' in data:
-            scale.set_fill_level(-data['min_headroom'])
-        if 'headroom' in data:
-            scale.set_value(-data['headroom'])
-        if 'detection_mode' in data or 'enabled' in data:
-            self.update_runout_mode()
-        if 'encoder_pos' in data:
-            flow_rate = self._printer.get_stat('mmu_encoder mmu_encoder')['flow_rate']
-            self.update_movement(data['encoder_pos'], flow_rate)
+        desired_headroom = data['desired_headroom']
+        if self.ui_runout_mark != desired_headroom:
+            self.ui_runout_mark = desired_headroom
+            scale.clear_marks()
+            scale.add_mark(-desired_headroom, Gtk.PositionType.RIGHT, f"{desired_headroom}")
+        scale.set_range(-data['detection_length'], 0.)
+        scale.set_fill_level(-data['min_headroom'])
+        scale.set_value(-data['headroom'])
+        self.update_runout_mode(data)
+        self.update_movement(data['encoder_pos'], data['flow_rate'])
 
 
-    def update_runout_mode(self):
-        detection_mode = self._printer.get_stat('mmu_encoder mmu_encoder')['detection_mode']
-        enabled = self._printer.get_stat('mmu_encoder mmu_encoder')['enabled']
+    def update_runout_mode(self, data):
+        detection_mode = data['detection_mode']
+        enabled = data['enabled']
         detection_mode_str = "Disabled" if not enabled else "Clog (Auto)" if detection_mode == 2 else "Clog (Man)" if detection_mode == 1 else "Clog Off"
         self.labels['runout_frame'].set_label(f'{detection_mode_str}')
         self.labels['runout_frame'].set_sensitive(detection_mode and enabled)
@@ -614,7 +609,7 @@ class Panel(ScreenPanel, MmuMixin):
             if not self._screen.have_last_popup_message():
                 ui_state.append("no_message")
 
-            if not "printing" in ui_state or not self._printer.get_stat('mmu_encoder mmu_encoder', None):
+            if not "printing" in ui_state or not self.has_encoder():
                 self.labels['runout_layer'].set_current_page(0) # Manage recovery button
             else:
                 self.labels['runout_layer'].set_current_page(1) # Clog display
@@ -632,7 +627,6 @@ class Panel(ScreenPanel, MmuMixin):
             self.labels['t_increase'].set_sensitive(False)
             self.labels['t_decrease'].set_sensitive(False)
 
-        logging.debug(f"mmu_main: ui_state={ui_state}")
         for label in self.btn_states['all']:
             sensitive = True
             for state in ui_state:
@@ -729,6 +723,8 @@ class Panel(ScreenPanel, MmuMixin):
         else:
             home, line, arrow = "┫", "━", "▶"
 
+        # Helpers --------
+
         def past(target_pos):
             return arrow if pos >= target_pos else space
 
@@ -763,23 +759,33 @@ class Panel(ScreenPanel, MmuMixin):
             return space + gate_mark + "Nz  "
 
         def buffer_segment():
-            state = mmu.get("sync_feedback_state")
-            value = mmu.get("sync_feedback_bias_modelled")
+            t_sensor = self.check_sensor(SENSOR_TENSION)
+            c_sensor = self.check_sensor(SENSOR_COMPRESSION)
+            sf_state = mmu.get("sync_feedback_state")
+            sf_value = mmu.get("sync_feedback_bias_modelled")
 
-            if state == "disabled":
-                return "[  X  ]"
-            if state == "inactive":
-                return "[  -  ]"
-            if state == "compressed":
-                return "[▷ C ◁]"
-            if state == "tension":
-                return " [◁T▷] "
-            if state == "neutral":
-                if value is not None:
+            sf_char = "?"
+            if sf_state == "disabled":
+                sf_char = "x"
+            if sf_state == "inactive":
+                sf_char = " "
+            if sf_state == "compressed":
+                sf_char = "C"
+            if sf_state == "tension":
+                return "T"
+            if sf_state == "neutral":
+                if self.has_sensor(SENSOR_PROPORTIONAL) and sf_value is not None:
                     self._last_sync_feedback_bias_rounded = round(value, 1)
                     return f"[{f'{value:.1f}'.center(5)}]"
-                return "[  N  ]"
-            return "[  ?  ]"
+                sf_char = "N"
+
+            if c_sensor:
+                return f"[ ▷{sf_char}◁ ]"
+            elif t_sensor:
+                return f" [◁{sf_char}▷] "
+            return f" [ {sf_char} ] "
+
+        # Impl --------
 
         if tool >= 0:
             tool_text = f"T{tool} "[:3]

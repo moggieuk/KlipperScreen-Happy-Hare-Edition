@@ -367,7 +367,6 @@ class Panel(ScreenPanel, MmuMixin):
         else:
             ui_state.append("disabled")
 
-        logging.debug(f"mmu_manage: ui_state={ui_state}")
         for label in self.btn_states['all']:
             sensitive = True
             for state in ui_state:

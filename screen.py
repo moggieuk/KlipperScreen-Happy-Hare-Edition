@@ -1359,7 +1359,8 @@ class KlipperScreen(Gtk.Window):
         self.log_notification("Printer Initialized", 1)
 
         # Happy Hare: Set sensible default value based on mmu config that we are connected to
-        mmu_default_spoolman = str(bool(self.printer.has_mmu and self.printer.spoolman and self.printer.get_config_section("mmu")["spoolman_support"] != "off"))
+        cs = self.printer.get_config_section("mmu_parameters") or self.printer.get_config_section("mmu")
+        mmu_default_spoolman = str(bool(self.printer.has_mmu and self.printer.spoolman and cs and cs.get("spoolman_support") != "off"))
         self._config.set("main", "mmu_use_spoolman", mmu_default_spoolman)
         # Happy Hare ^^^
 

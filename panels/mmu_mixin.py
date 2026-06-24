@@ -13,6 +13,7 @@
 # This file may be distributed under the terms of the GNU GPLv3 license.
 #
 
+import logging
 from gi.repository import Gdk
 
 
@@ -295,6 +296,21 @@ class MmuMixin:
             return True
 
         return False
+
+
+    def get_encoder_data(self):
+        # v4...
+        mmu = self._printer.get_stat("mmu")
+        encoder = mmu.get('encoder')
+        if encoder is not None:
+            return encoder
+
+        # v3...
+        encoder = self._printer.get_stat('mmu_encoder mmu_encoder', None)
+        if encoder:
+            return encoder
+
+        return {}
 
 
     def has_buffer(self):

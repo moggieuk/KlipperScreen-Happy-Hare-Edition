@@ -15,6 +15,7 @@
 # Happy Hare MMU Software
 #
 import logging, gi, re
+import math, html, cairo
 
 gi.require_version("Gtk", "3.0")
 
@@ -23,6 +24,7 @@ from ks_includes.screen_panel import ScreenPanel
 from panels.mmu_mixin import *
 
 NOT_SET = -99
+
 
 class Panel(ScreenPanel, MmuMixin):
 
@@ -113,23 +115,14 @@ class Panel(ScreenPanel, MmuMixin):
         self.labels['sensor_state'].set_xalign(0)
         self.labels['sensor_state'].get_style_context().add_class("mmu_sensor_text")
 
-        scale = Gtk.Scale.new_with_range(orientation=Gtk.Orientation.VERTICAL, min=-30., max=0., step=0.1)
-        self.labels['scale'] = scale
-        scale.add_mark(0., Gtk.PositionType.RIGHT, f"0")
-        scale.set_show_fill_level(True)
-        scale.set_restrict_to_fill_level(False)
-        scale.set_inverted(True)
-        scale.set_value_pos(Gtk.PositionType.TOP)
-        scale.set_digits(1)
-        scale.set_can_focus(False)
-        scale.get_style_context().add_class("mmu_runout")
-        scale.connect("format_value", self._mm_format)
+        encoder_gauge = DialGauge()
+        self.labels['encoder_gauge'] = encoder_gauge
 
         runout_frame = Gtk.Frame()
         self.labels['runout_frame'] = runout_frame
-        runout_frame.set_label(f"Clog")
+        runout_frame.set_label("FlowGuard")
         runout_frame.set_label_align(0.5, 0)
-        runout_frame.add(scale)
+        runout_frame.add(encoder_gauge)
 
         manage_grid = Gtk.Grid()
         manage_grid.set_column_homogeneous(True)
@@ -148,7 +141,7 @@ class Panel(ScreenPanel, MmuMixin):
         runout_layer.insert_page(manage_grid, None, 0)
         runout_layer.insert_page(runout_frame, None, 1)
         runout_layer.set_current_page(0)
-        
+
         # TextView has problems in this use case so use 5 separate labels... Simple!
         status_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
         for i in range(5):
@@ -292,12 +285,9 @@ class Panel(ScreenPanel, MmuMixin):
                         key in e_data
                         for key in ('action', 'print_state')
                     ):
-                        ee_data = self._printer.get_stat('mmu_encoder mmu_encoder', None)
+                        ee_data = self.get_encoder_data()
                         if ee_data:
-                            self.update_movement(
-                                ee_data['encoder_pos'],
-                                ee_data['flow_rate'],
-                            )
+                            self.update_movement(encoder_position=ee_data['encoder_pos'])
                         else:
                             self.update_movement()
 
@@ -463,7 +453,7 @@ class Panel(ScreenPanel, MmuMixin):
                 self.labels['t_decrease'].set_sensitive(False)
             else:
                 self.labels['t_decrease'].set_sensitive(True)
-    
+
             if self.ui_sel_tool == num_gates -1:
                 self.labels['t_increase'].set_sensitive(False)
             else:
@@ -494,46 +484,58 @@ class Panel(ScreenPanel, MmuMixin):
 
 
     def update_encoder(self, data):
-        scale = self.labels['scale']
-        desired_headroom = data['desired_headroom']
-        if self.ui_runout_mark != desired_headroom:
-            self.ui_runout_mark = desired_headroom
-            scale.clear_marks()
-            scale.add_mark(-desired_headroom, Gtk.PositionType.RIGHT, f"{desired_headroom}")
-        scale.set_range(-data['detection_length'], 0.)
-        scale.set_fill_level(-data['min_headroom'])
-        scale.set_value(-data['headroom'])
+        if self._printer.get_stat("print_stats")['state'] != "printing":
+            return
+
+        gauge = self.labels['encoder_gauge']
+        gauge.update(
+            data['detection_length'],
+            data['min_headroom'],
+            data['desired_headroom'],
+            data['headroom'],
+            data['flow_rate']
+        )
         self.update_runout_mode(data)
-        self.update_movement(data['encoder_pos'], data['flow_rate'])
+        self.update_movement(data['encoder_pos'])
 
 
     def update_runout_mode(self, data):
         detection_mode = data['detection_mode']
         enabled = data['enabled']
-        detection_mode_str = "Disabled" if not enabled else "Clog (Auto)" if detection_mode == 2 else "Clog (Man)" if detection_mode == 1 else "Clog Off"
+        detection_mode_str = "Disabled" if not enabled else "FlowGuard (Auto)" if detection_mode == 2 else "FlowGuard (Man)" if detection_mode == 1 else "FlowGuard Off"
         self.labels['runout_frame'].set_label(f'{detection_mode_str}')
         self.labels['runout_frame'].set_sensitive(detection_mode and enabled)
 
 
-    def update_movement(self, encoder_pos=None, flow_rate=None):
+    def update_movement(self, encoder_position=None):
         mmu = self._printer.get_stat("mmu")
-        if encoder_pos == None:
-            encoder_pos = mmu['filament_position'] # Use real position instead
-        encoder_pos=round(encoder_pos, 1)
-        mmu_print_state = mmu['print_state']
-        filament = mmu['filament']
-        action = mmu['action']
-        if mmu_print_state in ("complete", "error", "cancelled", "started"):
-            pos_str = mmu_print_state.capitalize()
+
+        print_state = mmu["print_state"]
+        action = mmu["action"]
+        filament = mmu["filament"]
+
+        filament_position = mmu["filament_position"]
+        filament_text = f"{filament_position:.1f}mm"
+        encoder_text = (
+            f" (e:{int(encoder_position)}mm)"
+            if encoder_position is not None
+            else ""
+        )
+
+        if print_state in {"complete", "error", "cancelled", "started"}:
+            label = print_state.capitalize()
         elif action == "Idle":
-            pos_str = (f"Filament: {encoder_pos}mm") if filament != "Unloaded" else "Filament: Unloaded"
-            if flow_rate and self._printer.get_stat("print_stats")['state'] == "printing":
-                pos_str += f"  ➥ {flow_rate}%"
-        elif action == "Loading" or action == "Unloading":
-            pos_str = (f"{action}: {encoder_pos}mm")
+            label = (
+                "Filament: Unloaded"
+                if filament == "Unloaded"
+                else f"Filament: {filament_text}{encoder_text}"
+            )
+        elif action in {"Loading", "Unloading"}:
+            label = f"{action}: {filament_text}"
         else:
-            pos_str = (f"{action}")
-        self.labels['filament'].set_label(f"{pos_str}")
+            label = action
+
+        self.labels["filament"].set_label(label)
 
 
     def update_filament_status(self):
@@ -609,10 +611,10 @@ class Panel(ScreenPanel, MmuMixin):
             if not self._screen.have_last_popup_message():
                 ui_state.append("no_message")
 
-            if not "printing" in ui_state or not self.has_encoder():
-                self.labels['runout_layer'].set_current_page(0) # Manage recovery button
-            else:
+            if "printing" in ui_state and self.has_encoder():
                 self.labels['runout_layer'].set_current_page(1) # Clog display
+            else:
+                self.labels['runout_layer'].set_current_page(0) # Manage recovery button
 
             if ("paused" not in ui_state and "pause_locked" not in ui_state) or "no_message" in ui_state:
                 self.labels['pause_layer'].set_current_page(0) # Pause button
@@ -888,3 +890,201 @@ class Panel(ScreenPanel, MmuMixin):
             result.append("</span>")
 
         return "".join(result)
+
+
+# -------------------------------------------------------------------------------------------
+# ENCODER FLOWGUARD METER
+# -------------------------------------------------------------------------------------------
+
+class DialGauge(Gtk.DrawingArea):
+    def __init__(self):
+        super().__init__()
+
+        self.value = 0.0
+        self.max_value = 30.0
+        self.desired_headroom = 10.0
+        self.min_headroom = 30.0
+        self.flowrate = 0.0
+
+        self.set_size_request(50, 30)
+        self.set_hexpand(True)
+        self.set_vexpand(True)
+
+        self.connect("draw", self._draw)
+
+    def update(self, detection_length, min_headroom, desired_headroom, headroom, flowrate):
+        new_max = max(1.0, float(detection_length))
+        new_min = max(0.0, min(float(min_headroom), new_max))
+        new_desired = max(0.0, min(float(desired_headroom), new_max))
+        new_value = max(0.0, min(float(headroom), new_max))
+        new_flowrate = None if flowrate is None else float(flowrate)
+
+        changed = (
+            abs(self.max_value - new_max) > 0.01 or
+            abs(self.min_headroom - new_min) > 0.01 or
+            abs(self.desired_headroom - new_desired) > 0.01 or
+            abs(self.value - new_value) > 0.05 or
+            self.flowrate != new_flowrate
+        )
+
+        if not changed:
+            return
+
+        self.max_value = new_max
+        self.min_headroom = new_min
+        self.desired_headroom = new_desired
+        self.value = new_value
+        self.flowrate = new_flowrate
+        self.queue_draw()
+
+    def _angle(self, value):
+        # left = detection_length, right = 0, across the top
+        fraction = value / self.max_value
+        return math.radians(-20 - 140 * fraction) # -30, -120 is shallower
+
+    def _arc(self, cr, cx, cy, r, start, end):
+        cr.arc(cx, cy, r, self._angle(start), self._angle(end))
+
+    def _draw_arc(self, cr, cx, cy, r, start, end, color):
+        cr.set_source_rgb(*color)
+        self._arc(cr, cx, cy, r, start, end)
+        cr.stroke()
+
+    def _point_on_arc(self, cx, cy, radius, value): # PAUL
+        a = self._angle(value)
+        return (
+            cx + radius * math.cos(a),
+            cy + radius * math.sin(a)
+        )
+
+    def _draw(self, widget, cr):
+        w = self.get_allocated_width()
+        h = self.get_allocated_height()
+
+        # Shape of arc (circle center and radius)
+        cx = w * 0.5
+        cy = h * 0.62 # 62% down
+        r = min(w * 0.41, h * 0.50)
+
+# PAUL vvv
+#        # Debug background
+#        cr.set_source_rgba(1.0, 0.0, 0.0, 0.25)
+#        cr.rectangle(0, 0, w, h)
+#        cr.fill()
+# PAUL ^^^
+
+        cr.set_line_width(10)
+        cr.set_line_cap(1)
+
+        h1 = self.desired_headroom
+        h2 = self.desired_headroom / 2.0
+
+        green = (0.25, 0.60, 0.32)
+        amber = (0.78, 0.55, 0.16)
+        red = (0.70, 0.20, 0.20)
+        white = (0.95, 0.95, 0.95)
+
+        # Zones:
+        # detection_length -> desired_headroom = green
+        # desired_headroom -> desired_headroom / 2 = amber
+        # desired_headroom / 2 -> 0 = red
+        self._draw_arc(cr, cx, cy, r, self.max_value, h1, green)
+        self._draw_arc(cr, cx, cy, r, h1, h2, amber)
+        self._draw_arc(cr, cx, cy, r, h2, 0.0, red)
+
+        # Detection length labels (max -> 0)
+        cr.set_source_rgb(*white)
+        cr.set_font_size(14)
+
+        # Left endpoint
+        x, y = self._point_on_arc(cx, cy, r, self.max_value)
+        text = f"{int(self.max_value)}"
+        ext = cr.text_extents(text)
+        cr.move_to(x - ext.width / 2, y + 24)
+        cr.show_text(text)
+
+        # Right endpoint
+        x, y = self._point_on_arc(cx, cy, r, 0.0)
+        text = "0"
+        ext = cr.text_extents(text)
+        cr.move_to(x - ext.width / 2, y + 24)
+        cr.show_text(text)
+
+        # Min headroom marker: short radial line outside the arc
+        marker_value = self.min_headroom
+
+        if marker_value <= h2:
+            marker_color = red
+        elif marker_value <= h1:
+            marker_color = amber
+        else:
+            marker_color = green
+
+        x1, y1 = self._point_on_arc(cx, cy, r + 7, marker_value)
+        x2, y2 = self._point_on_arc(cx, cy, r + 12, marker_value)
+
+        cr.set_source_rgb(*marker_color)
+        cr.set_line_width(4)
+        cr.set_line_cap(1)
+        cr.move_to(x1, y1)
+        cr.line_to(x2, y2)
+        cr.stroke()
+
+        # Needle
+        a = self._angle(self.value)
+        nx = cx + (r - 12) * math.cos(a)
+        ny = cy + (r - 12) * math.sin(a)
+
+        if self.value <= h2:
+            needle_color = red
+        elif self.value <= h1:
+            needle_color = amber
+        else:
+            needle_color = green
+
+        cr.set_source_rgb(*needle_color)
+        cr.set_line_width(4)
+        cr.move_to(cx, cy)
+        cr.line_to(nx, ny)
+        cr.stroke()
+
+        cr.arc(cx, cy, 6, 0, 2 * math.pi)
+        cr.fill()
+
+        cr.set_source_rgb(*white)
+        cr.select_font_face("Sans", cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_BOLD)
+        cr.set_font_size(16)
+
+        # Main value
+        value_y = h * 0.40
+        text = f"{self.value:.1f}"
+        ext = cr.text_extents(text)
+        cr.move_to(cx - ext.width / 2, value_y)
+        cr.show_text(text)
+
+        cr.select_font_face("Sans", cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_NORMAL)
+        cr.set_font_size(12)
+
+        # mm below value
+        text = "mm"
+        ext = cr.text_extents(text)
+        cr.move_to(cx - ext.width / 2, value_y + 12)
+        cr.show_text(text)
+
+        # Flowrate, top right
+        cr.set_font_size(14)
+        cr.set_source_rgb(*white)
+        self.flowrate = 100 # PAUL
+        text = f"{int(self.flowrate)}%"
+        ext = cr.text_extents(text)
+        cr.move_to(w - ext.width - 10, 10 - ext.y_bearing)
+        cr.show_text(text)
+
+        # Text under display
+        cr.set_font_size(14)
+        text = f"Encoder"
+        ext = cr.text_extents(text)
+        cr.move_to(cx - ext.width / 2, cy - ext.y_bearing + 14)
+        cr.show_text(text)
+
+        return False

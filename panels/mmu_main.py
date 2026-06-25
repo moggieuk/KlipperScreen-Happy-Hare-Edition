@@ -75,7 +75,7 @@ class Panel(ScreenPanel, MmuMixin):
             'tool_icon': self._gtk.Image('mmu_extruder', self._gtk.img_width * 0.8, self._gtk.img_height * 0.8),
             'tool_label': Gtk.Label('Unknown'),
             'filament': Gtk.Label('Filament: Unknown'),
-            'unit_label': Gtk.Label('Default'),
+            'unit_label': Gtk.Label('Unit0'),
             'select_bypass_img': self._gtk.Image('mmu_select_bypass'), # Alternative for tool
             'load_bypass_img': self._gtk.Image('mmu_load_bypass'),     # Alternative for picker
             'unload_bypass_img': self._gtk.Image('mmu_unload_bypass'), # Alternative for unload/eject
@@ -155,7 +155,7 @@ class Panel(ScreenPanel, MmuMixin):
         notebook_corner.insert_page(manage_grid, None, 0)
         notebook_corner.insert_page(self._clickable_page(flowguard_frame), None, 1)
         notebook_corner.insert_page(self._clickable_page(encoder_frame), None, 2)
-        notebook_corner.set_current_page(1) # PAUL was 0
+        notebook_corner.set_current_page(0)
 
         # TextView has problems in this use case so use 5 separate labels... Simple!
         status_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
@@ -268,12 +268,12 @@ class Panel(ScreenPanel, MmuMixin):
 
                 # v4 contains everything required in 'printer.mmu'
                 if 'mmu' in data:
+                    mmu = self._printer.get_stat("mmu")
                     e_data = data['mmu']
 
                     # v4 encoder
                     if self.has_encoder() and 'encoder' in e_data:
-                        mmu = self._printer.get_stat("mmu")
-                        self.update_encoder(mmu['encoder'])
+                        self.update_encoder()
 
                     # v4 buffer
                     if (
@@ -295,7 +295,7 @@ class Panel(ScreenPanel, MmuMixin):
                             for key in ('sync_feedback_flow_rate', 'flowguard')
                         )
                     ):
-                        self.update_flowguard(mmu['flowguard'])
+                        self.update_flowguard()
 
                     # Tool, gate or maps
                     if any(
@@ -434,8 +434,7 @@ class Panel(ScreenPanel, MmuMixin):
             if self.ui_sel_tool == TOOL_GATE_BYPASS:
                 self._screen._ws.api.gcode_script("MMU_SELECT_BYPASS")
             elif self.ui_sel_tool != tool or mmu['filament'] != "Loaded":
-                logging.info(f"PAUL: would have called: MMU_CHANGE_TOOL TOOL={self.ui_sel_tool} QUIET=1") # PAUL uncomment below..
-                #PAUL self._screen._ws.api.gcode_script(f"MMU_CHANGE_TOOL TOOL={self.ui_sel_tool} QUIET=1")
+                self._screen._ws.api.gcode_script(f"MMU_CHANGE_TOOL TOOL={self.ui_sel_tool} QUIET=1")
 
         self.update_tool_buttons()
 
@@ -567,12 +566,12 @@ class Panel(ScreenPanel, MmuMixin):
             self.labels['tool'].set_image(self.labels['tool_img'])
 
 
-    def update_flowguard(self, data):
-# PAUL temp
-#        if self._printer.get_stat("print_stats")['state'] != "printing":
-#            return
+    def update_flowguard(self):
+        if self._printer.get_stat("print_stats")['state'] != "printing":
+            return
 
         mmu = self._printer.get_stat("mmu")
+        data = mmu['flowguard']
         flowrate = mmu["sync_feedback_flow_rate"]
 
         gauge = self.labels['flowguard_gauge']
@@ -581,29 +580,34 @@ class Panel(ScreenPanel, MmuMixin):
         # Update frame heading
         enabled = data['enabled']
         active = data['active']
-        mode_str = "Disabled" if not enabled else "FlowGuard Active" if active else "FlowGuard Inactive"
+        if not enabled:
+            mode_str = "FlowGuard"
+        elif active:
+            mode_str = "FlowGuard Active"
+        else:
+            mode_str = "FlowGuard Inactive"
         self.labels['flowguard_frame'].set_label(f'{mode_str}')
         self.labels['flowguard_frame'].set_sensitive(enabled)
 
 
-    def update_encoder(self, data):
-# PAUL temp
-#        if self._printer.get_stat("print_stats")['state'] != "printing":
-#            return
+    def update_encoder(self, data=None):
+        if self._printer.get_stat("print_stats")['state'] != "printing":
+            return
 
+        mmu = self._printer.get_stat("mmu")
+        data = data or mmu['encoder']
         gauge = self.labels['encoder_gauge']
-        gauge.update(
-            data['detection_length'],
-            data['min_headroom'],
-            data['desired_headroom'],
-            data['headroom'],
-            data['flow_rate']
-        )
+        gauge.update(data)
 
         # Update frame heading
         detection_mode = data['detection_mode']
         enabled = data['enabled']
-        mode_str = "Disabled" if not enabled else "FlowGuard (Auto)" if detection_mode == 2 else "FlowGuard (Man)" if detection_mode == 1 else "FlowGuard Off"
+        if detection_mode == 2:
+            mode_str = "Encoder (Clog Auto)"
+        elif detection_mode == 1:
+            mode_str = "Encoder (Clog Man)"
+        else:
+            mode_str = "Encoder Off"
         self.labels['encoder_frame'].set_label(f'{mode_str}')
         self.labels['encoder_frame'].set_sensitive(detection_mode and enabled)
 
@@ -696,9 +700,10 @@ class Panel(ScreenPanel, MmuMixin):
 
             page = 0 # Manage recovery button
             if "printing" in ui_state:
-                if self.has_buffer():
+                page = self.labels['notebook_corner'].get_current_page()
+                if page == 0 and self.has_buffer():
                     page = 1 # Flowguard display
-                elif self.has_encoder():
+                elif page == 0 and self.has_encoder():
                     page = 2 # Encoder display
             self.labels['notebook_corner'].set_current_page(page)
 
@@ -711,7 +716,7 @@ class Panel(ScreenPanel, MmuMixin):
                 ui_state.append("busy")
         else:
             ui_state.append("disabled")
-            self.labels['notebook_corner'].set_current_page(1) # Manage recovery button # PAUL was 0
+            self.labels['notebook_corner'].set_current_page(0) # Manage recovery button
             self.labels['t_increase'].set_sensitive(False)
             self.labels['t_decrease'].set_sensitive(False)
 
@@ -766,10 +771,10 @@ class Panel(ScreenPanel, MmuMixin):
             unit_selected = 0
             first_gate = 0
             num_gates = len(gate_status)
-            unit_display_name = "default"
+            unit_display_name = "Unit0"
 
         gate_indices = list(range(first_gate, first_gate + num_gates))
-        unit_str = f"{unit_selected}:{unit_display_name}"
+        unit_str = f"{unit_display_name}"
         unit_str = unit_str[:1].upper() + unit_str[1:]
 
         # Trim displayed gates to the display limit
@@ -786,12 +791,6 @@ class Panel(ScreenPanel, MmuMixin):
                 start = max(0, selected_idx - display_limit // 2)
                 start = min(start, len(gate_indices) - display_limit)
                 gate_indices = gate_indices[start:start + display_limit]
-
-#        if len(gate_indices) > display_limit:
-#            selected_idx = gate_selected - first_gate
-#            start = max(0, selected_idx - display_limit // 2)
-#            start = min(start, len(gate_indices) - display_limit)
-#            gate_indices = gate_indices[start:start + display_limit]
 
         multi_tool = False
         msg_gates = ""
@@ -1041,7 +1040,26 @@ class EncoderDialGauge(Gtk.DrawingArea):
         self.max_value = 30.0
         self.desired_headroom = 10.0
         self.min_headroom = 30.0
-        self.flowrate = 0.0
+        self.flowrate = None
+
+        # Colors
+        self.green = (0.25, 0.60, 0.32)
+        self.amber = (0.78, 0.55, 0.16)
+        self.red   = (0.70, 0.20, 0.20)
+        self.white = (0.95, 0.95, 0.95)
+        self.grey  = (0.45, 0.45, 0.45)
+
+        # Geometry / styling
+        self.arc_width = 10
+        self.needle_width = 4
+        self.marker_width = 4
+        self.hub_radius = 6
+        self.marker_inner_offset = 7
+        self.marker_outer_offset = 12
+        self.needle_inset = 12
+
+        self.arc_start_deg = -20.0
+        self.arc_sweep_deg = -140.0
 
         self.set_size_request(50, 30)
         self.set_hexpand(True)
@@ -1049,18 +1067,20 @@ class EncoderDialGauge(Gtk.DrawingArea):
 
         self.connect("draw", self._draw)
 
-    def update(self, detection_length, min_headroom, desired_headroom, headroom, flowrate):
-        new_max = max(1.0, float(detection_length))
-        new_min = max(0.0, min(float(min_headroom), new_max))
-        new_desired = max(0.0, min(float(desired_headroom), new_max))
-        new_value = max(0.0, min(float(headroom), new_max))
-        new_flowrate = None if flowrate is None else float(flowrate)
+    def update(self, data):
+        new_max = max(1.0, float(data.get("detection_length", 10.0)))
+        new_min = float(data.get("min_headroom", 0.0))
+        new_desired = float(data.get("desired_headroom", 5.0))
+        new_value = float(data.get("headroom", 0.0))
+        new_enabled = bool(data.get("enabled", False))
+        new_flowrate = float(data.get("flow_rate", 0.0))
 
         changed = (
             abs(self.max_value - new_max) > 0.01 or
             abs(self.min_headroom - new_min) > 0.01 or
             abs(self.desired_headroom - new_desired) > 0.01 or
             abs(self.value - new_value) > 0.05 or
+            self.enabled != new_enabled or
             self.flowrate != new_flowrate
         )
 
@@ -1071,28 +1091,58 @@ class EncoderDialGauge(Gtk.DrawingArea):
         self.min_headroom = new_min
         self.desired_headroom = new_desired
         self.value = new_value
+        self.enabled = new_enabled
         self.flowrate = new_flowrate
+
         self.queue_draw()
 
+    def _clamp(self, value, low, high):
+        return max(low, min(high, value))
+
     def _angle(self, value):
-        # left = detection_length, right = 0, across the top
+        # left = max_value, right = 0, across the top
+        value = self._clamp(value, 0.0, self.max_value)
         fraction = value / self.max_value
-        return math.radians(-20 - 140 * fraction) # -30, -120 is shallower
+        degrees = self.arc_start_deg + self.arc_sweep_deg * fraction
+        return math.radians(degrees)
 
-    def _arc(self, cr, cx, cy, r, start, end):
-        cr.arc(cx, cy, r, self._angle(start), self._angle(end))
+    def _color_for_headroom(self, value):
+        warning = self.desired_headroom
+        danger = self.desired_headroom / 2.0
 
-    def _draw_arc(self, cr, cx, cy, r, start, end, color):
-        cr.set_source_rgb(*color)
-        self._arc(cr, cx, cy, r, start, end)
-        cr.stroke()
+        if value <= danger:
+            return self.red
+        if value <= warning:
+            return self.amber
+        return self.green
 
     def _point_on_arc(self, cx, cy, radius, value):
         a = self._angle(value)
         return (
             cx + radius * math.cos(a),
-            cy + radius * math.sin(a)
+            cy + radius * math.sin(a),
         )
+
+    def _draw_arc(self, cr, cx, cy, r, start, end, color):
+        cr.set_source_rgb(*color)
+        cr.arc(cx, cy, r, self._angle(start), self._angle(end))
+        cr.stroke()
+
+    def _draw_marker(self, cr, cx, cy, r, value):
+        x1, y1 = self._point_on_arc(cx, cy, r + self.marker_inner_offset, value)
+        x2, y2 = self._point_on_arc(cx, cy, r + self.marker_outer_offset, value)
+
+        cr.set_source_rgb(*self._color_for_headroom(value))
+        cr.set_line_width(self.marker_width)
+        cr.set_line_cap(cairo.LINE_CAP_ROUND)
+        cr.move_to(x1, y1)
+        cr.line_to(x2, y2)
+        cr.stroke()
+
+    def _draw_text_centered(self, cr, text, x, y):
+        ext = cr.text_extents(text)
+        cr.move_to(x - ext.width / 2, y)
+        cr.show_text(text)
 
     def _draw(self, widget, cr):
         w = self.get_allocated_width()
@@ -1103,128 +1153,86 @@ class EncoderDialGauge(Gtk.DrawingArea):
         cy = h * 0.62 # 62% down
         r = min(w * 0.40, h * 0.50)
 
-# PAUL vvv
-        # Debug background
-        cr.set_source_rgba(1.0, 0.0, 0.0, 0.25)
-        cr.rectangle(0, 0, w, h)
-        cr.fill()
-# PAUL ^^^
+        warning = self.desired_headroom
+        danger = self.desired_headroom / 2.0
 
-        cr.set_line_width(10)
-        cr.set_line_cap(1)
-
-        h1 = self.desired_headroom
-        h2 = self.desired_headroom / 2.0
-
-        green = (0.25, 0.60, 0.32)
-        amber = (0.78, 0.55, 0.16)
-        red = (0.70, 0.20, 0.20)
-        white = (0.95, 0.95, 0.95)
+        cr.set_line_width(self.arc_width)
+        cr.set_line_cap(cairo.LINE_CAP_ROUND)
 
         # Zones:
-        # detection_length -> desired_headroom = green
-        # desired_headroom -> desired_headroom / 2 = amber
-        # desired_headroom / 2 -> 0 = red
-        self._draw_arc(cr, cx, cy, r, self.max_value, h1, green)
-        self._draw_arc(cr, cx, cy, r, h1, h2, amber)
-        self._draw_arc(cr, cx, cy, r, h2, 0.0, red)
+        # max_value -> desired_headroom       = green
+        # desired_headroom -> desired / 2     = amber
+        # desired / 2 -> 0                    = red
+        self._draw_arc(cr, cx, cy, r, self.max_value, warning, self.green)
+        self._draw_arc(cr, cx, cy, r, warning, danger, self.amber)
+        self._draw_arc(cr, cx, cy, r, danger, 0.0, self.red)
 
-        # Detection length labels (max -> 0)
-        cr.set_source_rgb(*white)
+        # Endpoint labels
+        cr.set_source_rgb(*self.white)
+        cr.select_font_face("Sans", cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_NORMAL)
         cr.set_font_size(14)
 
-        # Left endpoint
         x, y = self._point_on_arc(cx, cy, r, self.max_value)
-        text = f"{int(self.max_value)}"
-        ext = cr.text_extents(text)
-        cr.move_to(x - ext.width / 2, y + 24)
-        cr.show_text(text)
+        self._draw_text_centered(cr, f"{int(self.max_value)}", x, y + 24)
 
-        # Right endpoint
         x, y = self._point_on_arc(cx, cy, r, 0.0)
-        text = "0"
-        ext = cr.text_extents(text)
-        cr.move_to(x - ext.width / 2, y + 24)
-        cr.show_text(text)
+        self._draw_text_centered(cr, "0", x, y + 24)
 
-        # Min headroom marker: short radial line outside the arc
-        marker_value = self.min_headroom
-
-        if marker_value <= h2:
-            marker_color = red
-        elif marker_value <= h1:
-            marker_color = amber
-        else:
-            marker_color = green
-
-        x1, y1 = self._point_on_arc(cx, cy, r + 7, marker_value)
-        x2, y2 = self._point_on_arc(cx, cy, r + 12, marker_value)
-
-        cr.set_source_rgb(*marker_color)
-        cr.set_line_width(4)
-        cr.set_line_cap(1)
-        cr.move_to(x1, y1)
-        cr.line_to(x2, y2)
-        cr.stroke()
+        # Min headroom marker
+        self._draw_marker(cr, cx, cy, r, self.min_headroom)
 
         # Needle
         a = self._angle(self.value)
-        nx = cx + (r - 12) * math.cos(a)
-        ny = cy + (r - 12) * math.sin(a)
+        nx = cx + (r - self.needle_inset) * math.cos(a)
+        ny = cy + (r - self.needle_inset) * math.sin(a)
 
-        if self.value <= h2:
-            needle_color = red
-        elif self.value <= h1:
-            needle_color = amber
-        else:
-            needle_color = green
-
-        cr.set_source_rgb(*needle_color)
-        cr.set_line_width(4)
+        cr.set_source_rgb(*self._color_for_headroom(self.value))
+        cr.set_line_width(self.needle_width)
+        cr.set_line_cap(cairo.LINE_CAP_ROUND)
         cr.move_to(cx, cy)
         cr.line_to(nx, ny)
         cr.stroke()
 
-        cr.arc(cx, cy, 6, 0, 2 * math.pi)
+        cr.arc(cx, cy, self.hub_radius, 0, 2 * math.pi)
         cr.fill()
 
-        cr.set_source_rgb(*white)
+        # Main value
+        cr.set_source_rgb(*self.white)
         cr.select_font_face("Sans", cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_BOLD)
         cr.set_font_size(16)
 
-        # Main value
         value_y = h * 0.40
-        text = f"{self.value:.1f}"
-        ext = cr.text_extents(text)
-        cr.move_to(cx - ext.width / 2, value_y)
-        cr.show_text(text)
+        self._draw_text_centered(cr, f"{self.value:.1f}", cx, value_y)
 
+        # Unit
         cr.select_font_face("Sans", cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_NORMAL)
         cr.set_font_size(12)
+        self._draw_text_centered(cr, "mm", cx, value_y + 12)
 
-        # mm below value
-        text = "mm"
-        ext = cr.text_extents(text)
-        cr.move_to(cx - ext.width / 2, value_y + 12)
-        cr.show_text(text)
-
-        # Flowrate, top right
+        # Gauge label
         cr.set_font_size(14)
-        cr.set_source_rgb(*white)
-        text = f"{int(self.flowrate)}%"
-        ext = cr.text_extents(text)
-        cr.move_to(w - ext.width - 10, 10 - ext.y_bearing)
-        cr.show_text(text)
+        if not self.enabled:
+            cr.set_source_rgb(*self.grey)
+            text = "Disabled"
+        else:
+            cr.set_source_rgb(*self.white)
+            text = "Encoder"
+        self._draw_text_centered(cr, text, cx, cy - cr.text_extents(text).y_bearing + 14)
 
-        # Text under display
-        cr.set_font_size(14)
-        text = f"Encoder"
-        ext = cr.text_extents(text)
-        cr.move_to(cx - ext.width / 2, cy - ext.y_bearing + 14)
-        cr.show_text(text)
+        # Flowrate / Trigger
+        if self.value <= 0:
+            cr.select_font_face("Sans", cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_BOLD)
+            cr.set_source_rgb(*self.red)
+            bottom_text = "Triggered: CLOG/TANGLE"
+        elif self.flowrate is not None:
+            cr.set_source_rgb(*self.white)
+            bottom_text = f"Flowrate: {int(self.flowrate)}%"
+        else:
+            cr.set_source_rgb(*self.grey)
+            bottom_text = "Flowrate: --%"
+        self._draw_text_centered(cr, bottom_text, cx, cy - cr.text_extents(bottom_text).y_bearing + 34)
 
         return False
-
 
 
 # -------------------------------------------------------------------------------------------
@@ -1241,7 +1249,26 @@ class FlowGuardDialGauge(Gtk.DrawingArea):
         self.active = False
         self.enabled = False
         self.trigger = ""
-        self.flowrate = 0.0
+        self.flowrate = None
+
+        # Colors
+        self.green = (0.25, 0.60, 0.32)
+        self.amber = (0.78, 0.55, 0.16)
+        self.red   = (0.70, 0.20, 0.20)
+        self.white = (0.95, 0.95, 0.95)
+        self.grey  = (0.45, 0.45, 0.45)
+
+        # Geometry / styling
+        self.arc_width = 10
+        self.needle_width = 4
+        self.marker_width = 4
+        self.hub_radius = 6
+        self.arc_start_deg = -160.0
+        self.arc_sweep_deg = 140.0
+
+        # Thresholds
+        self.amber_threshold = 0.5
+        self.red_threshold = 0.9
 
         self.set_size_request(50, 30)
         self.set_hexpand(True)
@@ -1249,13 +1276,14 @@ class FlowGuardDialGauge(Gtk.DrawingArea):
 
         self.connect("draw", self._draw)
 
-    def update(self, flowguard_status, new_flowrate):
-        new_level = self._clamp(float(flowguard_status.get("level", 0.0)))
-        new_max_clog = self._clamp(float(flowguard_status.get("max_clog", 0.0)))
-        new_max_tangle = self._clamp(float(flowguard_status.get("max_tangle", 0.0)))
+    def update(self, flowguard_status, flowrate=None):
+        new_level = float(flowguard_status.get("level", 0.0))
+        new_max_clog = float(flowguard_status.get("max_clog", 0.0))
+        new_max_tangle = float(flowguard_status.get("max_tangle", 0.0))
         new_active = bool(flowguard_status.get("active", False))
         new_enabled = bool(flowguard_status.get("enabled", False))
         new_trigger = flowguard_status.get("trigger", "")
+        new_flowrate = None if flowrate is None else float(flowrate)
 
         changed = (
             abs(self.level - new_level) > 0.01 or
@@ -1284,16 +1312,24 @@ class FlowGuardDialGauge(Gtk.DrawingArea):
         return max(-1.0, min(1.0, value))
 
     def _angle(self, value):
-        # value -1 = left, 0 = straight up, 1 = right
         fraction = (self._clamp(value) + 1.0) / 2.0
-        degrees = -160.0 + 140.0 * fraction
+        degrees = self.arc_start_deg + self.arc_sweep_deg * fraction
         return math.radians(degrees)
+
+    def _color_for_value(self, value):
+        abs_value = abs(value)
+
+        if abs_value > self.red_threshold:
+            return self.red
+        if abs_value > self.amber_threshold:
+            return self.amber
+        return self.green
 
     def _point_on_arc(self, cx, cy, radius, value):
         a = self._angle(value)
         return (
             cx + radius * math.cos(a),
-            cy + radius * math.sin(a)
+            cy + radius * math.sin(a),
         )
 
     def _draw_arc(self, cr, cx, cy, r, start, end, color):
@@ -1301,26 +1337,13 @@ class FlowGuardDialGauge(Gtk.DrawingArea):
         cr.arc(cx, cy, r, self._angle(start), self._angle(end))
         cr.stroke()
 
-    def _color_for_value(self, value):
-        abs_value = abs(value)
-
-        if abs_value > 0.9:
-            return (0.70, 0.20, 0.20)   # red
-
-        if abs_value > 0.5:
-            return (0.78, 0.55, 0.16)   # amber
-
-        return (0.25, 0.60, 0.32)       # green
-
     def _draw_marker(self, cr, cx, cy, r, value):
-        color = self._color_for_value(value)
-
         x1, y1 = self._point_on_arc(cx, cy, r + 7, value)
         x2, y2 = self._point_on_arc(cx, cy, r + 12, value)
 
-        cr.set_source_rgb(*color)
-        cr.set_line_width(4)
-        cr.set_line_cap(1)
+        cr.set_source_rgb(*self._color_for_value(value))
+        cr.set_line_width(self.marker_width)
+        cr.set_line_cap(cairo.LINE_CAP_ROUND)
         cr.move_to(x1, y1)
         cr.line_to(x2, y2)
         cr.stroke()
@@ -1338,24 +1361,16 @@ class FlowGuardDialGauge(Gtk.DrawingArea):
         cy = h * 0.62
         r = min(w * 0.40, h * 0.50)
 
-        green = (0.25, 0.60, 0.32)
-        amber = (0.78, 0.55, 0.16)
-        red = (0.70, 0.20, 0.20)
-        white = (0.95, 0.95, 0.95)
-        grey = (0.45, 0.45, 0.45)
+        cr.set_line_width(self.arc_width)
+        cr.set_line_cap(cairo.LINE_CAP_ROUND)
 
-        cr.set_line_width(10)
-        cr.set_line_cap(1)
+        self._draw_arc(cr, cx, cy, r, -0.5,  0.5, self.green)
+        self._draw_arc(cr, cx, cy, r, -0.9, -0.5, self.amber)
+        self._draw_arc(cr, cx, cy, r, -1.0, -0.9, self.red)
+        self._draw_arc(cr, cx, cy, r,  0.5,  0.9, self.amber)
+        self._draw_arc(cr, cx, cy, r,  0.9,  1.0, self.red)
 
-        # Colored zones:
-        self._draw_arc(cr, cx, cy, r, -0.5,  0.5, green)
-        self._draw_arc(cr, cx, cy, r, -0.9, -0.5, amber)
-        self._draw_arc(cr, cx, cy, r, -1.0, -0.9, red)
-        self._draw_arc(cr, cx, cy, r,  0.5,  0.9, amber)
-        self._draw_arc(cr, cx, cy, r,  0.9,  1.0, red)
-
-        # End labels
-        cr.set_source_rgb(*white)
+        cr.set_source_rgb(*self.white)
         cr.select_font_face("Sans", cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_NORMAL)
         cr.set_font_size(14)
 
@@ -1365,7 +1380,6 @@ class FlowGuardDialGauge(Gtk.DrawingArea):
         x, y = self._point_on_arc(cx, cy, r, 1.0)
         self._draw_text_centered(cr, "Clog", x - 2, y + 24)
 
-        # Max tangle / clog markers
         self._draw_marker(cr, cx, cy, r, self.max_tangle)
         self._draw_marker(cr, cx, cy, r, self.max_clog)
 
@@ -1375,44 +1389,51 @@ class FlowGuardDialGauge(Gtk.DrawingArea):
         ny = cy + (r - 12) * math.sin(a)
 
         cr.set_source_rgb(*self._color_for_value(self.level))
-        cr.set_line_width(4)
-        cr.set_line_cap(1)
+        cr.set_line_width(self.needle_width)
         cr.move_to(cx, cy)
         cr.line_to(nx, ny)
         cr.stroke()
 
-        cr.arc(cx, cy, 6, 0, 2 * math.pi)
+        cr.arc(cx, cy, self.hub_radius, 0, 2 * math.pi)
         cr.fill()
 
         # Main value
-        cr.set_source_rgb(*white)
+        cr.set_source_rgb(*self.white)
         cr.select_font_face("Sans", cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_BOLD)
         cr.set_font_size(16)
 
         value_y = h * 0.40
         self._draw_text_centered(cr, f"{self.level:+.2f}", cx, value_y)
 
-        # Status below value
         cr.select_font_face("Sans", cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_NORMAL)
-        cr.set_font_size(12)
 
-        if not self.enabled:
-            status_text = "Disabled"
-            cr.set_source_rgb(*grey)
-        elif self.active:
-            status_text = "Active"
-            cr.set_source_rgb(*self._color_for_value(self.level))
-        else:
-            status_text = "FlowGuard"
-            cr.set_source_rgb(*white)
+        if self.active:
+            cr.set_font_size(12)
+            self._draw_text_centered(cr, "Active", cx, value_y + 14)
 
-        self._draw_text_centered(cr, status_text, cx, value_y + 14)
-
-        # Text under display
         cr.set_font_size(14)
-        cr.set_source_rgb(*white)
+        if not self.enabled:
+            cr.set_source_rgb(*self.grey)
+            text = "Disabled"
+        elif self.active:
+            cr.set_source_rgb(*self.white)
+            text = "Active"
+        else:
+            cr.set_source_rgb(*self.grey)
+            text = "Inactive"
+        self._draw_text_centered(cr, text, cx, cy - cr.text_extents(text).y_bearing + 14)
 
-        bottom_text = self.trigger or "FlowGuard"
-        self._draw_text_centered(cr, bottom_text, cx, cy - cr.text_extents(bottom_text).y_bearing + 14)
+        # Flowrate / Trigger
+        if self.trigger:
+            cr.select_font_face("Sans", cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_BOLD)
+            cr.set_source_rgb(*self.red)
+            bottom_text = f"Triggered: {self.trigger.upper()}"
+        elif self.flowrate is not None:
+            cr.set_source_rgb(*self.white)
+            bottom_text = f"Flowrate: {int(self.flowrate)}%"
+        else:
+            cr.set_source_rgb(*self.grey)
+            bottom_text = "Flowrate: --%"
+        self._draw_text_centered(cr, bottom_text, cx, cy - cr.text_extents(bottom_text).y_bearing + 34)
 
         return False

@@ -778,7 +778,7 @@ class Panel(ScreenPanel, MmuMixin):
         unit_str = unit_str[:1].upper() + unit_str[1:]
 
         # Trim displayed gates to the display limit
-        display_limit = 4  # max number of gates to display
+        display_limit = 12  # max number of gates to display
 
         if show_gate is None:
             show_gate = gate_selected

@@ -843,6 +843,10 @@ keyboard_box {
     padding-bottom: .6em;
 }
 
+.mmu_unit_text {
+    font-weight: bold;
+}
+
 .mmu_spoolman_gate_text {
     padding-top: 8px;
     padding-bottom: 8px;

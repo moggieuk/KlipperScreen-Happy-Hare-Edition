@@ -37,6 +37,9 @@ class Panel(ScreenPanel, MmuMixin):
         self.min_tool = TOOL_GATE_BYPASS
         self._last_sync_feedback_bias_rounded = -9.9
 
+        self._select_gate_timer = None
+        self._select_gate_delay_ms = 700
+
         # btn_states: The "gaps" are what functionality the state takes away. Multiple states are combined
         self.btn_states = {
             'all':             ['check_gates', 'tool', 'unload', 'picker', 'pause', 'message', 'extrude', 'unlock', 'resume', 'manage', 'more'],
@@ -72,8 +75,7 @@ class Panel(ScreenPanel, MmuMixin):
             'tool_icon': self._gtk.Image('mmu_extruder', self._gtk.img_width * 0.8, self._gtk.img_height * 0.8),
             'tool_label': Gtk.Label('Unknown'),
             'filament': Gtk.Label('Filament: Unknown'),
-            'sensor': Gtk.Label('Ts:'),
-            'sensor_state': Gtk.Label('   '),
+            'unit_label': Gtk.Label('Default'),
             'select_bypass_img': self._gtk.Image('mmu_select_bypass'), # Alternative for tool
             'load_bypass_img': self._gtk.Image('mmu_load_bypass'),     # Alternative for picker
             'unload_bypass_img': self._gtk.Image('mmu_unload_bypass'), # Alternative for unload/eject
@@ -111,9 +113,8 @@ class Panel(ScreenPanel, MmuMixin):
         self.labels['tool_label'].get_style_context().add_class("mmu_tool_text")
         self.labels['tool_label'].set_xalign(0)
         self.labels['filament'].set_xalign(0)
-        self.labels['sensor'].set_xalign(1)
-        self.labels['sensor_state'].set_xalign(0)
-        self.labels['sensor_state'].get_style_context().add_class("mmu_sensor_text")
+        self.labels['unit_label'].set_xalign(1)
+        self.labels["unit_label"].get_style_context().add_class("mmu_unit_text")
 
         # In print Encoder guage ---------
         encoder_gauge = EncoderDialGauge()
@@ -151,32 +152,29 @@ class Panel(ScreenPanel, MmuMixin):
         notebook_corner = Gtk.Notebook()
         self.labels['notebook_corner'] = notebook_corner
         notebook_corner.set_show_tabs(False)
-#PAUL        notebook_corner.insert_page(manage_grid, None, 0)
-#PAUL        notebook_corner.insert_page(encoder_frame, None, 1)
-#PAUL        notebook_corner.insert_page(flowguard_frame, None, 2)
-        notebook_corner.insert_page(self._clickable_page(manage_grid), None, 0)
-        notebook_corner.insert_page(self._clickable_page(encoder_frame), None, 1)
-        notebook_corner.insert_page(self._clickable_page(flowguard_frame), None, 2)
-        notebook_corner.set_current_page(0)
+        notebook_corner.insert_page(manage_grid, None, 0)
+        notebook_corner.insert_page(self._clickable_page(flowguard_frame), None, 1)
+        notebook_corner.insert_page(self._clickable_page(encoder_frame), None, 2)
+        notebook_corner.set_current_page(1) # PAUL was 0
 
         # TextView has problems in this use case so use 5 separate labels... Simple!
         status_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
         for i in range(5):
             name = (f'status{i+1}')
-            self.labels[name] = Gtk.Label()
-            self.labels[name].get_style_context().add_class("mmu_status")
-            self.labels[name].set_xalign(0)
+            label = Gtk.Label()
+            self.labels[name] = label
+            label.get_style_context().add_class("mmu_status")
+            label.set_xalign(0)
             if i < 4:
-                status_box.pack_start(self.labels[name], False, True, 0)
+                status_box.pack_start(label, False, True, 0)
             else:
-                self.labels[name].get_style_context().add_class("mmu_status_filament")
+                label.get_style_context().add_class("mmu_status_filament")
 
         top_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
         top_box.pack_start(self.labels['tool_icon'], False, True, 0)
         top_box.pack_start(self.labels['tool_label'], True, True, 0)
         top_box.pack_start(self.labels['filament'], True, True, 0)
-        top_box.pack_start(self.labels['sensor'], False, True, 0)
-        top_box.pack_start(self.labels['sensor_state'], False, True, 0)
+        top_box.pack_start(self.labels['unit_label'], False, True, 12)
 
         pause_layer = Gtk.Notebook()
         self.labels['pause_layer'] = pause_layer
@@ -188,9 +186,9 @@ class Panel(ScreenPanel, MmuMixin):
         top_grid.set_vexpand(False)
         top_grid.set_column_homogeneous(True)
         top_grid.attach(top_box,                0, 0,  9, 1)
-        top_grid.attach(notebook_corner,           9, 0,  3, 3)
-        top_grid.attach(status_box,             0, 1, 10, 1)
-        top_grid.attach(self.labels['status5'], 0, 2, 12, 1)
+        top_grid.attach(notebook_corner,        9, 0,  3, 3)
+        top_grid.attach(status_box,             0, 1,  9, 1)
+        top_grid.attach(self.labels['status5'], 0, 2, 12, 1) # Allows filament line line to extend
 
         tool_grid = Gtk.Grid()
         tool_grid.set_column_homogeneous(False)
@@ -203,7 +201,7 @@ class Panel(ScreenPanel, MmuMixin):
         main_grid.set_column_homogeneous(True)
         main_grid.attach(tool_grid,                   0, 0, 6, 1)
         main_grid.attach(self.labels['picker'],       6, 0, 2, 1)
-        main_grid.attach(self.labels['unload'],        8, 0, 2, 1)
+        main_grid.attach(self.labels['unload'],       8, 0, 2, 1)
         main_grid.attach(self.labels['check_gates'], 10, 0, 2, 1)
         main_grid.attach(self.labels['pause_layer'],  0, 1, 3, 1)
         main_grid.attach(self.labels['unlock'],       3, 1, 2, 1)
@@ -227,10 +225,10 @@ class Panel(ScreenPanel, MmuMixin):
 
     def _next_notebook_corner_page(self, widget, event):
         notebook = self.labels["notebook_corner"]
-        page = notebook.get_current_page()
-        pages = notebook.get_n_pages()
-
-        notebook.set_current_page((page + 1) % pages)
+        if self.has_buffer() and self.has_encoder():
+            # Toggle flowguard monitor dials (unlikely user will have both)
+            page = notebook.get_current_page()
+            notebook.set_current_page(2 if page == 1 else 1)
         return True
 
 
@@ -299,6 +297,7 @@ class Panel(ScreenPanel, MmuMixin):
                     ):
                         self.update_flowguard(mmu['flowguard'])
 
+                    # Tool, gate or maps
                     if any(
                         key in e_data
                         for key in ('tool', 'gate', 'ttg_map', 'gate_status', 'gate_color')
@@ -309,7 +308,7 @@ class Panel(ScreenPanel, MmuMixin):
                         not filament_status_updated
                         or any(
                             key in e_data
-                            for key in ('tool', 'filament_pos', 'filament_direction')
+                            for key in ('tool', 'filament_pos', 'filament_direction', 'sensors')
                         )
                     ):
                         self.update_filament_status()
@@ -378,24 +377,66 @@ class Panel(ScreenPanel, MmuMixin):
         )
 
 
+    def _schedule_gate_select(self):
+        if self._select_gate_timer is not None:
+            GLib.source_remove(self._select_gate_timer)
+
+        self._select_gate_timer = GLib.timeout_add(
+            self._select_gate_delay_ms,
+            self.select_pending_gate,
+        )
+
+
+    def select_pending_gate(self):
+        self._select_gate_timer = None
+
+        mmu = self._printer.get_stat("mmu")
+        if mmu['filament'] == "Unloaded":
+            if self.ui_sel_tool == TOOL_GATE_BYPASS:
+                self._screen._ws.api.gcode_script("MMU_SELECT_BYPASS")
+            elif self.ui_sel_tool >= 0:
+                self._screen._ws.api.gcode_script(f"MMU_SELECT TOOL={self.ui_sel_tool} QUIET=1")
+        else:
+            # At least include visual includes gate of interest
+            self.update_status(self.ui_sel_tool)
+
+        return False
+
+
     def select_tool(self, widget, param=0):
         mmu = self._printer.get_stat("mmu")
         num_gates = len(mmu['gate_status'])
         tool = mmu['tool']
+
         if param < 0 and self.ui_sel_tool > self.min_tool:
             self.ui_sel_tool -= 1
             if self.ui_sel_tool == TOOL_GATE_UNKNOWN:
                 self.ui_sel_tool = TOOL_GATE_BYPASS
+
+            self.update_tool_buttons()
+            self._schedule_gate_select()
+            return
+
         elif param > 0 and self.ui_sel_tool < num_gates - 1:
             self.ui_sel_tool += 1
             if self.ui_sel_tool == TOOL_GATE_UNKNOWN:
                 self.ui_sel_tool = 0
-        elif param == 0:
-            if self.ui_sel_tool == TOOL_GATE_BYPASS:
-                self._screen._ws.api.gcode_script(f"MMU_SELECT_BYPASS")
-            elif self.ui_sel_tool != tool or mmu['filament'] != "Loaded":
-                self._screen._ws.api.gcode_script(f"MMU_CHANGE_TOOL TOOL={self.ui_sel_tool} QUIET=1")
+
+            self.update_tool_buttons()
+            self._schedule_gate_select()
             return
+
+        elif param == 0:
+            if self._select_gate_timer is not None:
+                GLib.source_remove(self._select_gate_timer)
+                self._select_gate_timer = None
+
+            if self.ui_sel_tool == TOOL_GATE_BYPASS:
+                self._screen._ws.api.gcode_script("MMU_SELECT_BYPASS")
+            elif self.ui_sel_tool != tool or mmu['filament'] != "Loaded":
+                logging.info(f"PAUL: would have called: MMU_CHANGE_TOOL TOOL={self.ui_sel_tool} QUIET=1") # PAUL uncomment below..
+                #PAUL self._screen._ws.api.gcode_script(f"MMU_CHANGE_TOOL TOOL={self.ui_sel_tool} QUIET=1")
+
         self.update_tool_buttons()
 
 
@@ -606,37 +647,17 @@ class Panel(ScreenPanel, MmuMixin):
         else:
             self.labels['status5'].set_label(self.get_filament_text(bold=self.bold_filament))
 
-        ts = self.check_sensor(SENSOR_TOOLHEAD)
-        if ts != None:
-            if ts == 1:
-                self.labels['sensor'].get_style_context().remove_class("mmu_disabled_text")
-                self.labels['sensor_state'].set_label("●  ")
-                c_name = "green"
-            elif ts == 0:
-                self.labels['sensor'].get_style_context().remove_class("mmu_disabled_text")
-                self.labels['sensor_state'].set_label("○  ")
-                c_name = "red"
-            else:
-                self.labels['sensor'].get_style_context().add_class("mmu_disabled_text")
-                self.labels['sensor_state'].set_label("◌  ")
-                c_name = "grey"
 
-            color = Gdk.RGBA()
-            Gdk.RGBA.parse(color, c_name)
-            self.labels['sensor_state'].override_color(Gtk.StateType.NORMAL, color)
-        else:
-            self.labels['sensor'].set_label("")
-            self.labels['sensor_state'].set_label("")
-
-
-    def update_status(self):
-        text, multi_tool = self.get_status_text(markup=self.markup_status)
+    def update_status(self, show_gate=None):
+        text, unit_str, multi_tool = self.get_status_text(show_gate=show_gate, markup=self.markup_status)
         for i in range(4):
             name = (f'status{i+1}')
             if self.markup_status:
                 self.labels[name].set_markup(text[i])
             else:
                 self.labels[name].set_label(text[i])
+
+        self.labels['unit_label'].set_label(unit_str)
 
 
     # Dynamically update button sensitivity based on state
@@ -673,10 +694,13 @@ class Panel(ScreenPanel, MmuMixin):
             if not self._screen.have_last_popup_message():
                 ui_state.append("no_message")
 
-            if "printing" in ui_state and self.has_encoder():
-                self.labels['notebook_corner'].set_current_page(1) # Clog display
-            else:
-                self.labels['notebook_corner'].set_current_page(0) # Manage recovery button
+            page = 0 # Manage recovery button
+            if "printing" in ui_state:
+                if self.has_buffer():
+                    page = 1 # Flowguard display
+                elif self.has_encoder():
+                    page = 2 # Encoder display
+            self.labels['notebook_corner'].set_current_page(page)
 
             if ("paused" not in ui_state and "pause_locked" not in ui_state) or "no_message" in ui_state:
                 self.labels['pause_layer'].set_current_page(0) # Pause button
@@ -687,7 +711,7 @@ class Panel(ScreenPanel, MmuMixin):
                 ui_state.append("busy")
         else:
             ui_state.append("disabled")
-            self.labels['notebook_corner'].set_current_page(0) # Manage recovery button
+            self.labels['notebook_corner'].set_current_page(1) # Manage recovery button # PAUL was 0
             self.labels['t_increase'].set_sensitive(False)
             self.labels['t_decrease'].set_sensitive(False)
 
@@ -721,21 +745,66 @@ class Panel(ScreenPanel, MmuMixin):
         return rgb_color
 
 
-    def get_status_text(self, markup=False):
+    def get_status_text(self, show_gate=None, markup=False):
         mmu = self._printer.get_stat("mmu")
         gate_status = mmu['gate_status']
         tool_to_gate_map = mmu['ttg_map']
         gate_selected = mmu['gate']
         tool_selected = mmu['tool']
         gate_color = mmu['gate_color']
-        num_gates = len(gate_status)
+
+        unit_selected = mmu.get('unit')
+        if unit_selected:
+            mmu_machine = self._printer.get_stat("mmu_machine")
+            unit = mmu_machine.get(f"unit_{unit_selected}")
+            first_gate = unit['first_gate']
+            num_gates = unit['num_gates']
+            unit_display_name = unit['display_name']
+        
+        else:
+            # Early v3 (single fixed unit)
+            unit_selected = 0
+            first_gate = 0
+            num_gates = len(gate_status)
+            unit_display_name = "default"
+
+        gate_indices = list(range(first_gate, first_gate + num_gates))
+        unit_str = f"{unit_selected}:{unit_display_name}"
+        unit_str = unit_str[:1].upper() + unit_str[1:]
+
+        # Trim displayed gates to the display limit
+        display_limit = 4  # max number of gates to display
+
+        if show_gate is None:
+            show_gate = gate_selected
+        if len(gate_indices) > display_limit:
+            try:
+                selected_idx = gate_indices.index(show_gate)
+            except ValueError:
+                gate_indices = gate_indices[:display_limit]
+            else:
+                start = max(0, selected_idx - display_limit // 2)
+                start = min(start, len(gate_indices) - display_limit)
+                gate_indices = gate_indices[start:start + display_limit]
+
+#        if len(gate_indices) > display_limit:
+#            selected_idx = gate_selected - first_gate
+#            start = max(0, selected_idx - display_limit // 2)
+#            start = min(start, len(gate_indices) - display_limit)
+#            gate_indices = gate_indices[start:start + display_limit]
 
         multi_tool = False
-        msg_gates = "Gates: "
-        msg_tools = "Tools: "
-        msg_avail = "Avail: "
-        msg_selct = "Selct: "
-        for g in range(num_gates):
+        msg_gates = ""
+        msg_tools = ""
+        msg_avail = ""
+        msg_selct = ""
+        if len(gate_indices) <= 10:
+            msg_gates += "Gates: "
+            msg_tools += "Tools: "
+            msg_avail += "Avail: "
+            msg_selct += "Selct: "
+
+        for g in gate_indices:
             color = self.get_rgb_color(gate_color[g])
             filament_icon = ("█") if not markup or color == "" else (f"<span color='{color}'>█</span>")
             msg_gates += ("│#%d " % g)[:4]
@@ -759,7 +828,7 @@ class Panel(ScreenPanel, MmuMixin):
         msg_avail += "│"
         msg_selct += "│" if gate_selected == (num_gates - 1) else "╛"
         msg = [msg_gates, msg_tools, msg_avail, msg_selct]
-        return [msg_gates, msg_tools, msg_avail, msg_selct], multi_tool
+        return [msg_gates, msg_tools, msg_avail, msg_selct], unit_str, multi_tool
 
 
     def get_filament_text(self, markup=False, bold=False):
@@ -770,9 +839,14 @@ class Panel(ScreenPanel, MmuMixin):
         gate = mmu["gate"]
         gate_color = mmu["gate_color"]
 
-        # PAUL TODO temp hack to assume non-renamed unit0
-        # TODO should reference current unit, look name in mmu_machine.unit_X.name. Then get correct parameters
-        cs = self._printer.get_config_section("mmu_unit_parameters unit0") or self._printer.get_config_section("mmu")
+        unit = self.get_mmu_unit(gate)
+        cs = None
+        if unit is not None:
+            unit_name = unit['name']
+            cs = self._printer.get_config_section(f"mmu_unit_parameters {unit_name}")
+        if cs is None:
+            # V3...
+            cs = self._printer.get_config_section("mmu")
         gate_homing_endstop = cs.get("gate_homing_endstop")
         if gate_homing_endstop is None:
             raise KeyError("gate_homing_endstop not found in mmu_parameters or mmu config")
@@ -820,7 +894,7 @@ class Panel(ScreenPanel, MmuMixin):
         def nozzle_segment():
             if pos >= FILAMENT_POS_LOADED:
                 return arrow + home + "Nz" + arrow * 2
-            return space + gate_mark + "Nz  "
+            return space + gate_mark + "Nz"
 
         def buffer_segment():
             t_sensor = self.check_sensor(SENSOR_TENSION)
@@ -858,7 +932,7 @@ class Panel(ScreenPanel, MmuMixin):
         else:
             tool_text = "T? "
 
-        bowden_length = max(1, 14 - len(tool_text))
+        bowden_length = max(1, 12 - len(tool_text))
         bowden_half = bowden_length // 2
 
         encoder_ref_pos = (

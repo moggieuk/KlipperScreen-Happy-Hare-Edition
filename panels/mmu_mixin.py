@@ -326,10 +326,11 @@ class MmuMixin:
 
     def get_selector_type(self):
         # >v3.1 method...
-        mmu_machine = self._printer.get_stat("mmu_machine")
-        unit0 = mmu_machine.get('unit_0') # PAUL TODO: support multi-unit
-        if unit0 is not None:
-            return unit0['selector_type']
+        mmu = self._printer.get_stat("mmu")
+        gate = mmu['gate']
+        mmu_unit = self.get_mmu_unit(gate)
+        if mmu_unit is not None:
+            return mmu_unit['selector_type']
 
         # v3.0...
         mmu = self._printer.get_stat("mmu")
@@ -339,3 +340,25 @@ class MmuMixin:
 
         # Prior to v3.0
         return 'LinearServoSelector'
+
+
+    def get_mmu_unit(self, gate):
+        mmu_machine = self._printer.get_stat("mmu_machine")
+        if mmu_machine is None: return None
+
+        for key, unit in mmu_machine.items():
+            if not key.startswith("unit_"):
+                continue
+
+            if gate == TOOL_GATE_BYPASS:
+                if unit.get("has_bypass", False):
+                    return unit
+                continue
+
+            first_gate = unit["first_gate"]
+            num_gates = unit["num_gates"]
+
+            if first_gate <= gate < first_gate + num_gates:
+                return unit
+
+        return None

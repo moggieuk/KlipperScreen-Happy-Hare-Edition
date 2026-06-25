@@ -183,23 +183,6 @@ class Panel(ScreenPanel, MmuMixin):
             self.ui_sel_gate = 0
 
 
-    def _get_selector_type(self):
-        # v3.1 method... (assume similar units for now)
-        mmu_machine = self._printer.get_stat("mmu_machine")
-        unit0 = mmu_machine.get('unit_0', None)
-        if unit0 is not None:
-            return unit0['selector_type']
-
-        # v3.0...
-        mmu = self._printer.get_stat("mmu")
-        selector_type = mmu.get('selector_type', None)
-        if selector_type:
-            return selector_type
-
-        # Prior to v3.0
-        return 'LinearSelector'
-
-
     def select_gate(self, widget, param=0):
         mmu = self._printer.get_stat("mmu")
         num_gates = len(mmu['gate_status'])
@@ -319,7 +302,7 @@ class Panel(ScreenPanel, MmuMixin):
         action = mmu['action']
         filament = mmu['filament']
         sync_drive = mmu['sync_drive']
-        selector_type = self._get_selector_type()
+        selector_type = self.get_selector_type()
 
         ui_state = []
         if enabled:

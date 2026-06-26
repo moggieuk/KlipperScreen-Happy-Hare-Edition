@@ -920,7 +920,7 @@ class Panel(ScreenPanel, MmuMixin):
         if unit is not None:
             unit_name = unit['name']
             cs = self._printer.get_config_section(f"mmu_unit_parameters {unit_name}")
-        if cs is None:
+        if not cs:
             # V3...
             cs = self._printer.get_config_section("mmu")
         gate_homing_endstop = cs.get("gate_homing_endstop")

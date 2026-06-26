@@ -140,13 +140,15 @@ class Panel(ScreenPanel, MmuMixin):
         manage_grid = Gtk.Grid()
         manage_grid.set_column_homogeneous(True)
 
-        mmu = self._printer.get_stat("mmu")
-        num_gates = len(mmu['gate_status'])
-        if num_gates > 9:
-            manage_grid.attach(Gtk.Label(),           0, 0, 1, 3)
-            manage_grid.attach(self.labels['manage'], 1, 0, 2, 3)
-        else:
-            manage_grid.attach(self.labels['manage'], 0, 0, 3, 3)
+# No need for this now - status self scales
+#        mmu = self._printer.get_stat("mmu")
+#        num_gates = len(mmu['gate_status'])
+#        if num_gates > 9:
+#            manage_grid.attach(Gtk.Label(),           0, 0, 1, 3)
+#            manage_grid.attach(self.labels['manage'], 1, 0, 2, 3)
+#        else:
+#            manage_grid.attach(self.labels['manage'], 0, 0, 3, 3)
+        manage_grid.attach(self.labels['manage'], 0, 0, 3, 3)
 
         # Notebook layers for three possible uses of top right corner ----------
         notebook_corner = Gtk.Notebook()
@@ -903,8 +905,7 @@ class Panel(ScreenPanel, MmuMixin):
             msg_selct += "│" if gate_selected == g else "╛" if at_unit_end else "╧"
 
         n = display_limit * 4 + 1
-        msg = [msg_gates[:n], msg_tools[:n], msg_avail[:n], msg_selct[:n]]
-        return [msg_gates, msg_tools, msg_avail, msg_selct], current_unit_name, multi_tool
+        return [msg_gates[:n], msg_tools[:n], msg_avail[:n], msg_selct[:n]], current_unit_name, multi_tool
 
 
     def get_filament_text(self, markup=False, bold=False):

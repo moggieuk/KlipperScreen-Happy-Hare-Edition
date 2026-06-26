@@ -794,15 +794,29 @@ keyboard_box {
 .mmu_status {
     background: transparent;
     margin-left: 8px;
-    font-family: Free Mono;
-    font-size: 1em;
+    font-size: 12pt;
     border: 0;
     padding: 0;
 }
 
+.mmu_unicode_mono {
+    font-family:
+        "JetBrains Mono NL",
+        "JetBrains Mono",
+        "DejaVu Sans Mono",
+        "FreeMono",
+        "Noto Sans Mono",
+        monospace;
+}
+
 .mmu_status_filament {
+    font-size: 12pt;
     margin-left: 8px;
     margin-top: 8px;
+    margin-bottom: 8px;
+}
+
+.mmu_status_text {
     margin-bottom: 8px;
 }
 
@@ -867,10 +881,6 @@ keyboard_box {
 .mmu_spoolman_color_swatch {
     font-size: 2.3em;
     padding-bottom: 6px;
-}
-
-.mmu_monospace_popup {
-    font-family: Free Mono;
 }
 
 .mmu_combobox box button {

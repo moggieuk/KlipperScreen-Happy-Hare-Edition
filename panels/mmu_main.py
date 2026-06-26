@@ -163,9 +163,10 @@ class Panel(ScreenPanel, MmuMixin):
             name = (f'status{i+1}')
             label = Gtk.Label()
             self.labels[name] = label
-            label.get_style_context().add_class("mmu_status")
+            label.get_style_context().add_class("mmu_unicode_mono")
             label.set_xalign(0)
             if i < 4:
+                label.get_style_context().add_class("mmu_status")
                 status_box.pack_start(label, False, True, 0)
             else:
                 label.get_style_context().add_class("mmu_status_filament")

@@ -1,7 +1,7 @@
 # Happy Hare MMU Software
 # Display and selection of tools based on color and material
 #
-# Copyright (C) 2023-2025  moggieuk#6538 (discord)
+# Copyright (C) 2023-2026  moggieuk#6538 (discord)
 #                          moggieuk@hotmail.com
 #
 import logging, gi

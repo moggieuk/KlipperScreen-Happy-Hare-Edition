@@ -534,7 +534,7 @@ class KlipperScreen(Gtk.Window):
         )
         popup.get_style_context().add_class("message_popup_popover")
         if monospace: # Happy Hare added
-            popup.get_style_context().add_class("mmu_monospace_popup")
+            popup.get_style_context().add_class("mmu_unicode_mono")
         popup.add(msg)
         popup.popup()
 

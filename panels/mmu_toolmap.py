@@ -1,7 +1,8 @@
+# -*- coding: utf-8 -*-
 # Happy Hare MMU Software
 # Display and editing of TTG map and endless spool groups
 #
-# Copyright (C) 2023-2025  moggieuk#6538 (discord)
+# Copyright (C) 2023-2026  moggieuk#6538 (discord)
 #                          moggieuk@hotmail.com
 #
 import logging, gi
@@ -32,7 +33,7 @@ class Panel(ScreenPanel, MmuMixin):
     box += ['┳', '╈', '┳', '╈', '┳', '╈', '┳', '╈', '┳', '╈', '┳', '╈', '┳', '╈', '┳', '╈'] # ┳ 224
     box += ['╂', '╂', '╂', '╂', '╂', '╂', '╂', '╂', '╂', '╂', '╂', '╂', '╂', '╂', '╂', '╂'] # ╋ 240 (+crossover)
     #box += ['╋', '╋', '╋', '╋', '╋', '╋', '╋', '╋', '╋', '╋', '╋', '╋', '╋', '╋', '╋', '╋'] # ╋ 240 (accurate)
-    box += ['▫', '▻', '▣', '►', '▶', '▪']
+    box += ['□', '▷', '■', '▶', '▶', '■']
 
     def __init__(self, screen, title):
         super().__init__(screen, title)
@@ -107,6 +108,7 @@ class Panel(ScreenPanel, MmuMixin):
             name = (f'toolmap{i}')
             self.labels[name] = Gtk.Label()
             self.labels[name].get_style_context().add_class("mmu_status")
+            self.labels[name].get_style_context().add_class("mmu_unicode_mono")
             self.labels[name].set_xalign(0)
             ttg_box.pack_start(self.labels[name], False, True, 0)
 
@@ -137,18 +139,19 @@ class Panel(ScreenPanel, MmuMixin):
         mid_pad = Gtk.Box()
         mid_pad.set_vexpand(True)
 
-        grid.attach(top_pad,              0, 0, 14, 1)
-        grid.attach(Gtk.Box(),            0, 1,  1, 1)
-        grid.attach(tool_grid,            1, 1,  2, 2)
-        grid.attach(ttg_box,              3, 1,  8, 1)
-        grid.attach(gate_grid,           11, 1,  2, 2)
-        grid.attach(Gtk.Box(),           13, 1,  1, 1)
-        grid.attach(self.labels['reset'], 3, 2,  8, 1)
-        grid.attach(mid_pad,              0, 3, 14, 1)
-        grid.attach(es_box,               0, 4,  2, 3)
-        grid.attach(es_grp_box,           2, 4,  9, 1)
-        grid.attach(self.labels['save'], 12, 4,  2, 3)
-        grid.attach(es_flowbox,           2, 5,  9, 2)
+        grid.attach(top_pad,               0, 0, 14, 1)
+        grid.attach(Gtk.Box(),             0, 1,  1, 1)
+        grid.attach(tool_grid,             1, 1,  2, 2)
+        grid.attach(ttg_box,               3, 1,  8, 2)
+        grid.attach(gate_grid,            11, 1,  2, 2)
+        grid.attach(Gtk.Box(),            13, 1,  1, 1)
+        grid.attach(mid_pad,               0, 3, 14, 1)
+        grid.attach(es_box,                0, 4,  2, 3)
+        grid.attach(es_grp_box,            2, 4,  9, 1)
+        # column 11 is intentionally empty spacer
+        grid.attach(self.labels['reset'], 12, 4,  2, 1)
+        grid.attach(self.labels['save'],  12, 5,  2, 2)
+        grid.attach(es_flowbox,            2, 5,  9, 2)
 
         scroll = self._gtk.ScrolledWindow()
         scroll.add(grid)
@@ -238,17 +241,20 @@ class Panel(ScreenPanel, MmuMixin):
         tool_map = self.gen_map(htool=tool, hgate=-1)
         grp = '╸' if len(gates_in_group) == 1 else '┓' + ('┫' * (len(gates_in_group) - 2)) + '┛'
         cnt = 0
+
         for y in range(len(tool_map[0])):
             msg = (f"T{y}  ")[:4]
             for x in range(len(tool_map)):
                 msg += self.box[tool_map[x][y]]
             msg += (f" Gate #{y}  ")[:10]
+
             if y in gates_in_group:
                 msg += grp[cnt]
                 cnt = (cnt + 1) if cnt < (len(grp) - 1) else 0
                 msg += self.convert_number_to_letter(es_group) if cnt == 1 or len(grp) == 1 else ""
             else:
                 msg += ' ' if cnt == 0 else '┃'
+
             self.labels[f'toolmap{y}'].set_text(msg)
         self.labels[f'es_gate{gate}'].get_style_context().add_class("mmu_es_gate_selected")
         self.labels['tool'].set_label(f"T{tool}")

@@ -1,7 +1,7 @@
 # Happy Hare MMU Software
 # Display filaments loaded on each gate with Spoolman integration
 #
-# Copyright (C) 2023-2025  moggieuk#6538 (discord)
+# Copyright (C) 2023-2026  moggieuk#6538 (discord)
 #                          moggieuk@hotmail.com
 #
 import logging, gi
@@ -36,7 +36,7 @@ class Panel(ScreenPanel, MmuMixin):
         for i in range(num_gates):
             status_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
             available = self.labels[f'available_{i}'] = Gtk.Label("Unknown")
-            available.get_style_context().add_class("mmu_status_text")
+            available.get_style_context().add_class("mmu_status")
             status_box.pack_start(available, True, True, 0)
 
             gate_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)

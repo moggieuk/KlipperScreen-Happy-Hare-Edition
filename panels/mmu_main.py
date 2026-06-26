@@ -22,6 +22,7 @@ gi.require_version("Gtk", "3.0")
 from gi.repository import Gtk, Gdk, GLib, Pango
 from ks_includes.screen_panel import ScreenPanel
 from panels.mmu_mixin import *
+from panels.mmu_widget import *
 
 NOT_SET = -99
 
@@ -136,17 +137,26 @@ class Panel(ScreenPanel, MmuMixin):
         flowguard_frame.set_label_align(0.5, 0)
         flowguard_frame.add(flowguard_gauge)
 
+        # PAUL Experimental spool rendering
+        self.spool_tray = MmuSpoolTray(self._printer)
+        # packing:
+        #some_container.pack_start(self.spool_tray, True, True, 0)
+        # whenever mmu state changes:
+        #self.spool_tray.refresh()
+
         # MMU Manage screen ---------
         manage_grid = Gtk.Grid()
         manage_grid.set_column_homogeneous(True)
 
-        mmu = self._printer.get_stat("mmu")
-        num_gates = len(mmu['gate_status'])
-        if num_gates > 9:
-            manage_grid.attach(Gtk.Label(),           0, 0, 1, 3)
-            manage_grid.attach(self.labels['manage'], 1, 0, 2, 3)
-        else:
-            manage_grid.attach(self.labels['manage'], 0, 0, 3, 3)
+# No need for this now - status self scales
+#        mmu = self._printer.get_stat("mmu")
+#        num_gates = len(mmu['gate_status'])
+#        if num_gates > 9:
+#            manage_grid.attach(Gtk.Label(),           0, 0, 1, 3)
+#            manage_grid.attach(self.labels['manage'], 1, 0, 2, 3)
+#        else:
+#            manage_grid.attach(self.labels['manage'], 0, 0, 3, 3)
+        manage_grid.attach(self.labels['manage'], 0, 0, 3, 3)
 
         # Notebook layers for three possible uses of top right corner ----------
         notebook_corner = Gtk.Notebook()
@@ -163,9 +173,10 @@ class Panel(ScreenPanel, MmuMixin):
             name = (f'status{i+1}')
             label = Gtk.Label()
             self.labels[name] = label
-            label.get_style_context().add_class("mmu_status")
+            label.get_style_context().add_class("mmu_unicode_mono")
             label.set_xalign(0)
             if i < 4:
+                label.get_style_context().add_class("mmu_status")
                 status_box.pack_start(label, False, True, 0)
             else:
                 label.get_style_context().add_class("mmu_status_filament")
@@ -185,9 +196,10 @@ class Panel(ScreenPanel, MmuMixin):
         top_grid = Gtk.Grid()
         top_grid.set_vexpand(False)
         top_grid.set_column_homogeneous(True)
+
         top_grid.attach(top_box,                0, 0,  9, 1)
         top_grid.attach(notebook_corner,        9, 0,  3, 3)
-        top_grid.attach(status_box,             0, 1,  9, 1)
+        top_grid.attach(status_box,             0, 1, 10, 1) # Should be 9, not 10 (but this prevents screen expansion)
         top_grid.attach(self.labels['status5'], 0, 2, 12, 1) # Allows filament line line to extend
 
         tool_grid = Gtk.Grid()
@@ -210,7 +222,8 @@ class Panel(ScreenPanel, MmuMixin):
         main_grid.attach(self.labels['more'],         9, 1, 3, 1)
 
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
-        box.pack_start(top_grid, False, True, 0)
+#PAUL        box.pack_start(top_grid, False, True, 0)
+        box.pack_start(self.spool_tray, True, True, 0)
         box.add(main_grid)
 
         scroll = self._gtk.ScrolledWindow()
@@ -653,7 +666,7 @@ class Panel(ScreenPanel, MmuMixin):
 
 
     def update_status(self, show_gate=None):
-        text, unit_str, multi_tool = self.get_status_text(show_gate=show_gate, markup=self.markup_status)
+        text, current_unit_name, multi_tool = self.get_status_text(show_gate=show_gate, markup=self.markup_status)
         for i in range(4):
             name = (f'status{i+1}')
             if self.markup_status:
@@ -661,7 +674,8 @@ class Panel(ScreenPanel, MmuMixin):
             else:
                 self.labels[name].set_label(text[i])
 
-        self.labels['unit_label'].set_label(unit_str)
+        self.labels['unit_label'].set_label(current_unit_name)
+        self.spool_tray.refresh() # PAUL experimental
 
 
     # Dynamically update button sensitivity based on state
@@ -735,21 +749,6 @@ class Panel(ScreenPanel, MmuMixin):
         self.update_tool_buttons(tool_sensitive)
 
 
-    def get_rgb_color(self, gate_color):
-        if gate_color and len(gate_color) == 8:
-            try:
-                int(gate_color, 16)
-                gate_color = gate_color[:6]
-            except ValueError:
-                pass
-        color = Gdk.RGBA()
-        if not Gdk.RGBA.parse(color, gate_color.lower() if gate_color else ""):
-            if not Gdk.RGBA.parse(color, '#' + gate_color if gate_color else ""):
-                return ""
-        rgb_color = "#{:02x}{:02x}{:02x}".format(int(color.red * 255), int(color.green * 255), int(color.blue * 255))
-        return rgb_color
-
-
     def get_status_text(self, show_gate=None, markup=False):
         mmu = self._printer.get_stat("mmu")
         gate_status = mmu['gate_status']
@@ -758,76 +757,151 @@ class Panel(ScreenPanel, MmuMixin):
         tool_selected = mmu['tool']
         gate_color = mmu['gate_color']
 
-        unit_selected = mmu.get('unit')
-        if unit_selected:
+        unit_selected = mmu.get("unit")
+        display_limit = 13 # Max number of gate "columns" to display (includes bypass and gaps)
+
+        if unit_selected is not None:
             mmu_machine = self._printer.get_stat("mmu_machine")
-            unit = mmu_machine.get(f"unit_{unit_selected}")
-            first_gate = unit['first_gate']
-            num_gates = unit['num_gates']
-            unit_display_name = unit['display_name']
-        
+
+            gate_indices = []
+            bypass_found = False
+
+            for unit_index in range(mmu_machine["num_units"]):
+                if gate_indices:
+                    gate_indices.append(None) # Unit separator
+
+                unit = mmu_machine[f"unit_{unit_index}"]
+                first_gate = unit["first_gate"]
+                num_gates = unit["num_gates"]
+
+                gate_indices.extend(
+                    range(first_gate, first_gate + num_gates)
+                )
+
+                if unit.get("has_bypass", False):
+                    gate_indices.append(TOOL_GATE_BYPASS)
+                    bypass_found = True
+
+                if unit_index == unit_selected:
+                    current_unit_name = unit.get("display_name") or unit.get("name")
+
+            if not bypass_found:
+                gate_indices.append(None)
+                gate_indices.append(TOOL_GATE_BYPASS)
+
         else:
-            # Early v3 (single fixed unit)
+            # Early v3 single fixed unit
             unit_selected = 0
             first_gate = 0
             num_gates = len(gate_status)
-            unit_display_name = "Unit0"
-
-        gate_indices = list(range(first_gate, first_gate + num_gates))
-        unit_str = f"{unit_display_name}"
-        unit_str = unit_str[:1].upper() + unit_str[1:]
+            current_unit_name = "Unit0"
 
         # Trim displayed gates to the display limit
-        display_limit = 4  # max number of gates to display
+        current_unit_name = current_unit_name[:1].upper() + current_unit_name[1:]
 
         if show_gate is None:
             show_gate = gate_selected
+
+        display_offset = 0
         if len(gate_indices) > display_limit:
             try:
                 selected_idx = gate_indices.index(show_gate)
             except ValueError:
-                gate_indices = gate_indices[:display_limit]
+                display_offset = 0
+                display_gate_indices = gate_indices[:display_limit]
             else:
-                start = max(0, selected_idx - display_limit // 2)
-                start = min(start, len(gate_indices) - display_limit)
-                gate_indices = gate_indices[start:start + display_limit]
+                display_offset = max(0, selected_idx - display_limit // 2)
+                display_offset = min(display_offset, len(gate_indices) - display_limit)
+                display_gate_indices = gate_indices[display_offset:display_offset + display_limit]
+        else:
+            display_gate_indices = gate_indices
 
         multi_tool = False
         msg_gates = ""
         msg_tools = ""
         msg_avail = ""
         msg_selct = ""
-        if len(gate_indices) <= 10:
-            msg_gates += "Gates: "
-            msg_tools += "Tools: "
-            msg_avail += "Avail: "
-            msg_selct += "Selct: "
 
-        for g in gate_indices:
-            color = self.get_rgb_color(gate_color[g])
-            filament_icon = ("█") if not markup or color == "" else (f"<span color='{color}'>█</span>")
-            msg_gates += ("│#%d " % g)[:4]
-            msg_avail += "│ %s " % (filament_icon if gate_status[g] in [GATE_AVAILABLE, GATE_AVAILABLE_FROM_BUFFER] else " " if gate_status[g] == GATE_EMPTY else "?")
-            tool_str = ""
-            prefix = ""
-            for t in range(num_gates):
-                if tool_to_gate_map[t] == g:
-                    if len(prefix) > 0: multi_tool = True
-                    tool_str += "%sT%d" % (prefix, t)
-                    prefix = "+"
-            if tool_str == "": tool_str = "   "
-            msg_tools += ("│%s " % tool_str)[:4]
-            if gate_selected == g:
-                icon = filament_icon if gate_status[g] == GATE_AVAILABLE else filament_icon if gate_status[g] == GATE_AVAILABLE_FROM_BUFFER else " " if gate_status[g] == GATE_EMPTY else "?"
-                msg_selct += ("╡ %s " % icon) if g != 0 else ("│ %s " % icon)
+        if len(gate_indices) <= 10:
+            msg_gates += "Gates "
+            msg_tools += "Tools "
+            msg_avail += "Avail "
+            msg_selct += "Selct "
+
+        for i, g in enumerate(display_gate_indices):
+            full_idx = display_offset + i
+            prev_g = gate_indices[full_idx - 1] if full_idx > 0 else None
+            next_g = gate_indices[full_idx + 1] if full_idx + 1 < len(gate_indices) else None
+            at_unit_start = prev_g is None
+            at_unit_end = next_g is None
+
+            if g is None:
+                # Unit separator: 3-character spacing
+                msg_gates += "│  "
+                msg_tools += "│  "
+                msg_avail += "│  "
+                msg_selct += "│  " if gate_selected == prev_g else "╛  "
+                continue
+
+            if g == TOOL_GATE_BYPASS:
+                msg_gates += "│Byp"
+                msg_tools += "│ - "
+                msg_avail += "│   "
+
             else:
-                msg_selct += "╞═══" if gate_selected != GATE_UNKNOWN and gate_selected == (g - 1) else "╧═══" if g != 0 else "╘═══"
-        msg_gates += "│"
-        msg_tools += "│"
-        msg_avail += "│"
-        msg_selct += "│" if gate_selected == (num_gates - 1) else "╛"
-        msg = [msg_gates, msg_tools, msg_avail, msg_selct]
-        return [msg_gates, msg_tools, msg_avail, msg_selct], unit_str, multi_tool
+                # Regular gate
+                color = self.get_rgb_color(gate_color[g])
+                filament_icon = ("█") if not markup or color == "" else (f"<span color='{color}'>█</span>")
+                msg_gates += ("│#%d " % g)[:4]
+
+                if gate_status[g] in (GATE_AVAILABLE, GATE_AVAILABLE_FROM_BUFFER):
+                    avail = filament_icon
+                elif gate_status[g] == GATE_EMPTY:
+                    avail = " "
+                else:
+                    avail = "?"
+                msg_avail += f"│ {avail} "
+
+                # Find tool associated with gate
+                tool_str = ""
+                prefix = ""
+                for t in range(num_gates):
+                    if tool_to_gate_map[t] == g:
+                        if len(prefix) > 0: multi_tool = True
+                        tool_str += "%sT%d" % (prefix, t)
+                        prefix = "+"
+                if tool_str == "": tool_str = "   "
+                msg_tools += ("│%s " % tool_str)[:4]
+
+            # Selected ("open") gate
+            if gate_selected == g:
+                icon = (
+                    " "
+                    if g == TOOL_GATE_BYPASS
+                    else filament_icon
+                    if gate_status[g] in (GATE_AVAILABLE, GATE_AVAILABLE_FROM_BUFFER)
+                    else " "
+                    if gate_status[g] == GATE_EMPTY
+                    else "?"
+                )
+                msg_selct += ("╡ %s " % icon) if not (at_unit_start or gate_selected == prev_g) else ("│ %s " % icon)
+            else:
+                msg_selct += (
+                    "╞═══"
+                    if gate_selected != GATE_UNKNOWN and gate_selected == prev_g
+                    else "╘═══"
+                    if at_unit_start
+                    else "╧═══"
+                )
+
+        if g is not None:
+            msg_gates += "│"
+            msg_tools += "│"
+            msg_avail += "│"
+            msg_selct += "│" if gate_selected == g else "╛" if at_unit_end else "╧"
+
+        n = display_limit * 4 + 1
+        return [msg_gates[:n], msg_tools[:n], msg_avail[:n], msg_selct[:n]], current_unit_name, multi_tool
 
 
     def get_filament_text(self, markup=False, bold=False):
@@ -843,7 +917,7 @@ class Panel(ScreenPanel, MmuMixin):
         if unit is not None:
             unit_name = unit['name']
             cs = self._printer.get_config_section(f"mmu_unit_parameters {unit_name}")
-        if cs is None:
+        if not cs:
             # V3...
             cs = self._printer.get_config_section("mmu")
         gate_homing_endstop = cs.get("gate_homing_endstop")
@@ -1223,7 +1297,7 @@ class EncoderDialGauge(Gtk.DrawingArea):
         if self.value <= 0:
             cr.select_font_face("Sans", cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_BOLD)
             cr.set_source_rgb(*self.red)
-            bottom_text = "Triggered: CLOG/TANGLE"
+            bottom_text = "CLOG / TANGLE"
         elif self.flowrate is not None:
             cr.set_source_rgb(*self.white)
             bottom_text = f"Flowrate: {int(self.flowrate)}%"
@@ -1427,7 +1501,7 @@ class FlowGuardDialGauge(Gtk.DrawingArea):
         if self.trigger:
             cr.select_font_face("Sans", cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_BOLD)
             cr.set_source_rgb(*self.red)
-            bottom_text = f"Triggered: {self.trigger.upper()}"
+            bottom_text = f"{self.trigger.upper()}"
         elif self.flowrate is not None:
             cr.set_source_rgb(*self.white)
             bottom_text = f"Flowrate: {int(self.flowrate)}%"

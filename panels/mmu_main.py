@@ -137,13 +137,6 @@ class Panel(ScreenPanel, MmuMixin):
         flowguard_frame.set_label_align(0.5, 0)
         flowguard_frame.add(flowguard_gauge)
 
-        # PAUL Experimental spool rendering
-        self.spool_tray = MmuSpoolTray(self._printer)
-        # packing:
-        #some_container.pack_start(self.spool_tray, True, True, 0)
-        # whenever mmu state changes:
-        #self.spool_tray.refresh()
-
         # MMU Manage screen ---------
         manage_grid = Gtk.Grid()
         manage_grid.set_column_homogeneous(True)
@@ -221,14 +214,31 @@ class Panel(ScreenPanel, MmuMixin):
         main_grid.attach(self.labels['extrude'],      7, 1, 2, 1)
         main_grid.attach(self.labels['more'],         9, 1, 3, 1)
 
+        self.spool_tray = MmuSpoolTray(self._printer)
+
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
 #PAUL        box.pack_start(top_grid, False, True, 0)
-        box.pack_start(self.spool_tray, True, True, 0)
+        box.pack_start(self.spool_tray, True, True, 0) # PAUL
         box.add(main_grid)
 
         scroll = self._gtk.ScrolledWindow()
+
+        self.overlay = Gtk.Overlay()
+        self.overlay.add(scroll)
+
+        self.spool_click_shield = Gtk.EventBox()
+        self.spool_click_shield.set_visible_window(False)
+        self.spool_click_shield.set_hexpand(True)
+        self.spool_click_shield.set_vexpand(True)
+        self.spool_click_shield.hide()
+
+        self.overlay.add_overlay(self.spool_click_shield)
+        self.overlay.set_overlay_pass_through(self.spool_click_shield, True)
+
+        self.spool_tray.set_click_shield(self.spool_click_shield, self.overlay)
+
         scroll.add(box)
-        self.content.add(scroll)
+        self.content.add(self.overlay)
 
         # Was in activate() but now process_update can occur before activate() !?
         self.ui_sel_tool = NOT_SET
@@ -850,7 +860,7 @@ class Panel(ScreenPanel, MmuMixin):
 
             else:
                 # Regular gate
-                color = self.get_rgb_color(gate_color[g])
+                color = MmuUtils.get_rgb_color(gate_color[g])
                 filament_icon = ("█") if not markup or color == "" else (f"<span color='{color}'>█</span>")
                 msg_gates += ("│#%d " % g)[:4]
 
@@ -1070,7 +1080,7 @@ class Panel(ScreenPanel, MmuMixin):
             visual = visual[:last_arrow] + arrow + visual[last_arrow + 1:]
 
         if markup and gate >= 0:
-            color = self.get_rgb_color(gate_color[gate])
+            color = MmuUtils.get_rgb_color(gate_color[gate])
             if color:
                 visual = self._add_color_markup(visual, color, line)
 

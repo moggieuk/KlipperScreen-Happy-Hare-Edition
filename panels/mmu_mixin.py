@@ -362,3 +362,25 @@ class MmuMixin:
                 return unit
 
         return None
+
+
+# -------------------------------------------------------------------------------------------
+# Common helper/utilities methods
+# -------------------------------------------------------------------------------------------
+
+class MmuUtils:
+
+    @staticmethod
+    def get_rgb_color(gate_color):
+        if gate_color and len(gate_color) == 8:
+            try:
+                int(gate_color, 16)
+                gate_color = gate_color[:6]
+            except ValueError:
+                pass
+        color = Gdk.RGBA()
+        if not Gdk.RGBA.parse(color, gate_color.lower() if gate_color else ""):
+            if not Gdk.RGBA.parse(color, '#' + gate_color if gate_color else ""):
+                return ""
+        rgb_color = "#{:02x}{:02x}{:02x}".format(int(color.red * 255), int(color.green * 255), int(color.blue * 255))
+        return rgb_color

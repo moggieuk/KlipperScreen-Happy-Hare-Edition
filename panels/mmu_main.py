@@ -1665,6 +1665,9 @@ class MmuSpoolTray(Gtk.DrawingArea):
         if event.button != 1:
             return False
 
+        # A new touch/drag on the tray should cancel any existing popup/shield.
+        self._close_gate_popover() # PAUL NEW
+
         self._drag_active = True # PAUL
         self._drag_start_x = event.x # PAUL
         self._drag_start_scroll_x = self._scroll_x # PAUL
@@ -1723,10 +1726,7 @@ class MmuSpoolTray(Gtk.DrawingArea):
         self.queue_draw()
         return True
 
-
     def _on_shield_button_press(self, shield, event):
-        logging.info(f"PAUL: _on_shield_button_press()")
-        # Convert shield coordinates to spool tray coordinates.
         coords = shield.translate_coordinates(self, event.x, event.y)
 
         self._close_gate_popover()
@@ -1734,16 +1734,40 @@ class MmuSpoolTray(Gtk.DrawingArea):
         if coords is not None:
             x, y = coords
 
-            gate = self._hit_test_spool(x, y)
-            if gate is not None:
-                GLib.idle_add(
-                    lambda: (
-                        self._show_gate_popover(gate, x, y),
-                        False,
-                    )[1]
-                )
+            # Reuse this first press as the start of a drag.
+            self._drag_active = True
+            self._drag_start_x = x
+            self._drag_start_scroll_x = self._scroll_x
 
         return True
+
+#    def _on_shield_button_press(self, shield, event):
+#        # First outside press only closes the popover/shield.
+#        # Do not reopen here, otherwise the first drag/touch gets interpreted
+#        # as a new gate tap instead of scroll.
+#        self._close_gate_popover()
+#        return True
+
+#    def _on_shield_button_press(self, shield, event):
+#        logging.info(f"PAUL: _on_shield_button_press()")
+#        # Convert shield coordinates to spool tray coordinates.
+#        coords = shield.translate_coordinates(self, event.x, event.y)
+#
+#        self._close_gate_popover()
+#
+#        if coords is not None:
+#            x, y = coords
+#
+#            gate = self._hit_test_spool(x, y)
+#            if gate is not None:
+#                GLib.idle_add(
+#                    lambda: (
+#                        self._show_gate_popover(gate, x, y),
+#                        False,
+#                    )[1]
+#                )
+#
+#        return True
 
 
     def _show_gate_popover(self, gate, x, y):

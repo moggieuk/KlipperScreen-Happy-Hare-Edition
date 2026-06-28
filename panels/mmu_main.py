@@ -117,120 +117,172 @@ class Panel(ScreenPanel, MmuMixin):
         self.labels['unit_label'].set_xalign(1)
         self.labels["unit_label"].get_style_context().add_class("mmu_unit_text")
 
-        # In print Encoder guage ---------
+        # In print Encoder gauge
         encoder_gauge = EncoderDialGauge()
         self.labels['encoder_gauge'] = encoder_gauge
-
         encoder_frame = Gtk.Frame()
         self.labels['encoder_frame'] = encoder_frame
         encoder_frame.set_label("FlowGuard")
         encoder_frame.set_label_align(0.5, 0)
         encoder_frame.add(encoder_gauge)
 
-        # In print sync-feedback flowguard  guage ---------
+        # In print sync-feedback flowguard gauge
         flowguard_gauge = FlowGuardDialGauge()
         self.labels['flowguard_gauge'] = flowguard_gauge
-
         flowguard_frame = Gtk.Frame()
         self.labels['flowguard_frame'] = flowguard_frame
         flowguard_frame.set_label("FlowGuard")
         flowguard_frame.set_label_align(0.5, 0)
         flowguard_frame.add(flowguard_gauge)
 
-        # MMU Manage screen ---------
-        manage_grid = Gtk.Grid()
-        manage_grid.set_column_homogeneous(True)
-
-        manage_grid.attach(self.labels['manage'], 0, 0, 3, 3)
-
-        # Notebook layers for three possible uses of top right corner ----------
+        # Notebook corner "layers" ---------------------------------
         notebook_corner = Gtk.Notebook()
         self.labels['notebook_corner'] = notebook_corner
         notebook_corner.set_show_tabs(False)
-        notebook_corner.insert_page(manage_grid, None, 0)
+        notebook_corner.insert_page(self.labels['manage'], None, 0)
         notebook_corner.insert_page(self._clickable_page(flowguard_frame), None, 1)
         notebook_corner.insert_page(self._clickable_page(encoder_frame), None, 2)
         notebook_corner.set_current_page(0)
 
-        # TextView has problems in this use case so use 5 separate labels... Simple!
-        status_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
-        for i in range(5):
-            name = (f'status{i+1}')
-            label = Gtk.Label()
-            self.labels[name] = label
-            label.get_style_context().add_class("mmu_unicode_mono")
-            label.set_xalign(0)
-            if i < 4:
-                label.get_style_context().add_class("mmu_status")
-                status_box.pack_start(label, False, True, 0)
-            else:
-                label.get_style_context().add_class("mmu_status_filament")
-
-        top_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
-        top_box.pack_start(self.labels['tool_icon'], False, True, 0)
-        top_box.pack_start(self.labels['tool_label'], True, True, 0)
-        top_box.pack_start(self.labels['filament'], True, True, 0)
-        top_box.pack_start(self.labels['unit_label'], False, True, 12)
-
+        # Pause button "layers" ------------------------------------
         pause_layer = Gtk.Notebook()
         self.labels['pause_layer'] = pause_layer
         pause_layer.set_show_tabs(False)
         pause_layer.insert_page(self.labels['pause'], None, 0)
         pause_layer.insert_page(self.labels['message'], None, 1)
 
-        top_grid = Gtk.Grid()
-        top_grid.set_vexpand(False)
-        top_grid.set_column_homogeneous(True)
 
-        top_grid.attach(top_box,                0, 0,  9, 1)
-        top_grid.attach(notebook_corner,        9, 0,  3, 3)
-        top_grid.attach(status_box,             0, 1, 10, 1) # Should be 9, not 10 (but this prevents screen expansion)
-        top_grid.attach(self.labels['status5'], 0, 2, 12, 1) # Allows filament line line to extend
+        # Assemble "classic" view --------------------------------------
 
-        tool_grid = Gtk.Grid()
-        tool_grid.set_column_homogeneous(False)
-        tool_grid.attach(self.labels['t_decrease'], 0, 0, 1, 1)
-        tool_grid.attach(self.labels['tool'],       1, 0, 1, 1)
-        tool_grid.attach(self.labels['t_increase'], 2, 0, 1, 1)
+        self.classic_status = False
+        if self.classic_status:
 
-        main_grid = Gtk.Grid()
-        main_grid.set_vexpand(True)
-        main_grid.set_column_homogeneous(True)
-        main_grid.attach(tool_grid,                   0, 0, 6, 1)
-        main_grid.attach(self.labels['picker'],       6, 0, 2, 1)
-        main_grid.attach(self.labels['unload'],       8, 0, 2, 1)
-        main_grid.attach(self.labels['check_gates'], 10, 0, 2, 1)
-        main_grid.attach(self.labels['pause_layer'],  0, 1, 3, 1)
-        main_grid.attach(self.labels['unlock'],       3, 1, 2, 1)
-        main_grid.attach(self.labels['resume'],       5, 1, 2, 1)
-        main_grid.attach(self.labels['extrude'],      7, 1, 2, 1)
-        main_grid.attach(self.labels['more'],         9, 1, 3, 1)
+            # Top line status ------------------------------------------
+            top_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+            top_box.pack_start(self.labels['tool_icon'], False, True, 0)
+            top_box.pack_start(self.labels['tool_label'], True, True, 0)
+            top_box.pack_start(self.labels['filament'], True, True, 0)
+            top_box.pack_start(self.labels['unit_label'], False, True, 12)
 
-        self.spool_tray = MmuSpoolTray(self._printer)
 
-        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
-#PAUL        box.pack_start(top_grid, False, True, 0)
-        box.pack_start(self.spool_tray, True, True, 0) # PAUL
-        box.add(main_grid)
+            # Main textual status area ---------------------------------
 
-        scroll = self._gtk.ScrolledWindow()
+            status_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
+            # TextView has problems in this use case so use 5 separate labels...
+            for i in range(5):
+                name = (f'status{i+1}')
+                label = Gtk.Label()
+                self.labels[name] = label
+                label.get_style_context().add_class("mmu_unicode_mono")
+                label.set_xalign(0)
+                if i < 4:
+                    label.get_style_context().add_class("mmu_status")
+                    status_box.pack_start(label, False, True, 0)
+                else:
+                    label.get_style_context().add_class("mmu_status_filament")
 
-        self.overlay = Gtk.Overlay()
-        self.overlay.add(scroll)
 
-        self.spool_click_shield = Gtk.EventBox()
-        self.spool_click_shield.set_visible_window(False)
-        self.spool_click_shield.set_hexpand(True)
-        self.spool_click_shield.set_vexpand(True)
-        self.spool_click_shield.hide()
+            # Assemble upper section of panel ---------------------------
 
-        self.overlay.add_overlay(self.spool_click_shield)
-        self.overlay.set_overlay_pass_through(self.spool_click_shield, True)
+            top_grid = Gtk.Grid()
+            top_grid.set_vexpand(False)
+            top_grid.set_column_homogeneous(True)
 
-        self.spool_tray.set_click_shield(self.spool_click_shield, self.overlay)
+            top_grid.attach(top_box,                0, 0,  9, 1)
+            top_grid.attach(notebook_corner,        9, 0,  3, 3)
+            top_grid.attach(status_box,             0, 1, 10, 1) # Should be 9, not 10 (but this prevents screen expansion)
+            top_grid.attach(self.labels['status5'], 0, 2, 12, 1) # Allows filament line line to extend
 
-        scroll.add(box)
-        self.content.add(self.overlay)
+            # Assemble the two primary button rows ------------
+            tool_grid = Gtk.Grid()
+            tool_grid.set_column_homogeneous(False)
+            tool_grid.attach(self.labels['t_decrease'], 0, 0, 1, 1)
+            tool_grid.attach(self.labels['tool'],       1, 0, 1, 1)
+            tool_grid.attach(self.labels['t_increase'], 2, 0, 1, 1)
+
+            main_grid = Gtk.Grid()
+            main_grid.set_vexpand(True)
+            main_grid.set_column_homogeneous(True)
+            main_grid.attach(tool_grid,                   0, 0, 6, 1)
+            main_grid.attach(self.labels['picker'],       6, 0, 2, 1)
+            main_grid.attach(self.labels['unload'],       8, 0, 2, 1)
+            main_grid.attach(self.labels['check_gates'], 10, 0, 2, 1)
+            main_grid.attach(self.labels['pause_layer'],  0, 1, 3, 1)
+            main_grid.attach(self.labels['unlock'],       3, 1, 2, 1)
+            main_grid.attach(self.labels['resume'],       5, 1, 2, 1)
+            main_grid.attach(self.labels['extrude'],      7, 1, 2, 1)
+            main_grid.attach(self.labels['more'],         9, 1, 3, 1)
+
+            box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
+            box.pack_start(top_grid, False, True, 0)
+            box.add(main_grid)
+
+            scroll = self._gtk.ScrolledWindow()
+            scroll.add(box)
+            self.content.add(scroll)
+
+
+        else:
+            l = self.labels
+            l['spool_tray'] = MmuSpoolTray(self._printer)
+
+            l['status5'] = label = Gtk.Label()
+            label.get_style_context().add_class("mmu_unicode_mono")
+            label.get_style_context().add_class("mmu_status_filament")
+            label.set_xalign(0)
+
+            main_grid = Gtk.Grid()
+            main_grid.set_vexpand(True)
+            #main_grid.set_row_homogeneous(True) # PAUL
+            main_grid.set_column_homogeneous(True)
+
+            # PAUL debug vvv
+            dframe = Gtk.Frame()
+            css = b"""
+            .debug-cell {
+                background-color: rgba(255, 255, 0, 0.35);
+                border: 1px solid red;
+            }
+            """
+            provider = Gtk.CssProvider()
+            provider.load_from_data(css)
+            Gtk.StyleContext.add_provider_for_screen(Gdk.Screen.get_default(), provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+            dframe.get_style_context().add_class("debug-cell")
+            # PAUL debug ^^^
+
+            dframe.add(l['spool_tray'])
+            main_grid.attach(dframe,               0,  0,  9,  5)
+            main_grid.attach(l['notebook_corner'], 9,  0,  3,  5)
+            main_grid.attach(l['tool_label'],      0,  5,  1,  1)
+            main_grid.attach(l['status5'],         1,  5,  10, 1)
+            main_grid.attach(l['tool_icon'],      11,  5,  1,  1)
+ 
+            main_grid.attach(l['pause_layer'],     0,  6,  3,  2)
+            main_grid.attach(l['unlock'],          3,  6,  2,  2)
+            main_grid.attach(l['resume'],          5,  6,  2,  2)
+            main_grid.attach(l['extrude'],         7,  6,  2,  2)
+            main_grid.attach(l['more'],            9,  6,  3,  2)
+
+            scroll = self._gtk.ScrolledWindow()
+            scroll.add(main_grid)
+
+            # This creates a "click shield" to allow catching of all clicks when
+            # popup menu is active. Without this Gtk tries to handle close and
+            # doesn't propogate to the spool_tray preventing quick selection of spools
+            overlay = Gtk.Overlay()
+            overlay.add(scroll)
+
+            spool_click_shield = Gtk.EventBox()
+            spool_click_shield.set_visible_window(False)
+            spool_click_shield.set_hexpand(True)
+            spool_click_shield.set_vexpand(True)
+            spool_click_shield.hide()
+            overlay.add_overlay(spool_click_shield)
+            overlay.set_overlay_pass_through(spool_click_shield, True)
+            l['spool_tray'].set_click_shield(spool_click_shield, overlay)
+
+            self.content.add(overlay)
+
 
         # Was in activate() but now process_update can occur before activate() !?
         self.ui_sel_tool = NOT_SET
@@ -353,7 +405,7 @@ class Panel(ScreenPanel, MmuMixin):
 
                     self.update_active_buttons()
 
-            except KeyError as ke:
+            except KeyError:
                 # Almost certainly a version mismatch of Happy Hare on the printer
                 msg = "You are probably trying to connect to an incompatible"
                 msg += "\nversion of Happy Hare on your printer. Ensure Happy Hare"
@@ -361,7 +413,7 @@ class Panel(ScreenPanel, MmuMixin):
                 msg += "\nprinter, then make sure you restart Klipper."
                 msg += "\n\nI'll bet this will work out for you :-)"
                 self._screen.show_popup_message(msg, 3, save=True)
-                logging.info("Happy Hare: KeyError: %s" % str(ke))
+                logging.exception("Happy Hare KeyError")
 
 
     def init_tool_value(self):
@@ -492,12 +544,15 @@ class Panel(ScreenPanel, MmuMixin):
 
     def update_enabled(self):
         enabled = self._printer.get_stat('mmu', 'enabled')
-        for i in range(5):
-            name = (f'status{i+1}')
-            if enabled:
-                self.labels[name].get_style_context().remove_class("mmu_disabled_text")
-            else:
-                self.labels[name].get_style_context().add_class("mmu_disabled_text")
+        if self.classic_status:
+            for i in range(5):
+                name = (f'status{i+1}')
+                if enabled:
+                    self.labels[name].get_style_context().remove_class("mmu_disabled_text")
+                else:
+                    self.labels[name].get_style_context().add_class("mmu_disabled_text")
+        else:
+            pass # PAUL todo
 
 
     def update_tool(self):
@@ -668,16 +723,18 @@ class Panel(ScreenPanel, MmuMixin):
 
 
     def update_status(self, show_gate=None):
-        text, current_unit_name, multi_tool = self.get_status_text(show_gate=show_gate, markup=self.markup_status)
-        for i in range(4):
-            name = (f'status{i+1}')
-            if self.markup_status:
-                self.labels[name].set_markup(text[i])
-            else:
-                self.labels[name].set_label(text[i])
+        if self.classic_status:
+            text, current_unit_name, multi_tool = self.get_status_text(show_gate=show_gate, markup=self.markup_status)
+            for i in range(4):
+                name = (f'status{i+1}')
+                if self.markup_status:
+                    self.labels[name].set_markup(text[i])
+                else:
+                    self.labels[name].set_label(text[i])
 
-        self.labels['unit_label'].set_label(current_unit_name)
-        self.spool_tray.refresh() # PAUL experimental
+            self.labels['unit_label'].set_label(current_unit_name)
+        else:
+            self.labels['spool_tray'].refresh()
 
 
     # Dynamically update button sensitivity based on state
@@ -902,8 +959,7 @@ class Panel(ScreenPanel, MmuMixin):
             msg_avail += "│"
             msg_selct += "│" if gate_selected == g else "╛" if at_unit_end else "╧"
 
-        n = display_limit * 4 + 1
-        return [msg_gates[:n], msg_tools[:n], msg_avail[:n], msg_selct[:n]], current_unit_name, multi_tool
+        return [msg_gates, msg_tools, msg_avail, msg_selct], current_unit_name, multi_tool
 
 
     def get_filament_text(self, markup=False, bold=False):
@@ -1116,18 +1172,28 @@ class MmuSpoolTray(Gtk.DrawingArea):
         self._items = None
         self._spool_cache = {}
 
+        # Pop-up menus
         self._hitboxes = []  # list of (gate, x, y, w, h)
-        self._scroll_x = 0
-        self.add_events(
-            Gdk.EventMask.BUTTON_PRESS_MASK |
-            Gdk.EventMask.SCROLL_MASK
-        )
-        self.connect("button-press-event", self._on_button_press)
-        self.connect("scroll-event", self._on_scroll)
-
         self._popover = None
         self._popover_timeout_id = None
         self._click_shield = None
+
+        # Drag scrolling
+        self._scroll_x = 0
+        self._drag_active = False
+        self._drag_start_x = 0
+        self._drag_start_scroll_x = 0
+
+        self.add_events(
+            Gdk.EventMask.BUTTON_PRESS_MASK |
+            Gdk.EventMask.BUTTON_RELEASE_MASK |
+            Gdk.EventMask.POINTER_MOTION_MASK |
+            Gdk.EventMask.SCROLL_MASK
+        )
+        self.connect("button-press-event", self._on_button_press)
+        self.connect("button-release-event", self._on_button_release)
+        self.connect("motion-notify-event", self._on_motion)
+        self.connect("scroll-event", self._on_scroll)
 
         self.set_app_paintable(True)
         self.connect("draw", self._draw)
@@ -1259,7 +1325,8 @@ class MmuSpoolTray(Gtk.DrawingArea):
         # Spool layout and tray extensions are separate.
         # The tray may extend before/after a unit, but spool centers and hitboxes
         # should be based only on actual spool slots.
-        spool_start_x = margin + reserved_tray_pad - self._scroll_x
+#        spool_start_x = margin + reserved_tray_pad - self._scroll_x
+        spool_start_x = margin - self._scroll_x
     
         tray_rects = []
         lid_rects = []
@@ -1496,7 +1563,7 @@ class MmuSpoolTray(Gtk.DrawingArea):
             else:
                 stroke_rgb = (1.00, 0.55, 0.05)
 
-        self._draw_rounded_rect(cr, badge_x, badge_y, badge_w, badge_h, radius, fill_rgb=fill_rgba, stroke_rgb=stroke_rgb, stroke_width=1.2)
+        self._draw_rounded_rect(cr, badge_x, badge_y, badge_w, badge_h, radius, fill_rgb=fill_rgba, stroke_rgb=stroke_rgb, stroke_width=2)
 
         cr.select_font_face("Sans", cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_BOLD)
         font_size = max(8, min(badge_h * 0.68, spool_h * 0.12))
@@ -1594,18 +1661,52 @@ class MmuSpoolTray(Gtk.DrawingArea):
 
 
     def _on_button_press(self, widget, event):
+        logging.info(f"PAUL: _on_button_press()")
         if event.button != 1:
             return False
 
-        gate = self._hit_test_spool(event.x, event.y)
-        if gate is None:
+        self._drag_active = True # PAUL
+        self._drag_start_x = event.x # PAUL
+        self._drag_start_scroll_x = self._scroll_x # PAUL
+        return True # PAUL
+
+#PAUL        gate = self._hit_test_spool(event.x, event.y)
+#PAUL        if gate is None:
+#PAUL            return False
+#PAUL
+#PAUL        self._show_gate_popover(gate, event.x, event.y)
+#PAUL        return True
+
+
+    def _on_motion(self, widget, event):
+        logging.info(f"PAUL: _on_motion()")
+        if not self._drag_active:
             return False
 
-        self._show_gate_popover(gate, event.x, event.y)
+        dx = event.x - self._drag_start_x
+        self._scroll_x = self._drag_start_scroll_x - dx
+        self.queue_draw()
+        return True
+
+
+    def _on_button_release(self, widget, event):
+        logging.info(f"PAUL: _on_button_release()")
+        if not self._drag_active:
+            return False
+
+        self._drag_active = False
+
+        # Treat short drags as taps/clicks.
+        if abs(event.x - self._drag_start_x) < 8:
+            gate = self._hit_test_spool(event.x, event.y)
+            if gate is not None:
+                self._show_gate_popover(gate, event.x, event.y)
+
         return True
 
 
     def _on_scroll(self, widget, event):
+        logging.info(f"PAUL: _on_scroll()")
         step = self.get_allocation().height * 0.45
 
         if event.direction == Gdk.ScrollDirection.LEFT:
@@ -1624,6 +1725,7 @@ class MmuSpoolTray(Gtk.DrawingArea):
 
 
     def _on_shield_button_press(self, shield, event):
+        logging.info(f"PAUL: _on_shield_button_press()")
         # Convert shield coordinates to spool tray coordinates.
         coords = shield.translate_coordinates(self, event.x, event.y)
 

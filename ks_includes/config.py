@@ -192,10 +192,10 @@ class KlipperScreenConfig:
 # Happy Hare: not a valid check, attributes can be referenced with index, e.g. printer.mmu.gate_status[4]
 #        if string:
 #            msg = "Section headers have extra information after brackets possible newline issue:"
-#            for line in string.split('\n'):
+#            for line in string.split("\n"):
 #                if re.match(r".+\].", line):
 #                    logging.error(line)
-#                    self.errors.append(f'{msg}\n\n{line}')
+#                    self.errors.append(f"{msg}\n\n{line}")
 #                    return False
         for section in config:
             if section == "DEFAULT" or section.startswith("include "):

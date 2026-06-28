@@ -57,7 +57,7 @@ class AppState:
     notification_log = []
 
 
-class KlipperScreen(Gtk.Window):
+class KlipperScreen(Gtk.ApplicationWindow):
     MAX_RETRIES = 4
 
     def __init__(self, args):
@@ -66,7 +66,6 @@ class KlipperScreen(Gtk.Window):
         except Exception as e:
             logging.exception(f"{e}\n\n{traceback.format_exc()}")
             raise RuntimeError from e
-        GLib.set_prgname("KlipperScreen")
         self.state: AppState = AppState()
         self.panels = {}
         self.panels_reinit = []
@@ -95,6 +94,7 @@ class KlipperScreen(Gtk.Window):
         self.last_popup_time = datetime.now()
         self.last_popup_msg = None # Happy Hare
         self.last_error = ""
+        self.inhibit_cookie = None
 
         configfile = os.path.normpath(os.path.expanduser(args.configfile))
 
@@ -182,10 +182,9 @@ class KlipperScreen(Gtk.Window):
             self.show_error_modal("Invalid config file", self._config.get_errors())
             return
         self.base_panel.activate()
-        self.use_dpms = self._config.get_main_config().getboolean(
-            "use_dpms", fallback=(not self.wayland)
-        )
-        self.use_dpms &= functions.dpms_loaded
+        self.use_dpms = self._config.get_main_config().getboolean("use_dpms", fallback=False)
+        if not self.wayland:
+            self.use_dpms &= functions.dpms_loaded
         self.set_dpms(self.use_dpms)
         autolock = self._config.get_main_config().getint("autolock_timeout", fallback=0)
         self.lock_screen.set_autolock_timeout(autolock)
@@ -534,7 +533,7 @@ class KlipperScreen(Gtk.Window):
         )
         popup.get_style_context().add_class("message_popup_popover")
         if monospace: # Happy Hare added
-            popup.get_style_context().add_class("mmu_monospace_popup")
+            popup.get_style_context().add_class("mmu_unicode_mono")
         popup.add(msg)
         popup.popup()
 
@@ -634,7 +633,7 @@ class KlipperScreen(Gtk.Window):
 
         self.style_provider.load_from_data(self.base_css.encode())
         Gtk.StyleContext.add_provider_for_screen(
-            Gdk.Screen.get_default(), Gtk.CssProvider(), Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
+            Gdk.Screen.get_default(), self.style_provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
         )
 
     def load_custom_theme(self, theme_name):
@@ -750,7 +749,7 @@ class KlipperScreen(Gtk.Window):
         self.show_panel(panel_name, title, remove_all=False)
 
     def check_dpms_state(self):
-        if not self.use_dpms:
+        if not self.use_dpms or self.wayland:
             return False
         state = functions.get_DPMS_state()
         if state == functions.DPMS_State.Fail:
@@ -779,14 +778,24 @@ class KlipperScreen(Gtk.Window):
             self.set_dpms(False)
             return
 
+    def inhibit_idle(self):
+        app = self.get_application()
+        if app and self.inhibit_cookie is None:
+            self.inhibit_cookie = app.inhibit(
+                self, Gtk.ApplicationInhibitFlags.IDLE, "KlipperScreen"
+            )
+            logging.info(f"Idle inhibit acquired: {self.inhibit_cookie}")
+
+    def uninhibit_idle(self):
+        if self.inhibit_cookie is not None:
+            app = self.get_application()
+            if app:
+                app.uninhibit(self.inhibit_cookie)
+                self.inhibit_cookie = None
+                logging.debug("Idle inhibit released")
+
     def set_dpms(self, use_dpms):
-        if self.wayland:
-            self.use_dpms = False
-            self._config.set("main", "use_dpms", False)
-            self._config.save_user_config_options()
-            logging.debug("DPMS handling not supported on Wayland")
-            return
-        if not use_dpms:
+        if not use_dpms and not self.wayland:
             if self.check_dpms_timeout is not None:
                 GLib.source_remove(self.check_dpms_timeout)
             self.check_dpms_timeout = None
@@ -802,6 +811,12 @@ class KlipperScreen(Gtk.Window):
                         f"FAILED to turn DPMS off on {self.display_number}:\n {e}"
                     )
                     return
+        elif use_dpms and self.wayland:
+            if self.get_application() is not None:
+                self.inhibit_idle()
+            else:
+                logging.debug("Warning too early call to set idle inhibit cookie")
+                GLib.idle_add(self.inhibit_idle)
         self.use_dpms = use_dpms
         self._config.set("main", "use_dpms", use_dpms)
         self._config.save_user_config_options()
@@ -1057,7 +1072,11 @@ class KlipperScreen(Gtk.Window):
 
     def process_update(self, *args):
         self.base_panel.process_update(*args)
-        if self._cur_panels and hasattr(self.panels[self._cur_panels[-1]], "process_update"):
+        if (
+            self.printer
+            and self._cur_panels
+            and hasattr(self.panels[self._cur_panels[-1]], "process_update")
+        ):
             self.panels[self._cur_panels[-1]].process_update(*args)
 
     def confirm_save(self, widget):
@@ -1082,6 +1101,7 @@ class KlipperScreen(Gtk.Window):
             sign = "+" if zoffset > 0 else "-"
             msg = f"Apply {sign}{abs(zoffset)} offset?"
             zlabel = Gtk.Label(label=msg, hexpand=True, vexpand=True, wrap=True)
+            zlabel.set_line_wrap_mode(Pango.WrapMode.WORD_CHAR)
             grid.attach(zlabel, 0, 1, 2, 1)
             if "Z_OFFSET_APPLY_PROBE" in self.printer.available_commands:
                 apply_probe = self.gtk.Button(label=_("Save Z") + "\n" + "Probe", style="color1")
@@ -1186,11 +1206,10 @@ class KlipperScreen(Gtk.Window):
 
     def power_devices(self, widget=None, devices=None, on=False):
         devs = self.search_power_devices(devices)
-        if self._ws is not None:
-            if on:
-                self._ws.api.power_device_on(devs)
-            else:
-                self._ws.api.power_device_off(devs)
+        if on:
+            self._ws.api.power_device_on(devs)
+        else:
+            self._ws.api.power_device_off(devs)
 
     def _init_printer(self, msg, go_to_splash=False):
         self.printer_initializing(msg, go_to_splash)
@@ -1425,7 +1444,9 @@ class KlipperScreen(Gtk.Window):
     def _get_keyboard(self, input_purpose):
         if input_purpose in self.keyboard_cache:
             return self.keyboard_cache[input_purpose]
-        k = self.keyboard_cache[input_purpose] = Keyboard(self, lambda *args, **kwargs: None, input_purpose)
+        k = self.keyboard_cache[input_purpose] = Keyboard(
+            self, lambda *args, **kwargs: None, purpose=input_purpose
+        )
         return k
 
     def _show_matchbox_keyboard(self, kbd_grid):
@@ -1492,6 +1513,21 @@ class KlipperScreen(Gtk.Window):
             self.reload_panels()
 
 
+class KlipperScreenApplication(Gtk.Application):
+    def __init__(self, args):
+        super().__init__(application_id="org.klipperscreen.KlipperScreen")
+        self._args = args
+
+    def do_activate(self):
+        self._win = KlipperScreen(self._args)
+        self._win.connect("destroy", self._on_destroy)
+        self.add_window(self._win)
+
+    @staticmethod
+    def _on_destroy(win):
+        win.gtk.shutdown()
+
+
 def main():
     parser = argparse.ArgumentParser(description="KlipperScreen - A GUI for Klipper")
     homedir = os.path.expanduser("~")
@@ -1524,22 +1560,9 @@ def main():
 
     functions.setup_logging(os.path.normpath(os.path.expanduser(args.logfile)))
     functions.patch_threading_excepthook()
-    if not Gtk.init_check():
-        logging.critical("Failed to initialize Gtk")
-        raise RuntimeError
-    try:
-        win = KlipperScreen(args)
-    except Exception as e:
-        logging.exception(f"Failed to initialize window\n{e}\n\n{traceback.format_exc()}")
-        raise RuntimeError from e
 
-    def _on_destroy(win):
-        win.gtk.shutdown()
-        Gtk.main_quit()
-
-    win.connect("destroy", _on_destroy)
-    win.show_all()
-    Gtk.main()
+    app = KlipperScreenApplication(args)
+    app.run()
 
 
 if __name__ == "__main__":

@@ -19,7 +19,7 @@ OLD_KLIPPER_CONFIG_HOME="${HOME}/klipper_config"
 
 OS_FLYOS_FAST="flyos-fast"
 OS_TYPE=""
-if [ $(sed -n 's/^NAME="\(.*\)"/\1/p' /etc/os-release 2>/dev/null) = "FlyOS-Fast" ]; then
+if [ "$(sed -n 's/^NAME="\(.*\)"/\1/p' /etc/os-release 2>/dev/null)" = "FlyOS-Fast" ]; then
     OS_TYPE="${OS_FLYOS_FAST}"
     echo "Detected FlyOS-Fast"
 fi
@@ -118,6 +118,7 @@ self_update() {
     echo -e "${B_GREEN}Already the latest version: ${GIT_VER}"
 }
 
+
 function nextsuffix {
     local name="$1"
     local -i num=0
@@ -126,6 +127,7 @@ function nextsuffix {
     done
     printf "%s.0%d" "$name" "$num"
 }
+
 
 verify_not_root() {
     if [ "$OS_TYPE" = "$OS_FLYOS_FAST" ]; then
@@ -138,6 +140,7 @@ verify_not_root() {
     fi
 }
 
+
 check_klipper() {
     if [ "$(sudo systemctl list-units --full -all -t service --no-legend | grep -F "klipper.service")" ]; then
         echo -e "${INFO}Klipper service found"
@@ -147,6 +150,7 @@ check_klipper() {
     fi
 
 }
+
 
 verify_home_dirs() {
     if [ ! -d "${KLIPPER_CONFIG_HOME}" ]; then
@@ -158,6 +162,7 @@ verify_home_dirs() {
     fi
     echo -e "${INFO}Klipper config directory (${KLIPPER_CONFIG_HOME}) found"
 }
+
 
 install_klipper_screen() {
     echo -e "${INFO}Adding KlipperScreen support for MMU"
@@ -216,6 +221,87 @@ EOF
     restart_klipperscreen
 }
 
+
+install_jetbrains_fonts() {
+    local FORCE="${1:-}"
+
+    echo -e "${INFO}Checking for JetBrains Mono..."
+
+    if [ "$FORCE" != "--force" ] &&
+       command -v fc-match >/dev/null 2>&1 &&
+       fc-match "JetBrains Mono" 2>/dev/null | grep -q "JetBrainsMono"; then
+        echo -e "${INFO}JetBrains Mono is already installed."
+        return 0
+    fi
+
+    [ "$FORCE" = "--force" ] && \
+        echo -e "${WARNING}Forcing JetBrains Mono reinstallation..."
+
+    local FONT_NAME="JetBrainsMono"
+    local ZIP_URL="https://download.jetbrains.com/fonts/JetBrainsMono-2.304.zip"
+    local FONT_DIR
+    local TMP_DIR
+
+    if [ "$(id -u)" -eq 0 ]; then
+        FONT_DIR="/usr/local/share/fonts/jetbrains-mono"
+    else
+        FONT_DIR="${HOME}/.local/share/fonts/jetbrains-mono"
+    fi
+
+    mkdir -p "$FONT_DIR"
+
+    TMP_DIR="$(mktemp -d)" || {
+        echo -e "${ERROR}Failed to create temporary directory."
+        return 1
+    }
+
+    trap 'rm -rf "$TMP_DIR"' RETURN
+
+    echo -e "${INFO}Downloading JetBrains Mono..."
+
+    if command -v curl >/dev/null 2>&1; then
+        if ! curl -fsSL "$ZIP_URL" -o "$TMP_DIR/$FONT_NAME.zip"; then
+            echo -e "${ERROR}Failed to download JetBrains Mono."
+            return 1
+        fi
+    elif command -v wget >/dev/null 2>&1; then
+        if ! wget -q -O "$TMP_DIR/$FONT_NAME.zip" "$ZIP_URL"; then
+            echo -e "${ERROR}Failed to download JetBrains Mono."
+            return 1
+        fi
+    else
+        echo -e "${ERROR}Neither curl nor wget is installed."
+        return 1
+    fi
+
+    echo -e "${INFO}Extracting fonts..."
+
+    if ! unzip -q "$TMP_DIR/$FONT_NAME.zip" -d "$TMP_DIR"; then
+        echo -e "${ERROR}Failed to extract JetBrains Mono archive."
+        return 1
+    fi
+
+    echo -e "${INFO}Installing fonts..."
+
+    if ! find "$TMP_DIR" -type f \( -iname "*.ttf" -o -iname "*.otf" \) \
+        -exec cp {} "$FONT_DIR/" \;; then
+        echo -e "${ERROR}Failed to install font files."
+        return 1
+    fi
+
+    echo -e "${INFO}Refreshing font cache..."
+
+    if command -v fc-cache >/dev/null 2>&1; then
+        fc-cache -f "$FONT_DIR"
+    else
+        echo -e "${WARNING}fc-cache not found. Font cache was not refreshed."
+    fi
+
+    echo -e "${INFO}JetBrains Mono installed successfully."
+    return 0
+}
+
+
 install_update_manager() {
     echo -e "${INFO}Adding update manager to moonraker.conf"
     echo "${KLIPPER_CONFIG_HOME}/moonraker.conf"
@@ -268,6 +354,7 @@ install_update_manager() {
     fi
 }
 
+
 restart_klipperscreen() {
     echo -e "${INFO}Restarting KlipperScreen..."
     if [ "$OS_TYPE" = "$OS_FLYOS_FAST" ]; then
@@ -277,10 +364,12 @@ restart_klipperscreen() {
     fi
 }
 
+
 restart_moonraker() {
     echo -e "${INFO}Restarting Moonraker..."
     sudo systemctl restart moonraker
 }
+
 
 usage() {
     echo -e "${EMPHASIZE}"
@@ -291,29 +380,40 @@ usage() {
     exit 1
 }
 
+
 # Find SRCDIR from the pathname of this script
 SRCDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )"/ && pwd )"
 
-while getopts "c:g:z" arg; do
+while getopts "jc:g:z" arg; do
     case $arg in
         c) KLIPPER_CONFIG_HOME=${OPTARG};;
         g) num_gates=$OPTARG;;
 	z) SKIP_UPDATE=1;;
+	j) FORCE_JETBRAINS="--force";;
         *) usage;;
     esac
 done
-if [ -z "$num_gates" ]; then
-    echo "Must specify the number of gates (selectors) with the -g <num_gates> argument" >&2
-    exit 1
-fi
 
 clear
+
+if [ -z "$num_gates" ]; then
+    num_gates=12
+    echo
+    echo -e "${WARNING}You didn't specify the number of gates with the -g <num_gates> argument so setting up for up to 12" >&2
+    echo
+fi
+
 verify_not_root
 [ -z "${SKIP_UPDATE}" ] && {
     self_update # Make sure the repo is up-to-date
 }
+
+install_jetbrains_fonts ${FORCE_JETBRAINS}
+
 verify_home_dirs
+
 install_klipper_screen
+
 if [ "$OS_TYPE" = "$OS_FLYOS_FAST" ]; then
     echo -e "${WARNING}Skipping update manager install on ${OS_TYPE} system"
 else

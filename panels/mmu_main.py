@@ -179,6 +179,7 @@ class Panel(ScreenPanel, MmuMixin):
                     label.get_style_context().add_class("mmu_status")
                     status_box.pack_start(label, False, True, 0)
                 else:
+                    self.labels['filament_pos'] = label # Alias for status5
                     label.get_style_context().add_class("mmu_status_filament")
 
 
@@ -188,17 +189,17 @@ class Panel(ScreenPanel, MmuMixin):
             top_grid.set_vexpand(False)
             top_grid.set_column_homogeneous(True)
 
-            top_grid.attach(top_box,                0, 0,  9, 1)
-            top_grid.attach(notebook_corner,        9, 0,  3, 3)
-            top_grid.attach(status_box,             0, 1, 10, 1) # Should be 9, not 10 (but this prevents screen expansion)
-            top_grid.attach(self.labels['status5'], 0, 2, 12, 1) # Allows filament line line to extend
+            top_grid.attach(top_box,                      0, 0,  9, 1)
+            top_grid.attach(notebook_corner,              9, 0,  3, 3)
+            top_grid.attach(status_box,                   0, 1, 10, 1) # Should be 9, not 10 (but this prevents screen expansion)
+            top_grid.attach(self.labels['filament_pos'],  0, 2, 12, 1) # Allows filament line line to extend
 
             # Assemble the two primary button rows ------------
             tool_grid = Gtk.Grid()
             tool_grid.set_column_homogeneous(False)
-            tool_grid.attach(self.labels['t_decrease'], 0, 0, 1, 1)
-            tool_grid.attach(self.labels['tool'],       1, 0, 1, 1)
-            tool_grid.attach(self.labels['t_increase'], 2, 0, 1, 1)
+            tool_grid.attach(self.labels['t_decrease'],   0, 0, 1, 1)
+            tool_grid.attach(self.labels['tool'],         1, 0, 1, 1)
+            tool_grid.attach(self.labels['t_increase'],   2, 0, 1, 1)
 
             main_grid = Gtk.Grid()
             main_grid.set_vexpand(True)
@@ -226,10 +227,12 @@ class Panel(ScreenPanel, MmuMixin):
             l = self.labels
             l['spool_tray'] = MmuSpoolTray(self._printer)
 
-            l['status5'] = label = Gtk.Label()
+            l['filament_pos'] = label = Gtk.Label()
             label.get_style_context().add_class("mmu_unicode_mono")
             label.get_style_context().add_class("mmu_status_filament")
             label.set_xalign(0)
+
+            'unload': self._gtk.Button('mmu_unload', 'Unload', 'color4'), # Doubles as eject button
 
             main_grid = Gtk.Grid()
             main_grid.set_vexpand(True)
@@ -254,7 +257,7 @@ class Panel(ScreenPanel, MmuMixin):
             main_grid.attach(dframe,               0,  0,  9,  5)
             main_grid.attach(l['notebook_corner'], 9,  0,  3,  5)
             main_grid.attach(l['tool_label'],      0,  5,  1,  1)
-            main_grid.attach(l['status5'],         1,  5,  10, 1)
+            main_grid.attach(l['filament_pos'],    1,  5,  10, 1)
             main_grid.attach(l['tool_icon'],      11,  5,  1,  1)
  
             main_grid.attach(l['pause_layer'],     0,  6,  3,  2)
@@ -717,9 +720,9 @@ class Panel(ScreenPanel, MmuMixin):
 
     def update_filament_status(self):
         if self.markup_filament:
-            self.labels['status5'].set_markup(self.get_filament_text(markup=True, bold=self.bold_filament))
+            self.labels['filament_pos'].set_markup(self.get_filament_text(markup=True, bold=self.bold_filament))
         else:
-            self.labels['status5'].set_label(self.get_filament_text(bold=self.bold_filament))
+            self.labels['filament_pos'].set_label(self.get_filament_text(bold=self.bold_filament))
 
 
     def update_status(self, show_gate=None):
@@ -1294,28 +1297,24 @@ class MmuSpoolTray(Gtk.DrawingArea):
         total_spools = sum(len(g) for g in groups)
         if total_spools == 0:
             return False
-    
-        spool_h = height * 0.86    # Height drives spool size. Everything else is derived from spool_h
-        spool_w = spool_h * 0.80   # Overall drawing width allocated to one spool image
-    
-        tray_pad_ratio = 0.25
-        group_gap = spool_h * 0.18 # Gap between separate MMU units, in spool-height units
-    
-        margin = spool_h * 0.12    # Left/right outer margin inside this widget
-        reserved_tray_pad = spool_h * 0.28 # Extra room before/after trays so rounded ends are not clipped
-    
-        slot_w = spool_w * 0.5    # Horizontal spacing between spool centers; Smaller = tighter overlap inside a unit.
-        spool_cy = height * 0.44  # Vertical center of normal spools
-    
-        # Tray anchored to spool position.
-        # Larger value = tray starts lower = covers less of the spool.
-        tray_top = spool_cy + spool_h * 0.24
-        tray_h = height - tray_top - 2
+
+        layout = self._get_layout(width, height)
+
+        spool_h = layout["spool_h"]
+        spool_w = layout["spool_w"]
+        tray_pad_ratio = layout["tray_pad_ratio"]
+        group_gap = layout["group_gap"]
+        margin = layout["margin"]
+        slot_w = layout["slot_w"]
+        scroll_pad = layout["scroll_pad"]
+        spool_cy = layout["spool_cy"]
+        tray_top = layout["tray_top"]
+        tray_h = layout["tray_h"]
     
         content_w = (
             total_spools * slot_w +
             max(0, len(groups) - 1) * group_gap +
-            reserved_tray_pad * 2 +
+            scroll_pad * 2 +
             margin * 2
         )
     
@@ -1325,8 +1324,7 @@ class MmuSpoolTray(Gtk.DrawingArea):
         # Spool layout and tray extensions are separate.
         # The tray may extend before/after a unit, but spool centers and hitboxes
         # should be based only on actual spool slots.
-#        spool_start_x = margin + reserved_tray_pad - self._scroll_x
-        spool_start_x = margin - self._scroll_x
+        spool_start_x = margin + scroll_pad - self._scroll_x
     
         tray_rects = []
         lid_rects = []
@@ -1361,7 +1359,10 @@ class MmuSpoolTray(Gtk.DrawingArea):
                 hitbox_w = slot_w
                 hitbox_h = height - hitbox_y
                 positioned_items.append((item, cx, item_spool_cy, spool_x, spool_y))
-                self._hitboxes.append((item["gate"], hitbox_x, hitbox_y, hitbox_w, hitbox_h))
+                visible_x = max(0, hitbox_x)
+                visible_w = min(width, hitbox_x + hitbox_w) - visible_x
+                if visible_w > 0:
+                    self._hitboxes.append((item["gate"], visible_x, hitbox_y, visible_w, hitbox_h))
                 gate_badges.append((item, cx, tray_top, tray_h, slot_w, spool_h))
     
                 x += slot_w
@@ -1647,8 +1648,63 @@ class MmuSpoolTray(Gtk.DrawingArea):
         cr.restore()
 
 
+    def scroll_gate_into_view(self, gate, center=False):
+        if self._items is None:
+            self._items = self._build_items()
+
+        alloc = self.get_allocation()
+        width = alloc.width
+        height = alloc.height
+
+        groups = self._items
+        total_spools = sum(len(g) for g in groups)
+        if total_spools == 0 or width <= 0:
+            return
+
+        layout = self._get_layout(width, height)
+
+        slot_w = layout["slot_w"]
+        group_gap = layout["group_gap"]
+        margin = layout["margin"]
+        scroll_pad = layout["scroll_pad"]
+
+        content_w = (
+            total_spools * slot_w +
+            max(0, len(groups) - 1) * group_gap +
+            scroll_pad * 2 +
+            margin * 2
+        )
+
+        max_scroll_x = max(0, content_w - width)
+
+        x = margin + scroll_pad
+
+        for group in groups:
+            for item in group:
+                slot_x = x
+                slot_center = slot_x + slot_w / 2
+
+                if item["gate"] == gate:
+                    fully_visible = (
+                        slot_x >= self._scroll_x and
+                        slot_x + slot_w <= self._scroll_x + width
+                    )
+
+                    if fully_visible and not center:
+                        return
+
+                    target_scroll_x = slot_center - width / 2
+                    self._scroll_x = max(0, min(target_scroll_x, max_scroll_x))
+                    self.queue_draw()
+                    return
+
+                x += slot_w
+
+            x += group_gap
+
+
     # ---------------------------------------------------------------------------
-    # Pop-up action handling
+    # Scrolling and Pop-up action handling
     # ---------------------------------------------------------------------------
 
     def _hit_test_spool(self, px, py):
@@ -1661,28 +1717,19 @@ class MmuSpoolTray(Gtk.DrawingArea):
 
 
     def _on_button_press(self, widget, event):
-        logging.info(f"PAUL: _on_button_press()")
         if event.button != 1:
             return False
 
         # A new touch/drag on the tray should cancel any existing popup/shield.
-        self._close_gate_popover() # PAUL NEW
+        self._close_gate_popover()
 
-        self._drag_active = True # PAUL
-        self._drag_start_x = event.x # PAUL
-        self._drag_start_scroll_x = self._scroll_x # PAUL
-        return True # PAUL
-
-#PAUL        gate = self._hit_test_spool(event.x, event.y)
-#PAUL        if gate is None:
-#PAUL            return False
-#PAUL
-#PAUL        self._show_gate_popover(gate, event.x, event.y)
-#PAUL        return True
+        self._drag_active = True
+        self._drag_start_x = event.x
+        self._drag_start_scroll_x = self._scroll_x
+        return True
 
 
     def _on_motion(self, widget, event):
-        logging.info(f"PAUL: _on_motion()")
         if not self._drag_active:
             return False
 
@@ -1693,11 +1740,14 @@ class MmuSpoolTray(Gtk.DrawingArea):
 
 
     def _on_button_release(self, widget, event):
-        logging.info(f"PAUL: _on_button_release()")
         if not self._drag_active:
             return False
 
         self._drag_active = False
+
+        device = event.get_device()
+        if device is not None:
+            device.ungrab(event.time)
 
         # Treat short drags as taps/clicks.
         if abs(event.x - self._drag_start_x) < 8:
@@ -1709,7 +1759,6 @@ class MmuSpoolTray(Gtk.DrawingArea):
 
 
     def _on_scroll(self, widget, event):
-        logging.info(f"PAUL: _on_scroll()")
         step = self.get_allocation().height * 0.45
 
         if event.direction == Gdk.ScrollDirection.LEFT:
@@ -1726,7 +1775,9 @@ class MmuSpoolTray(Gtk.DrawingArea):
         self.queue_draw()
         return True
 
+
     def _on_shield_button_press(self, shield, event):
+
         coords = shield.translate_coordinates(self, event.x, event.y)
 
         self._close_gate_popover()
@@ -1734,40 +1785,26 @@ class MmuSpoolTray(Gtk.DrawingArea):
         if coords is not None:
             x, y = coords
 
-            # Reuse this first press as the start of a drag.
             self._drag_active = True
             self._drag_start_x = x
             self._drag_start_scroll_x = self._scroll_x
 
+            # Grab pointer motion after the shield is hidden.
+            window = self.get_window()
+            if window is not None:
+                device = event.get_device()
+                if window is not None and device is not None:
+                    Gdk.Device.grab(
+                        device,
+                        window,
+                        Gdk.GrabOwnership.NONE,
+                        False,
+                        Gdk.EventMask.BUTTON_RELEASE_MASK |
+                        Gdk.EventMask.POINTER_MOTION_MASK,
+                        None,
+                        event.time,
+                    )
         return True
-
-#    def _on_shield_button_press(self, shield, event):
-#        # First outside press only closes the popover/shield.
-#        # Do not reopen here, otherwise the first drag/touch gets interpreted
-#        # as a new gate tap instead of scroll.
-#        self._close_gate_popover()
-#        return True
-
-#    def _on_shield_button_press(self, shield, event):
-#        logging.info(f"PAUL: _on_shield_button_press()")
-#        # Convert shield coordinates to spool tray coordinates.
-#        coords = shield.translate_coordinates(self, event.x, event.y)
-#
-#        self._close_gate_popover()
-#
-#        if coords is not None:
-#            x, y = coords
-#
-#            gate = self._hit_test_spool(x, y)
-#            if gate is not None:
-#                GLib.idle_add(
-#                    lambda: (
-#                        self._show_gate_popover(gate, x, y),
-#                        False,
-#                    )[1]
-#                )
-#
-#        return True
 
 
     def _show_gate_popover(self, gate, x, y):
@@ -1862,7 +1899,42 @@ class MmuSpoolTray(Gtk.DrawingArea):
 
     # ---------------------------------------------------------------------------
     # Drawing helpers
-    # ---------------------------------------------------------------------------
+    #  ---------------------------------------------------------------------------
+
+    def _get_layout(self, width, height):
+        """
+        Centralized layout sizing logic for tweaking look and feel of major components
+        """
+        spool_h = height * 0.86        # Height drives spool size. Everything else is derived from spool_h
+        spool_w = spool_h * 0.80       # Overall drawing width allocated to one spool image
+
+        tray_pad_ratio = 0.25
+        group_gap = spool_h * 0.18     # Gap between separate MMU units, in spool-height units
+
+        margin = spool_h * 0.0         # Left/right outer margin inside this widget
+
+        slot_w = spool_w * 0.5         # Horizontal spacing between spool centers; Smaller = tighter overlap inside a unit.
+        scroll_pad = slot_w * 0.10     # Extra scroll padding before first and after last spool
+
+        spool_cy = height * 0.44       # Vertical center of normal spools
+
+        # Tray anchored to spool position. Larger value = tray starts lower = covers less of the spool.
+        tray_top = spool_cy + spool_h * 0.24
+        tray_h = height - tray_top - 2
+
+        return {
+            "spool_h": spool_h,
+            "spool_w": spool_w,
+            "tray_pad_ratio": tray_pad_ratio,
+            "group_gap": group_gap,
+            "margin": margin,
+            "slot_w": slot_w,
+            "scroll_pad": scroll_pad,
+            "spool_cy": spool_cy,
+            "tray_top": tray_top,
+            "tray_h": tray_h,
+        }
+
 
     def _draw_oval(self, cr, cx, cy, w, h, fill_rgb, stroke_rgb=None, stroke_width=1.0):
         cr.save()

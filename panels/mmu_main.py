@@ -904,8 +904,7 @@ class Panel(ScreenPanel, MmuMixin):
             msg_avail += "│"
             msg_selct += "│" if gate_selected == g else "╛" if at_unit_end else "╧"
 
-        n = display_limit * 4 + 1
-        return [msg_gates[:n], msg_tools[:n], msg_avail[:n], msg_selct[:n]], current_unit_name, multi_tool
+        return [msg_gates, msg_tools, msg_avail, msg_selct], current_unit_name, multi_tool
 
 
     def get_filament_text(self, markup=False, bold=False):

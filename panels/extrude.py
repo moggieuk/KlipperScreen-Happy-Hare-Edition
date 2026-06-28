@@ -267,28 +267,20 @@ class Panel(ScreenPanel):
                         switch.set_active(data[x]["enabled"])
                         switch.handler_unblock(handler_id)
                     else:
-                        switch.set_active(data[x]['enabled'])
-
-# Happy Hare: original code block
-#                if "filament_detected" in data[x] and self._printer.get_stat(x, "enabled"):
-#                    if data[x]["filament_detected"]:
-#                        self.labels[x]["box"].get_style_context().remove_class("filament_sensor_empty")
-#                        self.labels[x]["box"].get_style_context().add_class("filament_sensor_detected")
-#                    else:
-#                        self.labels[x]["box"].get_style_context().remove_class("filament_sensor_detected")
-#                        self.labels[x]["box"].get_style_context().add_class("filament_sensor_empty")
-
-                # Happy Hare modified block to always give feedback on disabled sensor (no highlight class)
-                # but retain status if switch indicator is present. i.e. 3 states if small, 4 if switch
-                if self._printer.get_stat(x, "filament_detected"):
-                    self.labels[x]['box'].get_style_context().remove_class("filament_sensor_empty")
-                    self.labels[x]['box'].get_style_context().add_class("filament_sensor_detected")
-                else:
-                    self.labels[x]['box'].get_style_context().remove_class("filament_sensor_detected")
-                    self.labels[x]['box'].get_style_context().add_class("filament_sensor_empty")
-                if not self._printer.get_stat(x, "enabled") and 'switch' not in self.labels[x]:
-                    self.labels[x]['box'].get_style_context().remove_class("filament_sensor_detected")
-                    self.labels[x]['box'].get_style_context().remove_class("filament_sensor_empty")
+                        switch.set_active(data[x]["enabled"])
+                if "filament_detected" in data[x] and self._printer.get_stat(x, "enabled"):
+                    if data[x]["filament_detected"]:
+                        self.labels[x]["box"].get_style_context().remove_class(
+                            "filament_sensor_empty"
+                        )
+                        self.labels[x]["box"].get_style_context().add_class(
+                            "filament_sensor_detected"
+                        )
+                    else:
+                        self.labels[x]["box"].get_style_context().remove_class(
+                            "filament_sensor_detected"
+                        )
+                        self.labels[x]["box"].get_style_context().add_class("filament_sensor_empty")
 
     def change_distance(self, widget, distance):
         logging.info(f"### Distance {distance}")
@@ -374,9 +366,8 @@ class Panel(ScreenPanel):
                 self.labels[x]["box"].get_style_context().add_class("filament_sensor_empty")
         else:
             self._screen._ws.api.gcode_script(f"SET_FILAMENT_SENSOR SENSOR={name} ENABLE=0")
-# Happy Hare: Believe this is a mistake in upstream
-#            self.labels[x]["box"].get_style_context().remove_class("filament_sensor_empty")
-#            self.labels[x]["box"].get_style_context().remove_class("filament_sensor_detected")
+            self.labels[x]["box"].get_style_context().remove_class("filament_sensor_empty")
+            self.labels[x]["box"].get_style_context().remove_class("filament_sensor_detected")
 
     def update_temp(self, extruder, temp, target, power):
         if not temp:

@@ -122,7 +122,7 @@ class Panel(ScreenPanel, MmuMixin):
         self.labels['encoder_gauge'] = encoder_gauge
         encoder_frame = Gtk.Frame()
         self.labels['encoder_frame'] = encoder_frame
-        encoder_frame.set_label("FlowGuard")
+        encoder_frame.set_label("Encoder")
         encoder_frame.set_label_align(0.5, 0)
         encoder_frame.add(encoder_gauge)
 
@@ -139,7 +139,8 @@ class Panel(ScreenPanel, MmuMixin):
         notebook_corner = Gtk.Notebook()
         self.labels['notebook_corner'] = notebook_corner
         notebook_corner.set_show_tabs(False)
-        notebook_corner.insert_page(self.labels['manage'], None, 0)
+#PAUL TEMP        notebook_corner.insert_page(self.labels['manage'], None, 0)
+        notebook_corner.insert_page(self._clickable_page(self.labels['manage']), None, 0) # PAUL TEMP
         notebook_corner.insert_page(self._clickable_page(flowguard_frame), None, 1)
         notebook_corner.insert_page(self._clickable_page(encoder_frame), None, 2)
         notebook_corner.set_current_page(0)
@@ -227,12 +228,6 @@ class Panel(ScreenPanel, MmuMixin):
 
         else:
             l = self.labels
-            l['spool_tray'] = MmuSpoolTray(self._printer)
-
-            l['filament_pos'] = label = Gtk.Label()
-            label.get_style_context().add_class("mmu_unicode_mono")
-            label.get_style_context().add_class("mmu_status_filament")
-            label.set_xalign(0)
 
             # Popup action buttons --------
             l['menu_select']  = self._gtk.Button('mmu_select',     'Select',      'color1')
@@ -242,32 +237,45 @@ class Panel(ScreenPanel, MmuMixin):
             l['menu_eject']   = self._gtk.Button('mmu_eject',      'Eject',       'color3')
             l['menu_check']   = self._gtk.Button('mmu_checkgates', 'Check Gates', 'color4')
 
+            # Spool visualization --------
+            l['spool_tray'] = MmuSpoolTray(self._printer, self)
+            spool_frame = l['spool_frame'] = Gtk.Frame()
+            spool_frame.set_label("Filament: Unknown")
+            spool_frame.set_label_align(0.5, 0)
+            spool_frame.add(l['spool_tray'])
+
+            l['filament_pos'] = label = Gtk.Label()
+            label.get_style_context().add_class("mmu_unicode_mono")
+            label.get_style_context().add_class("mmu_status_filament")
+            label.set_xalign(0)
+
             main_grid = Gtk.Grid()
             main_grid.set_vexpand(True)
             #main_grid.set_row_homogeneous(True) # PAUL
             main_grid.set_column_homogeneous(True)
 
-            # PAUL debug vvv
-            dframe = Gtk.Frame()
-            css = b"""
-            .debug-cell {
-                background-color: rgba(255, 255, 0, 0.35);
-                border: 1px solid red;
-            }
-            """
-            provider = Gtk.CssProvider()
-            provider.load_from_data(css)
-            Gtk.StyleContext.add_provider_for_screen(Gdk.Screen.get_default(), provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
-            dframe.get_style_context().add_class("debug-cell")
-            # PAUL debug ^^^
+#            # PAUL debug vvv
+#            dframe = Gtk.Frame()
+#            css = b"""
+#            .debug-cell {
+#                background-color: rgba(255, 255, 0, 0.35);
+#                border: 1px solid red;
+#            }
+#            """
+#            provider = Gtk.CssProvider()
+#            provider.load_from_data(css)
+#            Gtk.StyleContext.add_provider_for_screen(Gdk.Screen.get_default(), provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+#            dframe.get_style_context().add_class("debug-cell")
+#            dframe.add(l['spool_tray'])
+#            main_grid.attach(dframe,               0,  0,  9,  5)
+#           # PAUL debug ^^^
 
-            dframe.add(l['spool_tray'])
-            main_grid.attach(dframe,               0,  0,  9,  5)
+            main_grid.attach(l['spool_frame'],     0,  0,  9,  5)
             main_grid.attach(l['notebook_corner'], 9,  0,  3,  5)
             main_grid.attach(l['tool_label'],      0,  5,  1,  1)
             main_grid.attach(l['filament_pos'],    1,  5,  10, 1)
             main_grid.attach(l['tool_icon'],      11,  5,  1,  1)
- 
+
             main_grid.attach(l['pause_layer'],     0,  6,  3,  2)
             main_grid.attach(l['unlock'],          3,  6,  2,  2)
             main_grid.attach(l['resume'],          5,  6,  2,  2)
@@ -301,13 +309,32 @@ class Panel(ScreenPanel, MmuMixin):
         self.config_update()
 
 
+#    def _next_notebook_corner_page(self, widget, event):
+#        notebook = self.labels["notebook_corner"]
+#        if self.has_buffer() and self.has_encoder():
+#            # Toggle flowguard monitor dials (unlikely user will have both)
+#            page = notebook.get_current_page()
+#            notebook.set_current_page(2 if page == 1 else 1)
+#        return True
+
     def _next_notebook_corner_page(self, widget, event):
         notebook = self.labels["notebook_corner"]
-        if self.has_buffer() and self.has_encoder():
-            # Toggle flowguard monitor dials (unlikely user will have both)
-            page = notebook.get_current_page()
-            notebook.set_current_page(2 if page == 1 else 1)
+
+        page = notebook.get_current_page()
+        n_pages = notebook.get_n_pages()
+
+        for i in range(1, n_pages + 1):
+            candidate = (page + i) % n_pages
+            if self._is_clickable_page(notebook, candidate):
+                notebook.set_current_page(candidate)
+                break
+
         return True
+
+
+    def _is_clickable_page(self, notebook, page_num):
+        child = notebook.get_nth_page(page_num)
+        return isinstance(child, Gtk.EventBox)
 
 
     def _clickable_page(self, child):
@@ -697,6 +724,7 @@ class Panel(ScreenPanel, MmuMixin):
 
 
     def update_movement(self, encoder_position=None):
+        # Supports classic and visual layouts
         mmu = self._printer.get_stat("mmu")
         print_state = mmu["print_state"]
         action = mmu["action"]
@@ -723,7 +751,10 @@ class Panel(ScreenPanel, MmuMixin):
         else:
             label = action
 
-        self.labels["filament"].set_label(label)
+        if self.classic_status:
+            self.labels["filament"].set_label(label)
+        else:
+            self.labels["spool_frame"].set_label(label)
 
 
     def update_filament_status(self):
@@ -735,6 +766,7 @@ class Panel(ScreenPanel, MmuMixin):
 
 
     def update_status(self, show_gate=None):
+        logging.info("PAUL: update_status()")
         # Supports classic and visual layouts
         if self.classic_status:
             text, current_unit_name, multi_tool = self.get_status_text(show_gate=show_gate, markup=self.markup_status)
@@ -785,14 +817,22 @@ class Panel(ScreenPanel, MmuMixin):
             if not self._screen.have_last_popup_message():
                 ui_state.append("no_message")
 
-            page = 0 # Manage recovery button
+            # Adjust "notebook corner" if necessary
+            notebook = self.labels['notebook_corner']
+            page = notebook.get_current_page()
+            new_page = None
             if "printing" in ui_state:
-                page = self.labels['notebook_corner'].get_current_page()
-                if page == 0 and self.has_buffer():
-                    page = 1 # Flowguard display
-                elif page == 0 and self.has_encoder():
-                    page = 2 # Encoder display
-            self.labels['notebook_corner'].set_current_page(page)
+                # Any "clickable" page is good (just get off manage button)
+                if not self._is_clickable_page(notebook, page):
+                    if self.has_buffer():
+                        new_page = 2 # Flowguard display
+                    elif self.has_encoder():
+                        new_page = 3 # Encoder display
+            else:
+                if page >= 2:
+                    new_page = 0 # Manage recovery button
+            if new_page is not None:
+                notebook.set_current_page(new_page)
 
             if ("paused" not in ui_state and "pause_locked" not in ui_state) or "no_message" in ui_state:
                 self.labels['pause_layer'].set_current_page(0) # Pause button
@@ -1070,12 +1110,14 @@ class Panel(ScreenPanel, MmuMixin):
 
         # Impl --------
 
-        if tool >= 0:
-            tool_text = f"T{tool} "[:3]
-        elif tool == TOOL_GATE_BYPASS:
-            tool_text = "BYPASS "
-        else:
-            tool_text = "T? "
+        tool_text = ""
+        if self.classic_status:
+            if tool >= 0:
+                tool_text = f"T{tool} "[:3]
+            elif tool == TOOL_GATE_BYPASS:
+                tool_text = "BYPASS "
+            else:
+                tool_text = "T? "
 
         bowden_length = max(1, 12 - len(tool_text))
         bowden_half = bowden_length // 2
@@ -1180,11 +1222,19 @@ class Panel(ScreenPanel, MmuMixin):
 
 class MmuSpoolTray(Gtk.DrawingArea):
 
-    def __init__(self, printer):
+    def __init__(self, printer, panel):
         super().__init__()
         self._printer = printer
+        self._panel = panel
         self._items = None
+
+        # Spool images are always cached
         self._spool_cache = {}
+
+        # MMU unit display can optionally be cached
+        self._render_cache = None
+        self._render_cache_key = None
+        self._enable_render_cache = True
 
         # Pop-up menus support
         self._hitboxes = []  # list of (gate, x, y, w, h)
@@ -1237,19 +1287,13 @@ class MmuSpoolTray(Gtk.DrawingArea):
         button_grid.set_column_spacing(4)
         button_grid.set_margin_top(4)
 
-        self._btn_select = Gtk.Button(label="Select")
-        self._btn_preload = Gtk.Button(label="Preload")
-        self._btn_load = Gtk.Button(label="Load")
-        self._btn_unload = Gtk.Button(label="Unload")
-        self._btn_eject = Gtk.Button(label="Eject")
-        self._btn_check = Gtk.Button(label="Check")
-
-        button_grid.attach(self._btn_select,   0, 0, 1, 1)
-        button_grid.attach(self._btn_preload,  1, 0, 1, 1)
-        button_grid.attach(self._btn_load,     0, 1, 1, 1)
-        button_grid.attach(self._btn_unload,   1, 1, 1, 1)
-        button_grid.attach(self._btn_eject,    0, 2, 1, 1)
-        button_grid.attach(self._btn_check,    1, 2, 1, 1)
+        l = self._panel.labels
+        button_grid.attach(l['menu_select'],   0, 0, 1, 1)
+        button_grid.attach(l['menu_preload'],  1, 0, 1, 1)
+        button_grid.attach(l['menu_load'],     0, 1, 1, 1)
+        button_grid.attach(l['menu_unload'],   1, 1, 1, 1)
+        button_grid.attach(l['menu_eject'],    0, 2, 1, 1)
+        button_grid.attach(l['menu_check'],    1, 2, 1, 1)
 
         box.pack_start(button_grid, False, False, 0)
         self._popover.add(box)
@@ -1273,6 +1317,7 @@ class MmuSpoolTray(Gtk.DrawingArea):
 
     def refresh(self):
         self._items = self._build_items()
+# assume _draw will catch changes        self._invalidate_render_cache() # PAUL caching
         self.queue_draw()
 
 
@@ -1342,11 +1387,10 @@ class MmuSpoolTray(Gtk.DrawingArea):
         alloc = self.get_allocation()
         width = alloc.width
         height = alloc.height
-        self._hitboxes.clear()
-    
+
         if self._items is None:
             self._items = self._build_items()
-    
+
         groups = self._items
         total_spools = sum(len(g) for g in groups)
         if total_spools == 0:
@@ -1359,72 +1403,103 @@ class MmuSpoolTray(Gtk.DrawingArea):
         tray_pad_ratio = layout["tray_pad_ratio"]
         group_gap = layout["group_gap"]
         margin = layout["margin"]
+        top_margin = layout["top_margin"]
+        bottom_margin = layout["bottom_margin"]
         slot_w = layout["slot_w"]
         scroll_pad = layout["scroll_pad"]
         spool_cy = layout["spool_cy"]
         tray_top = layout["tray_top"]
         tray_h = layout["tray_h"]
-    
+
+        viewport_w = width - margin * 2
+
         content_w = (
             total_spools * slot_w +
             max(0, len(groups) - 1) * group_gap +
-            scroll_pad * 2 +
-            margin * 2
+            scroll_pad * 2
         )
-    
-        max_scroll_x = max(0, content_w - width)
+
+        max_scroll_x = max(0, content_w - viewport_w)
         self._scroll_x = max(0, min(self._scroll_x, max_scroll_x))
-    
-        # Spool layout and tray extensions are separate.
-        # The tray may extend before/after a unit, but spool centers and hitboxes
-        # should be based only on actual spool slots.
+
+        # To make very efficient on rpi (paranoia), cache the entire render context
+        # and invalidate only when necessary. This also protects against unecessary
+        # calling of refresh(). Caching can be disabled with by setting:
+        #   self._enable_render_cache = False
+        key = (
+            width,
+            height,
+            round(self._scroll_x),
+# PAUL IMPORTANT .. add spool % and espooler to cache check
+            tuple(
+                tuple((i["gate"], i["color"], i["empty"], i["selected"], i["status"]) for i in group)
+                for group in groups
+            ),
+        )
+        if self._render_cache is not None and self._render_cache_key == key:
+            cr.set_source_surface(self._render_cache, 0, 0)
+            cr.paint()
+            return False
+
+        surface = cairo.ImageSurface(cairo.FORMAT_ARGB32, width, height)
+        cache_cr = cairo.Context(surface)
+
+        logging.info("PAUL: _draw()")
+
+        # Draw everything using cache_cr also rebuild self._hitboxes during this pass
+        self._hitboxes.clear()
+
         spool_start_x = margin + scroll_pad - self._scroll_x
-    
+
         tray_rects = []
         lid_rects = []
         gate_badges = []
-    
-        cr.save()
-        cr.rectangle(0, 0, width, height)
-        cr.clip()
-    
+
+        cache_cr.save()
+        cache_cr.rectangle(0, 0, width, height)
+        cache_cr.clip()
+
         x = spool_start_x
-    
+
         for group in groups:
             group_start = x
             group_w = slot_w * len(group)
-    
+
             positioned_items = []
-    
+
             for item in group:
                 cx = x + slot_w / 2
-    
+
                 # Lift selected spool upward from tray
                 selected_lift = spool_h * 0.05 if item["selected"] else 0
                 item_spool_cy = spool_cy - selected_lift
-    
+
                 spool_x = cx - spool_w / 2 - 7
                 spool_y = item_spool_cy - spool_h / 2 - 7
 
                 # Use non-overlapping slot hitboxes, not full spool image hitboxes.
                 # The spools overlap visually, but each gate should own one click slot.
                 hitbox_x = x
-                hitbox_y = item_spool_cy - spool_h / 2
+                hitbox_y = top_margin
                 hitbox_w = slot_w
-                hitbox_h = height - hitbox_y
+                hitbox_h = height - bottom_margin - hitbox_y
+
                 positioned_items.append((item, cx, item_spool_cy, spool_x, spool_y))
+
                 visible_x = max(0, hitbox_x)
                 visible_w = min(width, hitbox_x + hitbox_w) - visible_x
+
                 if visible_w > 0:
                     self._hitboxes.append((item["gate"], visible_x, hitbox_y, visible_w, hitbox_h))
+
                 gate_badges.append((item, cx, tray_top, tray_h, slot_w, spool_h))
-    
+
                 x += slot_w
-    
+
             # Draw right-to-left so leftward spools visually overlap correctly.
             for item, cx, item_spool_cy, spool_x, spool_y in reversed(positioned_items):
                 self._draw_spool(
-                    cr,
+                    cache_cr,
                     cx,
                     item_spool_cy,
                     spool_w,
@@ -1433,46 +1508,85 @@ class MmuSpoolTray(Gtk.DrawingArea):
                     empty=item["empty"],
                     selected=item["selected"],
                 )
-    
+
             tray_pad = slot_w * tray_pad_ratio
             tray_x = group_start - tray_pad
             tray_w = group_w + tray_pad * 2
-    
+
             tray_rects.append((tray_x, tray_top, tray_w, tray_h))
-    
-            lid_top = 1
-            lid_height = tray_top + tray_h * 0.1
+
+            lid_top = top_margin
+            lid_bottom = tray_top + tray_h * 0.15
+            lid_height = lid_bottom - lid_top
+
             lid_rects.append((tray_x, lid_top, tray_w, lid_height, spool_h))
-    
+
             x += group_gap
-    
+
         # Draw glass lids after spools but before trays.
         for rect in lid_rects:
-            self._draw_unit_lid(cr, *rect)
-    
+            self._draw_unit_lid(cache_cr, *rect)
+
         # Draw trays in foreground so they cover the lower part of the spools.
         for rect in tray_rects:
-            self._draw_tray(cr, *rect)
-    
+            self._draw_tray(cache_cr, *rect)
+
         # Draw gate badges on top of the tray.
         for item, cx, tray_top, tray_h, slot_w, spool_h in gate_badges:
-            self._draw_gate_status(cr, item, cx, tray_top, tray_h, slot_w, spool_h)
+            self._draw_gate_status(cache_cr, item, cx, tray_top, tray_h, slot_w, spool_h)
 
-#        # PAUL DEBUG: Visualize hitboxes
+        # Fade left/right edges when more content is available off-screen.
+        fade_w = slot_w * 0.55
+        fade_a = 0.55
+
+        if self._scroll_x > 0:
+            grad = cairo.LinearGradient(0, 0, fade_w, 0)
+            grad.add_color_stop_rgba(0.00, 0, 0, 0, fade_a)
+            grad.add_color_stop_rgba(1.00, 0, 0, 0, 0.00)
+
+            cache_cr.save()
+            cache_cr.rectangle(0, top_margin, fade_w, height - top_margin - bottom_margin)
+            cache_cr.clip()
+            cache_cr.set_source(grad)
+            cache_cr.paint()
+            cache_cr.restore()
+
+        if self._scroll_x < max_scroll_x:
+            grad = cairo.LinearGradient(width - fade_w, 0, width, 0)
+            grad.add_color_stop_rgba(0.00, 0, 0, 0, 0.00)
+            grad.add_color_stop_rgba(1.00, 0, 0, 0, fade_a)
+
+            cache_cr.save()
+            cache_cr.rectangle(width - fade_w, top_margin, fade_w, height - top_margin - bottom_margin)
+            cache_cr.clip()
+            cache_cr.set_source(grad)
+            cache_cr.paint()
+            cache_cr.restore()
+
+# PAUL DEBUG: Visualize hitboxes
 #        for gate, x, y, w, h in self._hitboxes:
-#            cr.save()
-#            cr.set_source_rgba(1.0, 0.0, 0.0, 0.18)
-#            cr.rectangle(x, y, w, h)
-#            cr.fill()
-#            cr.set_source_rgb(1.0, 0.0, 0.0)
-#            cr.set_line_width(1.0)
-#            cr.rectangle(x, y, w, h)
-#            cr.stroke()
-#            cr.restore()
-#        # PAUL DEBUG
-    
-        cr.restore()
-    
+#            cache_cr.save()
+#            cache_cr.set_source_rgba(1.0, 0.0, 0.0, 0.18)
+#            cache_cr.rectangle(x, y, w, h)
+#            cache_cr.fill()
+#            cache_cr.set_source_rgb(1.0, 0.0, 0.0)
+#            cache_cr.set_line_width(1.0)
+#            cache_cr.rectangle(x, y, w, h)
+#            cache_cr.stroke()
+#            cache_cr.restore()
+# PAUL DEBUG
+
+        cache_cr.restore()
+
+        self._render_cache = surface
+        self._render_cache_key = key
+
+        if not self._enable_render_cache:
+            self._invalidate_render_cache()
+
+        cr.set_source_surface(surface, 0, 0)
+        cr.paint()
+
         return False
 
 
@@ -1525,7 +1639,7 @@ class MmuSpoolTray(Gtk.DrawingArea):
 
 
     def _render_spool(self, cr, w, h, color, empty, filament_pct=100):
-        fr, fg, fb = self._parse_color(color)
+        fr, fg, fb, fa = self._parse_color(color)
         filament_pct = max(0.0, min(1.0, filament_pct / 100.0))
 
         # Cardboard colors
@@ -1560,7 +1674,7 @@ class MmuSpoolTray(Gtk.DrawingArea):
         # 100% = slightly smaller than cardboard flange
         max_filament_h = outer_h * 0.8
         inner_h = tube_h + (max_filament_h - tube_h) * filament_pct
-        inner_w = inner_h * oval_ratio * 0.8 # * 0.8 is because of lack of resolution on small display
+        inner_w = inner_h * oval_ratio * 0.75 # * 0.75 provides more cardboard view for full filament in low resolution
 
         # Filament bulk rectangle matches the oval height.
         filament_h = inner_h
@@ -1570,7 +1684,7 @@ class MmuSpoolTray(Gtk.DrawingArea):
         self._draw_oval(cr, right_x, h / 2, outer_w, outer_h, cardboard, cardboard_edge, stroke_width=2)
 
         # 2. Right core rounded tube end
-        self._draw_oval(cr, right_x, h / 2, tube_w, tube_h, cardboard, cardboard_dark)
+        self._draw_oval(cr, right_x, h / 2, tube_w, tube_h, cardboard, cardboard_dark, stroke_width=2)
 
         # 3. Core body (rectangle)
         cr.set_source_rgb(*cardboard)
@@ -1579,10 +1693,10 @@ class MmuSpoolTray(Gtk.DrawingArea):
 
         if not empty and filament_pct > 0.0:
             # 4. Filament oval on right face
-            self._draw_oval(cr, right_x, h / 2, inner_w, inner_h, (fr, fg, fb), cardboard_dark)
+            self._draw_oval(cr, right_x, h / 2, inner_w, inner_h, (fr, fg, fb, fa), cardboard_dark, stroke_width=3)
 
             # 5. Filament body (rectangle)
-            cr.set_source_rgb(fr, fg, fb)
+            cr.set_source_rgba(fr, fg, fb, fa)
             cr.rectangle(body_x, filament_y, body_w, filament_h)
             cr.fill()
 
@@ -1725,13 +1839,15 @@ class MmuSpoolTray(Gtk.DrawingArea):
         content_w = (
             total_spools * slot_w +
             max(0, len(groups) - 1) * group_gap +
-            scroll_pad * 2 +
-            margin * 2
+            scroll_pad * 2
+#            scroll_pad * 2 +
+#            margin * 2
         )
 
         max_scroll_x = max(0, content_w - width)
 
-        x = margin + scroll_pad
+        x = margin
+#        x = margin + scroll_pad
 
         for group in groups:
             for item in group:
@@ -1749,12 +1865,18 @@ class MmuSpoolTray(Gtk.DrawingArea):
 
                     target_scroll_x = slot_center - width / 2
                     self._scroll_x = max(0, min(target_scroll_x, max_scroll_x))
+                    self._invalidate_render_cache()
                     self.queue_draw()
                     return
 
                 x += slot_w
 
             x += group_gap
+
+
+    def _invalidate_render_cache(self):
+        self._render_cache = None
+        self._render_cache_key = None
 
 
     # ---------------------------------------------------------------------------
@@ -1793,13 +1915,19 @@ class MmuSpoolTray(Gtk.DrawingArea):
         dy = event.y - self._drag_start_y
 
         moved = abs(dx) > 8 or abs(dy) > 8
+        if not moved:
+            return True
 
-        if moved and self._drag_popup_pending:
+        if self._drag_popup_pending:
             self._close_gate_popover()
             self._drag_popup_pending = False
 
-        self._scroll_x = self._drag_start_scroll_x - dx
-        self.queue_draw()
+        new_scroll_x = self._drag_start_scroll_x - dx
+        if new_scroll_x != self._scroll_x:
+            self._scroll_x = new_scroll_x
+            self._invalidate_render_cache()
+            self.queue_draw()
+
         return True
 
 
@@ -1847,6 +1975,7 @@ class MmuSpoolTray(Gtk.DrawingArea):
         else:
             return False
 
+        self._invalidate_render_cache()
         self.queue_draw()
         return True
 
@@ -1912,12 +2041,13 @@ class MmuSpoolTray(Gtk.DrawingArea):
 #        self._btn_eject.set_sensitive(...)
 #        self._btn_check.set_sensitive(...)
 
-        self._connect_gate_button(self._btn_select,  gate, "select")
-        self._connect_gate_button(self._btn_preload, gate, "preload")
-        self._connect_gate_button(self._btn_load,    gate, "load")
-        self._connect_gate_button(self._btn_unload,  gate, "unload")
-        self._connect_gate_button(self._btn_eject,   gate, "eject")
-        self._connect_gate_button(self._btn_check,   gate, "check")
+        l = self._panel.labels
+        self._connect_gate_button(l['menu_select'],  gate, "select")
+        self._connect_gate_button(l['menu_preload'], gate, "preload")
+        self._connect_gate_button(l['menu_load'],    gate, "load")
+        self._connect_gate_button(l['menu_unload'],  gate, "unload")
+        self._connect_gate_button(l['menu_eject'],   gate, "eject")
+        self._connect_gate_button(l['menu_check'],   gate, "check")
 
         self._popover.show_all()
         self._popover.popup()
@@ -1977,22 +2107,29 @@ class MmuSpoolTray(Gtk.DrawingArea):
         """
         Centralized layout sizing logic for tweaking look and feel of major components
         """
-        spool_h = height * 0.86        # Height drives spool size. Everything else is derived from spool_h
-        spool_w = spool_h * 0.80       # Overall drawing width allocated to one spool image
+        top_margin = height * 0.04       # Top padding
+        bottom_margin = height * 0.01    # Bottom padding
+
+        spool_aspect = 0.77              # Overall spool width/height ratio
+        slot_overlap = 0.47              # Spool centre spacing
+
+        content_h = height - top_margin - bottom_margin
+
+        spool_h = content_h * 0.86       # Height drives spool size. Everything else is derived from spool_h
+        spool_w = spool_h * spool_aspect # Overall drawing width allocated to one spool image
+        slot_w = spool_w * slot_overlap  # Horizontal spacing between spool centers; Smaller = tighter overlap inside a unit.
+
+        margin = spool_w * 0.1           # Left/right outer margin
+        scroll_pad = slot_w * 0.10       # Extra scroll padding before first and after last spool
 
         tray_pad_ratio = 0.25
-        group_gap = spool_h * 0.18     # Gap between separate MMU units, in spool-height units
+        group_gap = spool_w * 0.10       # Gap between separate MMU units, in spool-height units
 
-        margin = spool_h * 0.0         # Left/right outer margin inside this widget
+        spool_cy = top_margin + content_h * 0.44
 
-        slot_w = spool_w * 0.5         # Horizontal spacing between spool centers; Smaller = tighter overlap inside a unit.
-        scroll_pad = slot_w * 0.10     # Extra scroll padding before first and after last spool
-
-        spool_cy = height * 0.44       # Vertical center of normal spools
-
-        # Tray anchored to spool position. Larger value = tray starts lower = covers less of the spool.
+        # Tray anchored to spool position.
         tray_top = spool_cy + spool_h * 0.24
-        tray_h = height - tray_top - 2
+        tray_h = height - bottom_margin - tray_top
 
         return {
             "spool_h": spool_h,
@@ -2001,6 +2138,8 @@ class MmuSpoolTray(Gtk.DrawingArea):
             "group_gap": group_gap,
             "margin": margin,
             "slot_w": slot_w,
+            "top_margin": top_margin,
+            "bottom_margin": bottom_margin,
             "scroll_pad": scroll_pad,
             "spool_cy": spool_cy,
             "tray_top": tray_top,
@@ -2015,12 +2154,20 @@ class MmuSpoolTray(Gtk.DrawingArea):
         cr.arc(0, 0, 1, 0, math.tau)
         cr.restore()
 
-        cr.set_source_rgb(*fill_rgb)
+        if len(fill_rgb) == 4:
+            cr.set_source_rgba(*fill_rgb)
+        else:
+            cr.set_source_rgb(*fill_rgb)
+
         cr.fill_preserve()
 
         if stroke_rgb is not None:
             cr.set_line_width(stroke_width)
-            cr.set_source_rgb(*stroke_rgb)
+
+            if len(fill_rgb) == 4:
+                cr.set_source_rgba(*stroke_rgb)
+            else:
+                cr.set_source_rgb(*stroke_rgb)
             cr.stroke()
         else:
             cr.new_path()
@@ -2072,5 +2219,5 @@ class MmuSpoolTray(Gtk.DrawingArea):
     def _parse_color(self, color):
         rgba = Gdk.RGBA()
         if color and rgba.parse(color):
-            return rgba.red, rgba.green, rgba.blue
-        return 0.45, 0.45, 0.45
+            return rgba.red, rgba.green, rgba.blue, rgba.alpha
+        return 0.502, 0.506, 0.510, 0.890 # #808182E3 convention I used in other UI's

@@ -14,7 +14,7 @@
 # This file may be distributed under the terms of the GNU GPLv3 license.
 # Happy Hare MMU Software
 #
-import logging, gi
+import logging, gi, math
 
 gi.require_version("Gtk", "3.0")
 
@@ -30,11 +30,12 @@ class EncoderDialGauge(Gtk.DrawingArea):
     def __init__(self):
         super().__init__()
 
-        self.value = 0.0
+        self.value = 30.0
         self.max_value = 30.0
         self.desired_headroom = 10.0
         self.min_headroom = 30.0
         self.flowrate = None
+        self.enabled = False
 
         # Colors
         self.green = (0.25, 0.60, 0.32)
@@ -369,10 +370,10 @@ class FlowGuardDialGauge(Gtk.DrawingArea):
         cr.set_font_size(14)
 
         x, y = self._point_on_arc(cx, cy, r, -1.0)
-        self._draw_text_centered(cr, "Tangle", x + 2, y + 24)
+        self._draw_text_centered(cr, "Tangle", x + 8, y + 24)
 
         x, y = self._point_on_arc(cx, cy, r, 1.0)
-        self._draw_text_centered(cr, "Clog", x - 2, y + 24)
+        self._draw_text_centered(cr, "Clog", x - 8, y + 24)
 
         self._draw_marker(cr, cx, cy, r, self.max_tangle)
         self._draw_marker(cr, cx, cy, r, self.max_clog)

@@ -80,7 +80,6 @@ class Panel(ScreenPanel, MmuMixin):
             'tool_icon': self._gtk.Image('mmu_extruder', self._gtk.img_width * 0.8, self._gtk.img_height * 0.8),
             'tool_label': Gtk.Label('T?'),
             'filament': Gtk.Label('Filament: Unknown'),
-#PAUL            'unit_label': Gtk.Label('Unit0'),
             'select_bypass_img': self._gtk.Image('mmu_select_bypass'), # Alternative for tool
             'load_bypass_img': self._gtk.Image('mmu_load_bypass'),     # Alternative for picker
             'unload_bypass_img': self._gtk.Image('mmu_unload_bypass'), # Alternative for unload/eject
@@ -112,21 +111,18 @@ class Panel(ScreenPanel, MmuMixin):
         l['t_decrease'].set_hexpand(False)
         l['t_decrease'].get_style_context().add_class("mmu_sel_decrease")
 
-        l['manage'].set_valign(Gtk.Align.CENTER)
-
         l['tool_icon'].get_style_context().add_class("mmu_tool_image")
         l['tool_label'].get_style_context().add_class("mmu_tool_text")
         l['tool_label'].set_xalign(0)
         l['filament'].set_xalign(0)
-#PAUL        l['unit_label'].set_xalign(1)
-#PAUL        l["unit_label"].get_style_context().add_class("mmu_unit_text")
 
         # Manage frame
         manage_grid = Gtk.Grid()
         manage_grid.set_vexpand(True)
         manage_grid.set_column_homogeneous(True)
-        manage_grid.attach(l['manage'],   1, 0, 2, 2)
-        manage_grid.attach(Gtk.Label(),   0, 2, 3, 1)
+        manage_grid.set_row_homogeneous(True)
+        manage_grid.attach(l['manage'],   0, 0, 4, 2) # PAUL revisit 1, 0, 3, 2
+        manage_grid.attach(Gtk.Label(),   0, 2, 4, 1)
         l['manage_frame'] = manage_frame = Gtk.Frame()
         manage_frame.set_label("unit0")
         manage_frame.set_label_align(0.5, 0)
@@ -173,7 +169,6 @@ class Panel(ScreenPanel, MmuMixin):
             top_box.pack_start(l['tool_icon'], False, True, 0)
             top_box.pack_start(l['tool_label'], True, True, 0)
             top_box.pack_start(l['filament'], True, True, 0)
-#PAUL            top_box.pack_start(l['unit_label'], False, True, 12)
 
 
             # Main textual status area ---------------------------------
@@ -200,9 +195,9 @@ class Panel(ScreenPanel, MmuMixin):
             top_grid.set_vexpand(False)
             top_grid.set_column_homogeneous(True)
 
-            top_grid.attach(top_box,                      0, 0,  9, 1)
-            top_grid.attach(notebook_corner,              9, 0,  3, 3)
-            top_grid.attach(status_box,                   0, 1, 10, 1) # Should be 9, not 10 (but this prevents screen expansion)
+            top_grid.attach(top_box,            0, 0,  9, 1)
+            top_grid.attach(notebook_corner,    9, 0,  3, 3)
+            top_grid.attach(status_box,         0, 1, 10, 1) # Should be 9, not 10 (but this prevents screen expansion)
             top_grid.attach(l['filament_pos'],  0, 2, 12, 1) # Allows filament line line to extend
 
             # Assemble the two primary button rows ------------
@@ -384,9 +379,13 @@ class Panel(ScreenPanel, MmuMixin):
                     # Tool, gate or maps
                     if any(
                         key in e_data
-                        for key in ('tool', 'gate', 'ttg_map', 'gate_status', 'gate_color')
+                        for key in ('tool', 'gate', 'ttg_map', 'gate_status', 'gate_color') # PAUL: need espooler, heater(?), fil_% (spoolman)
                     ):
                         self.update_status()
+
+                        # The spool tray may need to be scrolled so new gate is visible
+                        if self.show_spool_tray and 'gate' in e_data:
+                            self.labels['spool_tray'].scroll_gate_into_view(e_data['gate'])
 
                     if (
                         not filament_status_updated
@@ -409,7 +408,7 @@ class Panel(ScreenPanel, MmuMixin):
 
                     if any(
                         key in e_data
-                        for key in ('action', 'print_state')
+                        for key in ('action', 'print_state', 'filament')
                     ):
                         ee_data = self.get_encoder_data()
                         if ee_data:
@@ -744,7 +743,6 @@ class Panel(ScreenPanel, MmuMixin):
             self.labels['filament_pos'].set_label(self.get_filament_text(bold=self.bold_filament))
 
 
-# PAUL add unit label in visual layout?
     def update_status(self, show_gate=None):
         logging.info("PAUL: update_status()")
         # Supports classic and visual layouts
@@ -761,6 +759,8 @@ class Panel(ScreenPanel, MmuMixin):
             self.labels['manage_frame'].set_label(current_unit_name)
         else:
             self.labels['spool_tray'].refresh()
+
+            # Update unit name
             mmu = self._printer.get_stat("mmu")
             mmu_machine = self._printer.get_stat("mmu_machine")
             unit_index = mmu.get("unit")
@@ -853,7 +853,6 @@ class Panel(ScreenPanel, MmuMixin):
     def get_status_text(self, show_gate=None, markup=False):
         mmu = self._printer.get_stat("mmu")
         gate_status = mmu['gate_status']
-        tool_to_gate_map = mmu['ttg_map']
         gate_selected = mmu['gate']
         tool_selected = mmu['tool']
         gate_color = mmu['gate_color']
@@ -965,14 +964,12 @@ class Panel(ScreenPanel, MmuMixin):
                 msg_avail += f"│ {avail} "
 
                 # Find tool associated with gate
-                tool_str = ""
-                prefix = ""
-                for t in range(num_gates):
-                    if tool_to_gate_map[t] == g:
-                        if len(prefix) > 0: multi_tool = True
-                        tool_str += "%sT%d" % (prefix, t)
-                        prefix = "+"
-                if tool_str == "": tool_str = "   "
+                tools = self.get_tools_for_gate(g)
+                if len(tools) > 1:
+                    multi_tool = True
+                tool_str = "+".join(f"T{tool}" for tool in tools)
+                if not tool_str:
+                    tool_str = "   "
                 msg_tools += ("│%s " % tool_str)[:4]
 
             # Selected ("open") gate
@@ -1229,7 +1226,7 @@ class MmuSpoolTray(Gtk.DrawingArea):
         self._hitboxes = []  # list of (gate, x, y, w, h)
         self._popover = None
         self._popover_timeout_id = None
-       
+
 
         # Drag scrolling
         self._scroll_x = 0
@@ -1435,7 +1432,14 @@ class MmuSpoolTray(Gtk.DrawingArea):
         surface = cairo.ImageSurface(cairo.FORMAT_ARGB32, width, height)
         cache_cr = cairo.Context(surface)
 
-        logging.info("PAUL: _draw()")
+        logging.info(
+            "PAUL: DRAW scroll_x=%.1f max_scroll_x=%.1f spool_start_x=%.1f viewport_w=%.1f content_w=%.1f",
+            self._scroll_x,
+            max_scroll_x,
+            margin + scroll_pad - self._scroll_x,
+            viewport_w,
+            content_w,
+        )
 
         # Draw everything using cache_cr also rebuild self._hitboxes during this pass
         self._hitboxes.clear()
@@ -1814,6 +1818,8 @@ class MmuSpoolTray(Gtk.DrawingArea):
 
 
     def scroll_gate_into_view(self, gate, center=False):
+        logging.info(f"PAUL: scroll_gate_into_view ({gate}, {center})")
+
         if self._items is None:
             self._items = self._build_items()
 
@@ -1833,39 +1839,81 @@ class MmuSpoolTray(Gtk.DrawingArea):
         margin = layout["margin"]
         scroll_pad = layout["scroll_pad"]
 
+        viewport_w = width - margin * 2
+
         content_w = (
             total_spools * slot_w +
             max(0, len(groups) - 1) * group_gap +
             scroll_pad * 2
         )
 
-        max_scroll_x = max(0, content_w - width)
+        max_scroll_x = max(0, content_w - viewport_w)
 
-        x = margin
+        ordered_items = []
+        x = margin + scroll_pad
 
         for group in groups:
             for item in group:
-                slot_x = x
-                slot_center = slot_x + slot_w / 2
-
-                if item["gate"] == gate:
-                    fully_visible = (
-                        slot_x >= self._scroll_x and
-                        slot_x + slot_w <= self._scroll_x + width
-                    )
-
-                    if fully_visible and not center:
-                        return
-
-                    target_scroll_x = slot_center - width / 2
-                    self._scroll_x = max(0, min(target_scroll_x, max_scroll_x))
-                    self._invalidate_render_cache()
-                    self.queue_draw()
-                    return
-
+                ordered_items.append((item, x))
                 x += slot_w
 
             x += group_gap
+
+        first_gate = ordered_items[0][0]["gate"]
+        last_gate = ordered_items[-1][0]["gate"]
+
+        logging.info(
+            "PAUL: SCROLL gate=%s first=%s last=%s width=%.1f viewport_w=%.1f content_w=%.1f max_scroll_x=%.1f scroll_x=%.1f",
+            gate, first_gate, last_gate, width, viewport_w, content_w, max_scroll_x, self._scroll_x
+        )
+        if gate == first_gate:
+            target_scroll_x = 0
+
+        elif gate == last_gate:
+            target_scroll_x = max_scroll_x
+
+        else:
+            target_scroll_x = None
+
+            for item, slot_x in ordered_items:
+                if item["gate"] != gate:
+                    continue
+
+                slot_right = slot_x + slot_w
+                slot_center = slot_x + slot_w / 2
+
+                visible_left = margin + self._scroll_x
+                visible_right = visible_left + viewport_w
+
+                fully_visible = (
+                    slot_x >= visible_left and
+                    slot_right <= visible_right
+                )
+
+                if fully_visible and not center:
+                    return
+
+                if center:
+                    target_scroll_x = slot_center - viewport_w / 2 - margin
+                else:
+                    if slot_x < visible_left:
+                        target_scroll_x = slot_x - margin
+                    elif slot_right > visible_right:
+                        target_scroll_x = slot_right - margin - viewport_w
+                    else:
+                        target_scroll_x = self._scroll_x
+
+                break
+
+            if target_scroll_x is None:
+                return
+
+        new_scroll_x = max(0, min(target_scroll_x, max_scroll_x))
+
+        if new_scroll_x != self._scroll_x:
+            self._scroll_x = new_scroll_x
+            self._invalidate_render_cache()
+            self.queue_draw()
 
 
     def _invalidate_render_cache(self):
@@ -2065,11 +2113,13 @@ class MmuSpoolTray(Gtk.DrawingArea):
             return
 
         if action == "eject":
-            api.gcode_script(f"MMU_EJECT GATE={gate}")
+            self.scroll_gate_into_view(gate, center=True)
+#PAUL            api.gcode_script(f"MMU_EJECT GATE={gate}")
             return
 
         if action == "check":
-            api.gcode_script(f"MMU_CHECK_GATE GATE={gate}")
+            self.scroll_gate_into_view(gate)
+#PAUL            api.gcode_script(f"MMU_CHECK_GATE GATE={gate}")
             return
 
         # Shouldn't get here

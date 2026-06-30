@@ -106,6 +106,7 @@ class ScreenSaver:
         for dialog in self.screen.dialogs:
             logging.info(f"Restoring Dialog {dialog}")
             dialog.show()
+        self.screen.hide_popup_dimmer() # Happy Hare
         self.screen.lock_screen.relock()
         return False
 

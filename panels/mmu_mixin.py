@@ -364,6 +364,30 @@ class MmuMixin:
         return None
 
 
+    def get_tools_for_gate(self, gate):
+        mmu = self._printer.get_stat("mmu")
+        tool_to_gate_map = mmu["tool_to_gate_map"]
+
+        return [
+            tool
+            for tool, mapped_gate in enumerate(tool_to_gate_map)
+            if mapped_gate == gate
+        ]
+
+
+    def get_tools_for_gate_str(self, gate):
+        tools = self.get_tools_for_gate(g)
+
+        if len(tools) > 1:
+            multi_tool = True
+
+        tool_str = "+".join(f"T{tool}" for tool in tools)
+        if not tool_str:
+            tool_str = "   "
+
+        msg_tools += ("│%s " % tool_str)[:4]
+
+
 # -------------------------------------------------------------------------------------------
 # Common helper/utilities methods
 # -------------------------------------------------------------------------------------------

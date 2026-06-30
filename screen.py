@@ -169,13 +169,15 @@ class KlipperScreen(Gtk.ApplicationWindow):
         self.popup_dimmer.set_no_show_all(True)
         self.popup_dimmer.set_hexpand(True)
         self.popup_dimmer.set_vexpand(True)
-        self.popup_dimmer.connect("draw", self._draw_popup_dimmer)
-        self.popup_dimmer.hide()
+        self._popup_dimmer_draw_handler = self.popup_dimmer.connect("draw", self._draw_popup_dimmer)
         self.overlay.add_overlay(self.popup_dimmer)
         self.overlay.set_overlay_pass_through(self.popup_dimmer, True)
+        self.popup_dimmer.hide()
+        logging.info(f"PAUL: POPUP DIMMER")
         # Happy Hare ^^^
 
         self.show_all()
+        logging.info(f"PAUL: AFTER SHOW ALL")
         self.update_cursor(self.show_cursor)
         min_ver = (3, 8)
         if sys.version_info < min_ver:
@@ -1526,19 +1528,26 @@ class KlipperScreen(Gtk.ApplicationWindow):
             self.base_panel._reconfigure_main_grid()
             self.reload_panels()
 
-    def _draw_popup_dimmer(self, widget, cr): # Happy Hare added
+# Happy Hare: Added support for screen dimming with popup
+    def _draw_popup_dimmer(self, widget, cr):
         alloc = widget.get_allocation()
+        if alloc.width <= 0 or alloc.height <= 0:
+            return True
         cr.set_source_rgba(0, 0, 0, 0.50)
         cr.rectangle(0, 0, alloc.width, alloc.height)
         cr.fill()
-        return False
+        return True
 
-    def show_popup_dimmer(self): # Happy Hare added
-        self.popup_dimmer.show()
-        self.popup_dimmer.queue_draw()
+    def show_popup_dimmer(self):
+        logging.info(f"PAUL: show_popup_dimmer()")
+        if not self.popup_dimmer.get_visible():
+            self.popup_dimmer.show()
 
-    def hide_popup_dimmer(self): # Happy Hare added
-        self.popup_dimmer.hide()
+    def hide_popup_dimmer(self):
+        logging.info(f"PAUL: hide_popup_dimmer()")
+        if self.popup_dimmer.get_visible():
+            self.popup_dimmer.hide()
+# Happy Hare: Added ^^^
 
 
 class KlipperScreenApplication(Gtk.Application):

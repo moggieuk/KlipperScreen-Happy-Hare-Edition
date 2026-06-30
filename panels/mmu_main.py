@@ -121,11 +121,11 @@ class Panel(ScreenPanel, MmuMixin):
         manage_grid.set_vexpand(True)
         manage_grid.set_column_homogeneous(True)
         manage_grid.set_row_homogeneous(True)
-        manage_grid.attach(l['manage'],   0, 0, 4, 2) # PAUL revisit 1, 0, 3, 2
-        manage_grid.attach(Gtk.Label(),   0, 2, 4, 1)
+        manage_grid.attach(l['manage'],   1, 0, 6, 3)
+        manage_grid.attach(Gtk.Label(),   0, 3, 6, 3)
         l['manage_frame'] = manage_frame = Gtk.Frame()
-        manage_frame.set_label("unit0")
-        manage_frame.set_label_align(0.5, 0)
+        manage_frame.set_label("Unit0")
+        manage_frame.set_label_align(0.6, 0)
         manage_frame.add(manage_grid)
 
         # In print Encoder gauge
@@ -309,7 +309,6 @@ class Panel(ScreenPanel, MmuMixin):
 
 
     def activate(self):
-        logging.info("PAUL: activate()")
         self.config_update()
         self.update_status()
         self.update_filament_status()
@@ -322,7 +321,6 @@ class Panel(ScreenPanel, MmuMixin):
 
 
     def post_attach(self):
-        logging.info("PAUL: post_attach()")
         # Gtk Notebook will only change layer after show_all() hence this extra callback to fix state
         self.update_active_buttons()
 
@@ -568,7 +566,7 @@ class Panel(ScreenPanel, MmuMixin):
                 else:
                     self.labels[name].get_style_context().add_class("mmu_disabled_text")
         else:
-            pass # PAUL todo
+            self.labels["spool_frame"].set_sensitive(enabled)
 
 
     def update_tool(self):
@@ -744,7 +742,6 @@ class Panel(ScreenPanel, MmuMixin):
 
 
     def update_status(self, show_gate=None):
-        logging.info("PAUL: update_status()")
         # Supports classic and visual layouts
 
         if not self.show_spool_tray:
@@ -1018,6 +1015,8 @@ class Panel(ScreenPanel, MmuMixin):
         if not cs:
             # V3...
             cs = self._printer.get_config_section("mmu")
+        if not cs:
+            return "Unknown"
         gate_homing_endstop = cs.get("gate_homing_endstop")
         if gate_homing_endstop is None:
             raise KeyError("gate_homing_endstop not found in mmu_parameters or mmu config")
@@ -1432,15 +1431,6 @@ class MmuSpoolTray(Gtk.DrawingArea):
         surface = cairo.ImageSurface(cairo.FORMAT_ARGB32, width, height)
         cache_cr = cairo.Context(surface)
 
-        logging.info(
-            "PAUL: DRAW scroll_x=%.1f max_scroll_x=%.1f spool_start_x=%.1f viewport_w=%.1f content_w=%.1f",
-            self._scroll_x,
-            max_scroll_x,
-            margin + scroll_pad - self._scroll_x,
-            viewport_w,
-            content_w,
-        )
-
         # Draw everything using cache_cr also rebuild self._hitboxes during this pass
         self._hitboxes.clear()
 
@@ -1818,8 +1808,6 @@ class MmuSpoolTray(Gtk.DrawingArea):
 
 
     def scroll_gate_into_view(self, gate, center=False):
-        logging.info(f"PAUL: scroll_gate_into_view ({gate}, {center})")
-
         if self._items is None:
             self._items = self._build_items()
 
@@ -1862,10 +1850,6 @@ class MmuSpoolTray(Gtk.DrawingArea):
         first_gate = ordered_items[0][0]["gate"]
         last_gate = ordered_items[-1][0]["gate"]
 
-        logging.info(
-            "PAUL: SCROLL gate=%s first=%s last=%s width=%.1f viewport_w=%.1f content_w=%.1f max_scroll_x=%.1f scroll_x=%.1f",
-            gate, first_gate, last_gate, width, viewport_w, content_w, max_scroll_x, self._scroll_x
-        )
         if gate == first_gate:
             target_scroll_x = 0
 
@@ -2085,7 +2069,6 @@ class MmuSpoolTray(Gtk.DrawingArea):
         api = self._panel._screen._ws.api
 
         mmu = self._printer.get_stat("mmu")
-        logging.info("PAUL: %s gate %s", action, gate)
 
         if action == "select":
             if gate == TOOL_GATE_BYPASS:
@@ -2113,13 +2096,11 @@ class MmuSpoolTray(Gtk.DrawingArea):
             return
 
         if action == "eject":
-            self.scroll_gate_into_view(gate, center=True)
-#PAUL            api.gcode_script(f"MMU_EJECT GATE={gate}")
+            api.gcode_script(f"MMU_EJECT GATE={gate}")
             return
 
         if action == "check":
-            self.scroll_gate_into_view(gate)
-#PAUL            api.gcode_script(f"MMU_CHECK_GATE GATE={gate}")
+            api.gcode_script(f"MMU_CHECK_GATE GATE={gate}")
             return
 
         # Shouldn't get here

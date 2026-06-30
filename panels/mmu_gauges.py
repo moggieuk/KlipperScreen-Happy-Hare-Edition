@@ -196,7 +196,7 @@ class EncoderDialGauge(Gtk.DrawingArea):
         cr.select_font_face("Sans", cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_BOLD)
         cr.set_font_size(16)
 
-        value_y = h * 0.40
+        value_y = cy - (r * 0.25)
         self._draw_text_centered(cr, f"{self.value:.1f}", cx, value_y)
 
         # Unit
@@ -397,7 +397,7 @@ class FlowGuardDialGauge(Gtk.DrawingArea):
         cr.select_font_face("Sans", cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_BOLD)
         cr.set_font_size(16)
 
-        value_y = h * 0.40
+        value_y = cy - (r * 0.25)
         self._draw_text_centered(cr, f"{self.level:+.2f}", cx, value_y)
 
         cr.select_font_face("Sans", cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_NORMAL)

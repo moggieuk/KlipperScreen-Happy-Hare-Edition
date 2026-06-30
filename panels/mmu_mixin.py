@@ -343,8 +343,13 @@ class MmuMixin:
 
 
     def get_mmu_unit(self, gate):
+        logging.info(f"PAUL: get_mmu_unit({gate})")
         mmu_machine = self._printer.get_stat("mmu_machine")
+        logging.info(f"PAUL: mmu_machine={mmu_machine}")
         if mmu_machine is None: return None
+
+        if gate == TOOL_GATE_UNKNOWN:
+            return mmu_machine['unit_0']
 
         for key, unit in mmu_machine.items():
             if not key.startswith("unit_"):

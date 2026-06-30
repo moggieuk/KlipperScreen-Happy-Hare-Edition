@@ -426,6 +426,12 @@ class KlipperScreenConfig:
                 }
             },
             {
+                "mmu_spool_tray": {
+                    "section": "main", "name": _("MMU show graphical spool tray"), "type": "binary",
+                    "value": "True", "callback": screen.restart_ks,
+                }
+            },
+            {
                 "mmu_color_gates": {
                     "section": "main", "name": _("MMU show color in gates"), "type": "binary",
                     "value": "True",
@@ -445,7 +451,7 @@ class KlipperScreenConfig:
             },
             {
                 "mmu_use_spoolman": {
-                    "section": "main", "name": _("MMU use SpoolMan for filaments"), "type": "binary",
+                    "section": "main", "name": _("MMU use Spoolman for filament info"), "type": "binary",
                     "value": "False",
                 }
             }, # Happy Hare ^^^

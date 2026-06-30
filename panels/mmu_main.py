@@ -230,12 +230,12 @@ class Panel(ScreenPanel, MmuMixin):
             l = self.labels
 
             # Popup action buttons --------
-            l['menu_select']  = self._gtk.Button('mmu_select',     'Select',      'color1')
-            l['menu_preload'] = self._gtk.Button('mmu_preload',    'Preload',     'color2')
-            l['menu_load']    = self._gtk.Button('mmu_load',       'Load',        'color2')
-            l['menu_unload']  = self._gtk.Button('mmu_unload',     'Unload',      'color3')
-            l['menu_eject']   = self._gtk.Button('mmu_eject',      'Eject',       'color3')
-            l['menu_check']   = self._gtk.Button('mmu_checkgates', 'Check Gates', 'color4')
+            l['menu_select']  = self._gtk.Button('mmu_select_gate', 'Select',      'color1')
+            l['menu_check']   = self._gtk.Button('mmu_checkgates',  'Check Gates', 'color1')
+            l['menu_preload'] = self._gtk.Button('mmu_reset',       'Preload',     'color2')
+            l['menu_load']    = self._gtk.Button('mmu_load',        'Load',        'color2')
+            l['menu_unload']  = self._gtk.Button('mmu_unload',      'Unload',      'color3')
+            l['menu_eject']   = self._gtk.Button('mmu_eject',       'Eject',       'color3')
 
             # Spool visualization --------
             l['spool_tray'] = MmuSpoolTray(self._printer, self)
@@ -251,24 +251,7 @@ class Panel(ScreenPanel, MmuMixin):
 
             main_grid = Gtk.Grid()
             main_grid.set_vexpand(True)
-            #main_grid.set_row_homogeneous(True) # PAUL
             main_grid.set_column_homogeneous(True)
-
-#            # PAUL debug vvv
-#            dframe = Gtk.Frame()
-#            css = b"""
-#            .debug-cell {
-#                background-color: rgba(255, 255, 0, 0.35);
-#                border: 1px solid red;
-#            }
-#            """
-#            provider = Gtk.CssProvider()
-#            provider.load_from_data(css)
-#            Gtk.StyleContext.add_provider_for_screen(Gdk.Screen.get_default(), provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
-#            dframe.get_style_context().add_class("debug-cell")
-#            dframe.add(l['spool_tray'])
-#            main_grid.attach(dframe,               0,  0,  9,  5)
-#           # PAUL debug ^^^
 
             main_grid.attach(l['spool_frame'],     0,  0,  9,  5)
             main_grid.attach(l['notebook_corner'], 9,  0,  3,  5)
@@ -282,25 +265,11 @@ class Panel(ScreenPanel, MmuMixin):
             main_grid.attach(l['extrude'],         7,  6,  2,  2)
             main_grid.attach(l['more'],            9,  6,  3,  2)
 
+            # Precautionary - make area scrollable
             scroll = self._gtk.ScrolledWindow()
             scroll.add(main_grid)
 
-            # This creates a "click shield" to allow catching of all clicks when
-            # popup menu is active. Without this Gtk tries to handle close and
-            # doesn't propogate to the spool_tray preventing quick selection of spools
-            overlay = Gtk.Overlay()
-            overlay.add(scroll)
-
-            spool_click_shield = Gtk.EventBox()
-            spool_click_shield.set_visible_window(False)
-            spool_click_shield.set_hexpand(True)
-            spool_click_shield.set_vexpand(True)
-            spool_click_shield.hide()
-            overlay.add_overlay(spool_click_shield)
-            overlay.set_overlay_pass_through(spool_click_shield, True)
-            l['spool_tray'].set_click_shield(spool_click_shield, overlay)
-
-            self.content.add(overlay)
+            self.content.add(scroll)
 
 
         # Was in activate() but now process_update can occur before activate() !?
@@ -308,14 +277,6 @@ class Panel(ScreenPanel, MmuMixin):
         self.init_tool_value()
         self.config_update()
 
-
-#    def _next_notebook_corner_page(self, widget, event):
-#        notebook = self.labels["notebook_corner"]
-#        if self.has_buffer() and self.has_encoder():
-#            # Toggle flowguard monitor dials (unlikely user will have both)
-#            page = notebook.get_current_page()
-#            notebook.set_current_page(2 if page == 1 else 1)
-#        return True
 
     def _next_notebook_corner_page(self, widget, event):
         notebook = self.labels["notebook_corner"]
@@ -765,6 +726,7 @@ class Panel(ScreenPanel, MmuMixin):
             self.labels['filament_pos'].set_label(self.get_filament_text(bold=self.bold_filament))
 
 
+# PAUL add unit label in visual layout?
     def update_status(self, show_gate=None):
         logging.info("PAUL: update_status()")
         # Supports classic and visual layouts
@@ -780,7 +742,6 @@ class Panel(ScreenPanel, MmuMixin):
             self.labels['unit_label'].set_label(current_unit_name)
         else:
             self.labels['spool_tray'].refresh()
-# PAUL unit label in visual layout?
 
 
     # Dynamically update button sensitivity based on state
@@ -1240,14 +1201,13 @@ class MmuSpoolTray(Gtk.DrawingArea):
         self._hitboxes = []  # list of (gate, x, y, w, h)
         self._popover = None
         self._popover_timeout_id = None
-        self._click_shield = None
+       
 
         # Drag scrolling
         self._scroll_x = 0
         self._drag_active = False
         self._drag_start_x = 0
         self._drag_start_y = 0
-        self._drag_popup_pending = False
         self._drag_start_scroll_x = 0
 
         self.add_events(
@@ -1264,36 +1224,43 @@ class MmuSpoolTray(Gtk.DrawingArea):
         self.set_app_paintable(True)
         self.connect("draw", self._draw)
 
+        # Pop-up menu construction ---------------
 
-        # Pop-up menu construction --------
         self._popover = Gtk.Popover.new(self)
-        # Keep non-modal so another gate click can be handled by the shield.
-        self._popover.set_modal(False)
+        self._popover.connect("show", self._on_popover_show)
+        self._popover.connect("closed", self._on_popover_closed)
         self._popover.set_position(Gtk.PositionType.BOTTOM)
+        self._popover.set_border_width(0)
+        self._popover.get_style_context().add_class("mmu-popup")
 
-        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
-        box.set_margin_top(6)
-        box.set_margin_bottom(6)
-        box.set_margin_start(6)
-        box.set_margin_end(6)
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=3)
 
+        # Menu header
+        header = Gtk.EventBox()
+        header.get_style_context().add_class("mmu-popup-header")
         self._popover_title = Gtk.Label()
-        self._popover_title.get_style_context().add_class("heading")
-        self._popover_title.set_margin_bottom(2)
-        box.pack_start(self._popover_title, False, False, 0)
+        self._popover_title.set_xalign(0.0)
+        header.add(self._popover_title)
 
+        box.pack_start(header, False, False, 0)
+
+        # Action buttons
         button_grid = Gtk.Grid()
         button_grid.set_row_spacing(4)
         button_grid.set_column_spacing(4)
         button_grid.set_margin_top(4)
+        button_grid.set_margin_bottom(4)
+        button_grid.set_margin_start(4)
+        button_grid.set_margin_end(4)
+        button_grid.set_column_homogeneous(True)
 
         l = self._panel.labels
         button_grid.attach(l['menu_select'],   0, 0, 1, 1)
-        button_grid.attach(l['menu_preload'],  1, 0, 1, 1)
+        button_grid.attach(l['menu_check'],    1, 0, 1, 1)
+        button_grid.attach(l['menu_preload'],  2, 0, 1, 1)
         button_grid.attach(l['menu_load'],     0, 1, 1, 1)
         button_grid.attach(l['menu_unload'],   1, 1, 1, 1)
-        button_grid.attach(l['menu_eject'],    0, 2, 1, 1)
-        button_grid.attach(l['menu_check'],    1, 2, 1, 1)
+        button_grid.attach(l['menu_eject'],    2, 1, 1, 1)
 
         box.pack_start(button_grid, False, False, 0)
         self._popover.add(box)
@@ -1304,20 +1271,8 @@ class MmuSpoolTray(Gtk.DrawingArea):
         return (72, 128) # minimum, natural
 
 
-    def set_click_shield(self, shield, overlay):
-        self._click_shield = shield
-        self._click_shield_overlay = overlay
-
-        self._click_shield.add_events(Gdk.EventMask.BUTTON_PRESS_MASK)
-        self._click_shield.connect("button-press-event", self._on_shield_button_press)
-
-        self._click_shield.hide()
-        self._click_shield_overlay.set_overlay_pass_through(self._click_shield, True)
-
-
     def refresh(self):
         self._items = self._build_items()
-# assume _draw will catch changes        self._invalidate_render_cache() # PAUL caching
         self.queue_draw()
 
 
@@ -1536,17 +1491,22 @@ class MmuSpoolTray(Gtk.DrawingArea):
             self._draw_gate_status(cache_cr, item, cx, tray_top, tray_h, slot_w, spool_h)
 
         # Fade left/right edges when more content is available off-screen.
-        fade_w = slot_w * 0.55
-        fade_a = 0.55
+        fade_w = slot_w * 0.40
+        fade_a = 0.95
+
+        # Introduce fade progressively
+        left_fade_a = fade_a * min(1.0, self._scroll_x / fade_w)
+        right_fade_a = fade_a * min(1.0, (max_scroll_x - self._scroll_x) / fade_w)
 
         if self._scroll_x > 0:
             grad = cairo.LinearGradient(0, 0, fade_w, 0)
-            grad.add_color_stop_rgba(0.00, 0, 0, 0, fade_a)
+            grad.add_color_stop_rgba(0.00, 0, 0, 0, left_fade_a)
             grad.add_color_stop_rgba(1.00, 0, 0, 0, 0.00)
 
             cache_cr.save()
             cache_cr.rectangle(0, top_margin, fade_w, height - top_margin - bottom_margin)
             cache_cr.clip()
+            cache_cr.set_operator(cairo.OPERATOR_DEST_OUT)
             cache_cr.set_source(grad)
             cache_cr.paint()
             cache_cr.restore()
@@ -1554,11 +1514,12 @@ class MmuSpoolTray(Gtk.DrawingArea):
         if self._scroll_x < max_scroll_x:
             grad = cairo.LinearGradient(width - fade_w, 0, width, 0)
             grad.add_color_stop_rgba(0.00, 0, 0, 0, 0.00)
-            grad.add_color_stop_rgba(1.00, 0, 0, 0, fade_a)
+            grad.add_color_stop_rgba(1.00, 0, 0, 0, right_fade_a)
 
             cache_cr.save()
             cache_cr.rectangle(width - fade_w, top_margin, fade_w, height - top_margin - bottom_margin)
             cache_cr.clip()
+            cache_cr.set_operator(cairo.OPERATOR_DEST_OUT)
             cache_cr.set_source(grad)
             cache_cr.paint()
             cache_cr.restore()
@@ -1840,14 +1801,11 @@ class MmuSpoolTray(Gtk.DrawingArea):
             total_spools * slot_w +
             max(0, len(groups) - 1) * group_gap +
             scroll_pad * 2
-#            scroll_pad * 2 +
-#            margin * 2
         )
 
         max_scroll_x = max(0, content_w - width)
 
         x = margin
-#        x = margin + scroll_pad
 
         for group in groups:
             for item in group:
@@ -1896,11 +1854,7 @@ class MmuSpoolTray(Gtk.DrawingArea):
         if event.button != 1:
             return False
 
-        # A new touch/drag on the tray should cancel any existing popup/shield.
-        self._close_gate_popover()
-
         self._drag_active = True
-        self._drag_popup_pending = False
         self._drag_start_x = event.x
         self._drag_start_y = event.y
         self._drag_start_scroll_x = self._scroll_x
@@ -1918,10 +1872,6 @@ class MmuSpoolTray(Gtk.DrawingArea):
         if not moved:
             return True
 
-        if self._drag_popup_pending:
-            self._close_gate_popover()
-            self._drag_popup_pending = False
-
         new_scroll_x = self._drag_start_scroll_x - dx
         if new_scroll_x != self._scroll_x:
             self._scroll_x = new_scroll_x
@@ -1937,26 +1887,14 @@ class MmuSpoolTray(Gtk.DrawingArea):
 
         self._drag_active = False
 
-        device = event.get_device()
-        if device is not None:
-            device.ungrab(event.time)
-
         dx = event.x - self._drag_start_x
         dy = event.y - self._drag_start_y
         moved = abs(dx) > 8 or abs(dy) > 8
 
-        new_gate = None
         if not moved:
-            new_gate = self._hit_test_spool(event.x, event.y)
-
-        if self._drag_popup_pending:
-            self._drag_popup_pending = False
-
-            if new_gate is None:
-                self._close_gate_popover()
-
-        if not moved and new_gate is not None:
-            self._show_gate_popover(new_gate, event.x, event.y)
+            gate = self._hit_test_spool(event.x, event.y)
+            if gate is not None:
+                self._show_gate_popover(gate, event.x, event.y)
 
         return True
 
@@ -1980,38 +1918,6 @@ class MmuSpoolTray(Gtk.DrawingArea):
         return True
 
 
-    def _on_shield_button_press(self, shield, event):
-        coords = shield.translate_coordinates(self, event.x, event.y)
-        if coords is None:
-            self._close_gate_popover()
-            return True
-
-        x, y = coords
-
-        # Popup is open. Do not close it yet; wait to see if this is a tap or drag.
-        self._drag_active = True
-        self._drag_popup_pending = True
-        self._drag_start_x = x
-        self._drag_start_y = y
-        self._drag_start_scroll_x = self._scroll_x
-
-        window = self.get_window()
-        device = event.get_device()
-        if window is not None and device is not None:
-            Gdk.Device.grab(
-                device,
-                window,
-                Gdk.GrabOwnership.NONE,
-                False,
-                Gdk.EventMask.BUTTON_RELEASE_MASK |
-                Gdk.EventMask.POINTER_MOTION_MASK,
-                None,
-                event.time,
-            )
-
-        return True
-
-
     def _show_gate_popover(self, gate, x, y):
         if self._popover_timeout_id is not None:
             GLib.source_remove(self._popover_timeout_id)
@@ -2026,21 +1932,6 @@ class MmuSpoolTray(Gtk.DrawingArea):
 
         self._popover_title.set_text(f"Gate {gate}" if gate != TOOL_GATE_BYPASS else "Bypass")
 
-# PAUL TODO
-#        l = self.labels
-#        l['menu_select']
-#        l['menu_preload']
-#        l['menu_load']
-#        l['menu_unload']
-#        l['menu_eject']
-#        l['menu_check']
-#        self._btn_select.set_sensitive(...)
-#        self._btn_preload.set_sensitive(...)
-#        self._btn_load.set_sensitive(...)
-#        self._btn_unload.set_sensitive(...)
-#        self._btn_eject.set_sensitive(...)
-#        self._btn_check.set_sensitive(...)
-
         l = self._panel.labels
         self._connect_gate_button(l['menu_select'],  gate, "select")
         self._connect_gate_button(l['menu_preload'], gate, "preload")
@@ -2052,12 +1943,34 @@ class MmuSpoolTray(Gtk.DrawingArea):
         self._popover.show_all()
         self._popover.popup()
 
-        if self._click_shield is not None:
-            self._click_shield.show()
-            if self._click_shield_overlay is not None:
-                self._click_shield_overlay.set_overlay_pass_through(self._click_shield, False)
-
         self._popover_timeout_id = GLib.timeout_add_seconds(3, self._on_popover_timeout)
+
+
+    def _close_gate_popover(self):
+        if self._popover_timeout_id is not None:
+            GLib.source_remove(self._popover_timeout_id)
+            self._popover_timeout_id = None
+
+        if self._popover is not None:
+            self._popover.popdown()
+
+
+    def _on_popover_show(self, popover):
+        self._panel._screen.show_popup_dimmer()
+
+
+    def _on_popover_closed(self, popover):
+        if self._popover_timeout_id is not None:
+            GLib.source_remove(self._popover_timeout_id)
+            self._popover_timeout_id = None
+
+        self._panel._screen.hide_popup_dimmer()
+
+
+    def _on_popover_timeout(self):
+        self._popover_timeout_id = None
+        self._close_gate_popover()
+        return False
 
 
     def _connect_gate_button(self, button, gate, action):
@@ -2074,34 +1987,14 @@ class MmuSpoolTray(Gtk.DrawingArea):
         self._button_handlers[button] = handler
 
 
-    def _close_gate_popover(self):
-        if self._popover_timeout_id is not None:
-            GLib.source_remove(self._popover_timeout_id)
-            self._popover_timeout_id = None
-
-        if self._popover is not None:
-            self._popover.popdown()
-
-        if self._click_shield is not None:
-            if self._click_shield_overlay is not None:
-                self._click_shield_overlay.set_overlay_pass_through(self._click_shield, True)
-            self._click_shield.hide()
-
-
     def _on_gate_action(self, button, gate, action):
         self._close_gate_popover()
         logging.info("PAUL: %s gate %s", action, gate)
 
 
-    def _on_popover_timeout(self):
-        self._popover_timeout_id = None
-        self._close_gate_popover()
-        return False
-
-
     # ---------------------------------------------------------------------------
     # Drawing helpers
-    #  ---------------------------------------------------------------------------
+    # ---------------------------------------------------------------------------
 
     def _get_layout(self, width, height):
         """

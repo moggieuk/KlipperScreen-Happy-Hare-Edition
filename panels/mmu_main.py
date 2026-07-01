@@ -146,8 +146,7 @@ class Panel(ScreenPanel, MmuMixin):
         notebook_corner = Gtk.Notebook()
         l['notebook_corner'] = notebook_corner
         notebook_corner.set_show_tabs(False)
-#PAUL TEMP        notebook_corner.insert_page(l['manage'], None, 0)
-        notebook_corner.insert_page(self._clickable_page(manage_frame), None, 0) # PAUL TEMP
+        notebook_corner.insert_page(self._clickable_page(manage_frame), None, 0)
         notebook_corner.insert_page(self._clickable_page(flowguard_frame), None, 1)
         notebook_corner.insert_page(self._clickable_page(encoder_frame), None, 2)
         notebook_corner.set_current_page(0)
@@ -337,13 +336,11 @@ class Panel(ScreenPanel, MmuMixin):
         if action == "notify_status_update" and data is not None:
             filament_status_updated = False
 
-            self.update_encoder() # PAUL
-            self.update_flowguard() # PAUL
             try:
                 # v3 encoder
                 if self.has_encoder() and 'mmu_encoder mmu_encoder' in data: # There is only one mmu_encoder on v3
                     ee_data = data['mmu_encoder mmu_encoder']
-                    self.update_encoder(ee_data)
+                    self.update_encoder()
 
                 # v4 contains everything required in 'printer.mmu'
                 if 'mmu' in data:
@@ -379,7 +376,7 @@ class Panel(ScreenPanel, MmuMixin):
                     # Tool, gate or maps
                     if any(
                         key in e_data
-                        for key in ('tool', 'gate', 'ttg_map', 'gate_status', 'gate_color') # PAUL: need espooler, heater(?), fil_% (spoolman)
+                        for key in ('tool', 'gate', 'ttg_map', 'gate_status', 'gate_color', 'espooler') # PAUL: need heater(?), fil_% (spoolman)
                     ):
                         self.update_status()
 
@@ -654,11 +651,6 @@ class Panel(ScreenPanel, MmuMixin):
 
     def update_flowguard(self):
         mmu = self._printer.get_stat("mmu")
-# PAUL
-#        print_state = mmu.get("print_state")
-#        if print_state != "printing":
-#            return
-
         data = mmu['flowguard']
         flowrate = mmu["sync_feedback_flow_rate"]
 
@@ -667,13 +659,6 @@ class Panel(ScreenPanel, MmuMixin):
 
         # Update frame heading
         enabled = data['enabled']
-# PAUL
-#        active = data['active']
-#        if enabled and active:
-#            mode_str = "FlowGuard Active"
-#        else:
-#            mode_str = "FlowGuard"
-#        self.labels['flowguard_frame'].set_label(f'{mode_str}')
         self.labels['flowguard_frame'].set_sensitive(enabled)
 
 
@@ -684,12 +669,6 @@ class Panel(ScreenPanel, MmuMixin):
         self.update_movement(data['encoder_pos'])
 
         mmu = self._printer.get_stat("mmu")
-# PAUL
-#        print_state = mmu.get("print_state")
-#        if print_state != "printing":
-#            return
-
-#PAUL        data = data or mmu['encoder']
         gauge = self.labels['encoder_gauge']
         gauge.update(data)
 
@@ -1323,13 +1302,12 @@ class MmuSpoolTray(Gtk.DrawingArea):
         espooler = mmu.get("espooler") or [None] * len(gate_status)
 
         def build_gate(g):
-            filament_pct = 100.0  # PAUL TODO
             return self._gate_item(
                 g=g,
                 status=gate_status[g],
                 color=gate_color[g],
                 selected_gate=selected_gate,
-                filament_pct=filament_pct,
+                percent=99, # PAUL TODO wire up to spoolman (set in _build_items)
                 espooler=espooler[g],
             )
 
@@ -1361,14 +1339,14 @@ class MmuSpoolTray(Gtk.DrawingArea):
         return groups
 
 
-    def _gate_item(self, g, status, color, selected_gate, filament_pct, espooler):
+    def _gate_item(self, g, status, color, selected_gate, percent, espooler):
         return {
             "gate": g,
             "color": MmuUtils.get_rgb_color(color) or NO_FILAMENT_COLOR,
             "empty": status == GATE_EMPTY,
             "selected": g == selected_gate,
             "status": status,
-            "percent": int(filament_pct),
+            "percent": percent,
             "espooler": espooler,
         }
 
@@ -1380,7 +1358,7 @@ class MmuSpoolTray(Gtk.DrawingArea):
             "empty": False,
             "selected": selected_gate == TOOL_GATE_BYPASS,
             "status": GATE_EMPTY,
-            "percent": 100,
+            "percent": None,
             "espooler": None,
         }
 
@@ -1517,7 +1495,7 @@ class MmuSpoolTray(Gtk.DrawingArea):
                     item["color"],
                     empty=item["empty"],
                     selected=item["selected"],
-                    filament_pct=item.get("filament_pct", 100),
+                    percent=item.get("percent"),
                     espooler=item.get("espooler"),
                 )
 
@@ -1581,19 +1559,6 @@ class MmuSpoolTray(Gtk.DrawingArea):
             cache_cr.paint()
             cache_cr.restore()
 
-# PAUL DEBUG: Visualize hitboxes
-#        for gate, x, y, w, h in self._hitboxes:
-#            cache_cr.save()
-#            cache_cr.set_source_rgba(1.0, 0.0, 0.0, 0.18)
-#            cache_cr.rectangle(x, y, w, h)
-#            cache_cr.fill()
-#            cache_cr.set_source_rgb(1.0, 0.0, 0.0)
-#            cache_cr.set_line_width(1.0)
-#            cache_cr.rectangle(x, y, w, h)
-#            cache_cr.stroke()
-#            cache_cr.restore()
-# PAUL DEBUG
-
         cache_cr.restore()
 
         self._render_cache = surface
@@ -1612,10 +1577,8 @@ class MmuSpoolTray(Gtk.DrawingArea):
     # Draw colored spool with annotions
     # ---------------------------------------------------------------------------
 
-    def _draw_spool(self, cr, cx, cy, w, h, color, empty=False, selected=False, filament_pct=100, espooler=None):
-        filament_pct = max(0, min(100, filament_pct))
-
-        key = (round(w), round(h), color, empty, int(filament_pct))
+    def _draw_spool(self, cr, cx, cy, w, h, color, empty=False, selected=False, percent=None, espooler=None):
+        key = (round(w), round(h), color, empty, percent)
         surface = self._spool_cache.get(key)
 
         if surface is None:
@@ -1626,7 +1589,7 @@ class MmuSpoolTray(Gtk.DrawingArea):
             )
             c = cairo.Context(surface)
             c.translate(7, 7)
-            self._render_spool(c, w, h, color, empty, filament_pct)
+            self._render_spool(c, w, h, color, empty, percent)
             self._spool_cache[key] = surface
 
             if len(self._spool_cache) > 64:
@@ -1661,9 +1624,12 @@ class MmuSpoolTray(Gtk.DrawingArea):
             cr.restore()
 
 
-    def _render_spool(self, cr, w, h, color, empty, filament_pct=100):
-        fr, fg, fb, fa = self._parse_color(color)
-        filament_pct = max(0, min(100, filament_pct))
+    def _render_spool(self, cr, w, h, color, empty, percent):
+        rgb_color = MmuUtils.get_rgb_color(color)    # #rrggbbaa form
+        fr, fg, fb, fa = MmuUtils.parse_color(color) # rgba tuple form
+        filament_pct = 100
+        if percent is not None:
+            filament_pct = max(0, min(100, percent))
 
         # Cardboard colors
         cardboard      = (0.70, 0.52, 0.30)
@@ -1714,7 +1680,7 @@ class MmuSpoolTray(Gtk.DrawingArea):
         cr.rectangle(body_x, core_y, body_w, core_h)
         cr.fill()
 
-        if not empty and filament_pct > 0:
+        if not empty:
             # 4. Filament oval on right face
             self._draw_oval(cr, right_x, h / 2, inner_w, inner_h, (fr, fg, fb, fa), cardboard_dark, stroke_width=3)
 
@@ -1730,15 +1696,17 @@ class MmuSpoolTray(Gtk.DrawingArea):
         self._draw_oval(cr, left_x, h / 2, tube_w, tube_h, (0.03, 0.025, 0.02), cardboard_edge)
 
         # 8. Percent text on filament body
-        if not empty and filament_pct > 0:
-            label = f"{filament_pct}%"
+        if not empty and percent is not None and filament_pct > 0:
+            label = f"{percent}%"
             cr.save()
             cr.select_font_face("Sans", cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_BOLD)
             font_size = max(6, min(body_w * 0.25, filament_h * 0.19))
             cr.set_font_size(font_size)
             text_cx = spool_cx + body_w * 0.18
             xb, yb, tw, th, xa, ya = cr.text_extents(label)
-            cr.set_source_rgba(1.0, 1.0, 1.0, 0.92) # PAUL TODO white or dark
+
+            contrast_color = MmuUtils.filament_text_color(rgb_color)
+            cr.set_source_rgba(*contrast_color)
             cr.move_to(
                 text_cx - tw / 2 - xb,
                 h / 2 - th / 2 - yb,
@@ -2172,18 +2140,23 @@ class MmuSpoolTray(Gtk.DrawingArea):
         mmu = self._printer.get_stat("mmu")
         l = self._panel.labels
 
-        # We will only get here if not printing
+        # We should only get here if not printing
         printing = (mmu['print_state'] == "printing")
+        loaded = (mmu['filament'] == "Loaded")
         unloaded = (mmu['filament'] == "Unloaded")
-        can_crossload = True # PAUL fixme
+        selected = (mmu['gate'] == gate)
         bypass = (gate == TOOL_GATE_BYPASS)
+        unit = self._panel.get_mmu_unit(gate)
+        can_crossload = False
+        if unit is not None:
+            can_crossload = unit.get('can_crossload', False)
 
-        l['menu_select'].set_sensitive(unloaded)
+        l['menu_select'].set_sensitive(unloaded and not selected)
         l['menu_check'].set_sensitive(unloaded)
-        l['menu_preload'].set_sensitive(not bypass)
+        l['menu_preload'].set_sensitive(not bypass and (unloaded or can_crossload and not selected))
         l['menu_load'].set_sensitive(unloaded)
-        l['menu_unload'].set_sensitive(not unloaded)
-        l['menu_eject'].set_sensitive(not bypass)
+        l['menu_unload'].set_sensitive(loaded)
+        l['menu_eject'].set_sensitive(not bypass and (unloaded or can_crossload and not selected))
 
 
     def _handle_gate_action(self, gate, action):
@@ -2344,10 +2317,3 @@ class MmuSpoolTray(Gtk.DrawingArea):
         cr.arc(x + r, y + h - r, r, math.pi / 2, math.pi)
         cr.arc(x + r, y + r, r, math.pi, 3 * math.pi / 2)
         cr.close_path()
-
-
-    def _parse_color(self, color):
-        rgba = Gdk.RGBA()
-        if color and rgba.parse(color):
-            return rgba.red, rgba.green, rgba.blue, rgba.alpha
-        return 0.502, 0.506, 0.510, 0.890 # #808182E3 convention I used in other UI's

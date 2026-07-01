@@ -173,11 +173,9 @@ class KlipperScreen(Gtk.ApplicationWindow):
         self.overlay.add_overlay(self.popup_dimmer)
         self.overlay.set_overlay_pass_through(self.popup_dimmer, True)
         self.popup_dimmer.hide()
-        logging.info(f"PAUL: POPUP DIMMER")
         # Happy Hare ^^^
 
         self.show_all()
-        logging.info(f"PAUL: AFTER SHOW ALL")
         self.update_cursor(self.show_cursor)
         min_ver = (3, 8)
         if sys.version_info < min_ver:
@@ -1539,12 +1537,10 @@ class KlipperScreen(Gtk.ApplicationWindow):
         return True
 
     def show_popup_dimmer(self):
-        logging.info(f"PAUL: show_popup_dimmer()")
         if not self.popup_dimmer.get_visible():
             self.popup_dimmer.show()
 
     def hide_popup_dimmer(self):
-        logging.info(f"PAUL: hide_popup_dimmer()")
         if self.popup_dimmer.get_visible():
             self.popup_dimmer.hide()
 # Happy Hare: Added ^^^

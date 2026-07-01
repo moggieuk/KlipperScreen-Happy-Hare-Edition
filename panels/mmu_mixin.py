@@ -345,9 +345,7 @@ class MmuMixin:
 
 
     def get_mmu_unit(self, gate):
-        logging.info(f"PAUL: get_mmu_unit({gate})")
         mmu_machine = self._printer.get_stat("mmu_machine")
-        logging.info(f"PAUL: mmu_machine={mmu_machine}")
         if mmu_machine is None: return None
 
         if gate == TOOL_GATE_UNKNOWN:
@@ -402,6 +400,14 @@ class MmuMixin:
 class MmuUtils:
 
     @staticmethod
+    def parse_color(color):
+        rgba = Gdk.RGBA()
+        if color and rgba.parse(color):
+            return rgba.red, rgba.green, rgba.blue, rgba.alpha
+        return 0.502, 0.506, 0.510, 0.890 # #808182E3 convention I used in other UI's
+
+
+    @staticmethod
     def get_rgb_color(gate_color):
         if gate_color and len(gate_color) == 8:
             try:
@@ -415,3 +421,28 @@ class MmuUtils:
                 return "" # TODO: NO_FILAMENT_COLOR better?
         rgb_color = "#{:02x}{:02x}{:02x}".format(int(color.red * 255), int(color.green * 255), int(color.blue * 255))
         return rgb_color
+
+
+    @staticmethod
+    def filament_text_color(filament_color):
+        """
+        Returns an RGB tuple for text that contrasts with the filament color.
+
+        Accepts CSS colors such as:
+            #RRGGBB
+            #RRGGBBAA
+            #RGB
+        """
+        r, g, b, a = MmuUtils.parse_color(filament_color)
+
+        # W3C relative luminance weighting.
+        perceived_lightness = (
+            r * 0.2126 +
+            g * 0.7152 +
+            b * 0.0722
+        )
+
+        if perceived_lightness > 0.6:
+            return (0.13, 0.13, 0.13)   # #222222
+        else:
+            return (1.0, 1.0, 1.0)      # White

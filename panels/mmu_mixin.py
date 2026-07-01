@@ -234,6 +234,8 @@ W3C_COLORS = {
     'yellowgreen': '#9ACD32',
 }
 
+NO_FILAMENT_COLOR = '#808182E3'
+
 COLOR_RED        = Gdk.RGBA(1,0,0,1)
 COLOR_GREEN      = Gdk.RGBA(0,1,0,1)
 COLOR_DARK_GREY  = Gdk.RGBA(0.2,0.2,0.2,1)
@@ -410,6 +412,6 @@ class MmuUtils:
         color = Gdk.RGBA()
         if not Gdk.RGBA.parse(color, gate_color.lower() if gate_color else ""):
             if not Gdk.RGBA.parse(color, '#' + gate_color if gate_color else ""):
-                return ""
+                return "" # TODO: NO_FILAMENT_COLOR better?
         rgb_color = "#{:02x}{:02x}{:02x}".format(int(color.red * 255), int(color.green * 255), int(color.blue * 255))
         return rgb_color

@@ -337,6 +337,8 @@ class Panel(ScreenPanel, MmuMixin):
         if action == "notify_status_update" and data is not None:
             filament_status_updated = False
 
+            self.update_encoder() # PAUL
+            self.update_flowguard() # PAUL
             try:
                 # v3 encoder
                 if self.has_encoder() and 'mmu_encoder mmu_encoder' in data: # There is only one mmu_encoder on v3
@@ -651,10 +653,12 @@ class Panel(ScreenPanel, MmuMixin):
 
 
     def update_flowguard(self):
-        if self._printer.get_stat("print_stats")['state'] != "printing":
-            return
-
         mmu = self._printer.get_stat("mmu")
+# PAUL
+#        print_state = mmu.get("print_state")
+#        if print_state != "printing":
+#            return
+
         data = mmu['flowguard']
         flowrate = mmu["sync_feedback_flow_rate"]
 
@@ -663,23 +667,29 @@ class Panel(ScreenPanel, MmuMixin):
 
         # Update frame heading
         enabled = data['enabled']
-        active = data['active']
-        if not enabled:
-            mode_str = "FlowGuard"
-        elif active:
-            mode_str = "FlowGuard Active"
-        else:
-            mode_str = "FlowGuard Inactive"
-        self.labels['flowguard_frame'].set_label(f'{mode_str}')
+# PAUL
+#        active = data['active']
+#        if enabled and active:
+#            mode_str = "FlowGuard Active"
+#        else:
+#            mode_str = "FlowGuard"
+#        self.labels['flowguard_frame'].set_label(f'{mode_str}')
         self.labels['flowguard_frame'].set_sensitive(enabled)
 
 
-    def update_encoder(self, data=None):
-        if self._printer.get_stat("print_stats")['state'] != "printing":
-            return
+    def update_encoder(self):
+        data = self.get_encoder_data()
+
+        # Encoder pos is displayed in filament position status
+        self.update_movement(data['encoder_pos'])
 
         mmu = self._printer.get_stat("mmu")
-        data = data or mmu['encoder']
+# PAUL
+#        print_state = mmu.get("print_state")
+#        if print_state != "printing":
+#            return
+
+#PAUL        data = data or mmu['encoder']
         gauge = self.labels['encoder_gauge']
         gauge.update(data)
 
@@ -687,16 +697,13 @@ class Panel(ScreenPanel, MmuMixin):
         detection_mode = data['detection_mode']
         enabled = data['enabled']
         if detection_mode == 2:
-            mode_str = "Encoder (Clog Auto)"
+            mode_str = "Encoder (Auto)"
         elif detection_mode == 1:
-            mode_str = "Encoder (Clog Man)"
+            mode_str = "Encoder (Manual)"
         else:
-            mode_str = "Encoder Off"
+            mode_str = "Encoder (Off)"
         self.labels['encoder_frame'].set_label(f'{mode_str}')
         self.labels['encoder_frame'].set_sensitive(detection_mode and enabled)
-
-        # Encoder pos is displayed in filament position status
-        self.update_movement(data['encoder_pos'])
 
 
     def update_movement(self, encoder_position=None):
@@ -1313,60 +1320,68 @@ class MmuSpoolTray(Gtk.DrawingArea):
         gate_status = mmu["gate_status"]
         gate_color = mmu["gate_color"]
         selected_gate = mmu["gate"]
+        espooler = mmu.get("espooler") or [None] * len(gate_status)
 
-        unit_selected = mmu.get("unit")
+        def build_gate(g):
+            filament_pct = 100.0  # PAUL TODO
+            return self._gate_item(
+                g=g,
+                status=gate_status[g],
+                color=gate_color[g],
+                selected_gate=selected_gate,
+                filament_pct=filament_pct,
+                espooler=espooler[g],
+            )
+
         groups = []
 
-        if unit_selected is not None:
+        if mmu.get("unit") is not None:
             machine = self._printer.get_stat("mmu_machine")
+            has_bypass = False
 
             for unit_index in range(machine["num_units"]):
                 unit = machine[f"unit_{unit_index}"]
                 first = unit["first_gate"]
                 count = unit["num_gates"]
 
-                group = []
-                for g in range(first, first + count):
-                    group.append(self._gate_item(g, gate_status, gate_color, selected_gate))
+                group = [build_gate(g) for g in range(first, first + count)]
 
                 if unit.get("has_bypass", False):
                     group.append(self._bypass_item(selected_gate))
+                    has_bypass = True
 
                 groups.append(group)
 
-            if not any(
-                any(item["gate"] == TOOL_GATE_BYPASS for item in group)
-                for group in groups
-            ):
+            if not has_bypass:
                 groups.append([self._bypass_item(selected_gate)])
+
         else:
-            groups.append([
-                self._gate_item(g, gate_status, gate_color, selected_gate)
-                for g in range(len(gate_status))
-            ])
+            groups.append([build_gate(g) for g in range(len(gate_status))])
 
         return groups
 
 
-    def _gate_item(self, g, gate_status, gate_color, selected_gate):
-        status = gate_status[g]
-
+    def _gate_item(self, g, status, color, selected_gate, filament_pct, espooler):
         return {
             "gate": g,
-            "color": MmuUtils.get_rgb_color(gate_color[g]) or "#777777",
+            "color": MmuUtils.get_rgb_color(color) or NO_FILAMENT_COLOR,
             "empty": status == GATE_EMPTY,
             "selected": g == selected_gate,
             "status": status,
+            "percent": int(filament_pct),
+            "espooler": espooler,
         }
 
 
     def _bypass_item(self, selected_gate):
         return {
             "gate": TOOL_GATE_BYPASS,
-            "color": "#202020",
+            "color": NO_FILAMENT_COLOR,
             "empty": False,
             "selected": selected_gate == TOOL_GATE_BYPASS,
             "status": GATE_EMPTY,
+            "percent": 100,
+            "espooler": None,
         }
 
 
@@ -1417,9 +1432,19 @@ class MmuSpoolTray(Gtk.DrawingArea):
             width,
             height,
             round(self._scroll_x),
-# PAUL IMPORTANT .. add spool % and espooler to cache check
             tuple(
-                tuple((i["gate"], i["color"], i["empty"], i["selected"], i["status"]) for i in group)
+                tuple(
+                    (
+                        i["gate"],
+                        i["color"],
+                        i["empty"],
+                        i["selected"],
+                        i["status"],
+                        i["percent"],
+                        i["espooler"],
+                    )
+                    for i in group
+                )
                 for group in groups
             ),
         )
@@ -1492,6 +1517,8 @@ class MmuSpoolTray(Gtk.DrawingArea):
                     item["color"],
                     empty=item["empty"],
                     selected=item["selected"],
+                    filament_pct=item.get("filament_pct", 100),
+                    espooler=item.get("espooler"),
                 )
 
             tray_pad = slot_w * tray_pad_ratio
@@ -1581,10 +1608,12 @@ class MmuSpoolTray(Gtk.DrawingArea):
         return False
 
 
-    def _draw_spool(self, cr, cx, cy, w, h, color, empty=False, selected=False, filament_pct=100):
-        # Round to nearest 10% for efficient caching
+    # ---------------------------------------------------------------------------
+    # Draw colored spool with annotions
+    # ---------------------------------------------------------------------------
+
+    def _draw_spool(self, cr, cx, cy, w, h, color, empty=False, selected=False, filament_pct=100, espooler=None):
         filament_pct = max(0, min(100, filament_pct))
-        filament_pct = int(round(filament_pct / 10.0) * 10)
 
         key = (round(w), round(h), color, empty, int(filament_pct))
         surface = self._spool_cache.get(key)
@@ -1605,6 +1634,9 @@ class MmuSpoolTray(Gtk.DrawingArea):
 
         cr.set_source_surface(surface, cx - w / 2 - 7, cy - h / 2 - 7)
         cr.paint()
+
+        if espooler in ['rewind', 'assist']:
+            self._draw_espooler_overlay(cr, cx, cy, w, h, espooler)
 
         if selected:
             # Lighted-from-below effect
@@ -1631,7 +1663,7 @@ class MmuSpoolTray(Gtk.DrawingArea):
 
     def _render_spool(self, cr, w, h, color, empty, filament_pct=100):
         fr, fg, fb, fa = self._parse_color(color)
-        filament_pct = max(0.0, min(1.0, filament_pct / 100.0))
+        filament_pct = max(0, min(100, filament_pct))
 
         # Cardboard colors
         cardboard      = (0.70, 0.52, 0.30)
@@ -1664,7 +1696,7 @@ class MmuSpoolTray(Gtk.DrawingArea):
         # 0%  = same height as the core/tube
         # 100% = slightly smaller than cardboard flange
         max_filament_h = outer_h * 0.8
-        inner_h = tube_h + (max_filament_h - tube_h) * filament_pct
+        inner_h = tube_h + (max_filament_h - tube_h) * (filament_pct / 100)
         inner_w = inner_h * oval_ratio * 0.75 # * 0.75 provides more cardboard view for full filament in low resolution
 
         # Filament bulk rectangle matches the oval height.
@@ -1682,7 +1714,7 @@ class MmuSpoolTray(Gtk.DrawingArea):
         cr.rectangle(body_x, core_y, body_w, core_h)
         cr.fill()
 
-        if not empty and filament_pct > 0.0:
+        if not empty and filament_pct > 0:
             # 4. Filament oval on right face
             self._draw_oval(cr, right_x, h / 2, inner_w, inner_h, (fr, fg, fb, fa), cardboard_dark, stroke_width=3)
 
@@ -1697,6 +1729,90 @@ class MmuSpoolTray(Gtk.DrawingArea):
         # 7. Left black hole
         self._draw_oval(cr, left_x, h / 2, tube_w, tube_h, (0.03, 0.025, 0.02), cardboard_edge)
 
+        # 8. Percent text on filament body
+        if not empty and filament_pct > 0:
+            label = f"{filament_pct}%"
+            cr.save()
+            cr.select_font_face("Sans", cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_BOLD)
+            font_size = max(6, min(body_w * 0.25, filament_h * 0.19))
+            cr.set_font_size(font_size)
+            text_cx = spool_cx + body_w * 0.18
+            xb, yb, tw, th, xa, ya = cr.text_extents(label)
+            cr.set_source_rgba(1.0, 1.0, 1.0, 0.92) # PAUL TODO white or dark
+            cr.move_to(
+                text_cx - tw / 2 - xb,
+                h / 2 - th / 2 - yb,
+            )
+            cr.show_text(label)
+            cr.restore()
+
+
+    # ---------------------------------------------------------------------------
+    # Draw espooler movement arrows
+    # ---------------------------------------------------------------------------
+
+    def _draw_espooler_overlay(self, cr, cx, cy, w, h, direction):
+        if direction not in ("rewind", "assist"):
+            return
+
+        arrow_scale = h * 0.0038
+
+        # Position relative to spool center.
+        x_off = w * 0.06
+        y_off = h * 0.24
+
+        cr.save()
+
+        if direction == "rewind":
+            # Down arrow
+            cr.translate(cx + x_off, cy - y_off)
+            cr.rotate(math.pi / 2)
+            cr.scale(arrow_scale, arrow_scale)
+        else:
+            # Up arrow
+            cr.translate(cx + x_off, cy + y_off)
+            cr.rotate(3 * math.pi / 2)
+            cr.scale(arrow_scale, -arrow_scale)
+
+        # Center the SVG arrow artwork around its local bounding box.
+        cr.translate(-45, -37)
+
+        self._espool_arrow_path(cr)
+
+        cr.set_source_rgba(0.50, 0.50, 0.50, 0.70)
+        cr.fill_preserve()
+
+        cr.set_source_rgba(0.80, 0.80, 0.80, 0.45)
+        cr.set_line_width(3.0)
+        cr.stroke()
+
+        cr.restore()
+
+
+    def _espool_arrow_path(self, cr):
+        cr.move_to(89.561, 35.5)
+        cr.line_to(60.333, 15.734)
+        cr.curve_to(60.025, 15.526, 59.629, 15.505, 59.304, 15.679)
+        cr.curve_to(58.977, 15.852, 58.773, 16.192, 58.773, 16.562)
+        cr.line_to(58.773, 24.549)
+        cr.curve_to(46.735, 24.811, 32.467, 29.750, 21.272, 37.572)
+        cr.curve_to(7.554, 47.155, 0, 59.894, 0, 73.438)
+        cr.curve_to(0, 73.909, 0.329, 74.316, 0.790, 74.416)
+        cr.curve_to(0.860, 74.432, 0.931, 74.438, 1.000, 74.438)
+        cr.curve_to(1.386, 74.438, 1.747, 74.213, 1.911, 73.850)
+        cr.curve_to(9.734, 56.538, 28.863, 47.667, 58.772, 47.474)
+        cr.line_to(58.772, 56.094)
+        cr.curve_to(58.772, 56.464, 58.976, 56.804, 59.303, 56.977)
+        cr.curve_to(59.628, 57.150, 60.025, 57.130, 60.332, 56.922)
+        cr.line_to(89.560, 37.156)
+        cr.curve_to(89.835, 36.971, 90.000, 36.661, 90.000, 36.329)
+        cr.curve_to(90.000, 35.997, 89.835, 35.686, 89.561, 35.500)
+        cr.close_path()
+
+
+    # ---------------------------------------------------------------------------
+    # Draw gate status / filament availability and number
+    # ---------------------------------------------------------------------------
 
     def _draw_gate_status(self, cr, item, cx, tray_top, tray_h, slot_w, spool_h):
         badge_w = min(slot_w * 0.72, spool_h * 0.42)
@@ -1745,6 +1861,10 @@ class MmuSpoolTray(Gtk.DrawingArea):
         )
         cr.show_text(label)
 
+
+    # ---------------------------------------------------------------------------
+    # Draw spool tray clipping lower part of spool
+    # ---------------------------------------------------------------------------
 
     def _draw_tray(self, cr, x, y, w, h):
         tray_grad = cairo.LinearGradient(0, y, 0, y + h)
@@ -1991,7 +2111,9 @@ class MmuSpoolTray(Gtk.DrawingArea):
             GLib.source_remove(self._popover_timeout_id)
             self._popover_timeout_id = None
 
-        if self._printer.get_stat("print_stats")['state'] == "printing":
+        mmu = self._printer.get_stat("mmu")
+        print_state = mmu.get("print_state")
+        if print_state == "printing":
             return
 
         self._popover_gate = gate
@@ -2051,7 +2173,7 @@ class MmuSpoolTray(Gtk.DrawingArea):
         l = self._panel.labels
 
         # We will only get here if not printing
-        printing = (mmu['filament'] == "Unloaded")
+        printing = (mmu['print_state'] == "printing")
         unloaded = (mmu['filament'] == "Unloaded")
         can_crossload = True # PAUL fixme
         bypass = (gate == TOOL_GATE_BYPASS)
@@ -2082,14 +2204,14 @@ class MmuSpoolTray(Gtk.DrawingArea):
             return
 
         if action == "load":
-            if tool == TOOL_GATE_BYPASS:
+            if gate == TOOL_GATE_BYPASS:
                 api.gcode_script(f"MMU_LOAD EXTRUDER_ONLY=1")
             else:
                 api.gcode_script(f"MMU_LOAD")
             return
 
         if action == "unload":
-            if tool == TOOL_GATE_BYPASS:
+            if gate == TOOL_GATE_BYPASS:
                 api.gcode_script(f"MMU_UNLOAD EXTRUDER_ONLY=1")
             else:
                 api.gcode_script(f"MMU_UNLOAD")
@@ -2172,7 +2294,7 @@ class MmuSpoolTray(Gtk.DrawingArea):
         if stroke_rgb is not None:
             cr.set_line_width(stroke_width)
 
-            if len(fill_rgb) == 4:
+            if len(stroke_rgb) == 4:
                 cr.set_source_rgba(*stroke_rgb)
             else:
                 cr.set_source_rgb(*stroke_rgb)

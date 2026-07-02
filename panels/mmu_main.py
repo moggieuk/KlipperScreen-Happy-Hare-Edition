@@ -94,6 +94,7 @@ class Panel(ScreenPanel, MmuMixin):
 
         l['check_gates'].connect("clicked", self.select_check_gates)
         l['manage'].connect("clicked", self.menu_item_clicked, {"panel": "mmu_manage", "name": "MMU Manage"})
+        l['manage'].set_vexpand(False)
         l['t_decrease'].connect("clicked", self.select_tool, -1)
         l['tool'].connect("clicked", self.select_tool, 0)
         l['t_increase'].connect("clicked", self.select_tool, 1)
@@ -116,40 +117,73 @@ class Panel(ScreenPanel, MmuMixin):
         l['tool_label'].set_xalign(0)
         l['filament'].set_xalign(0)
 
+        # Notebook corner "layers" ---------------------------------
+
+        notebook_corner = Gtk.Notebook()
+        l['notebook_corner'] = notebook_corner
+        notebook_corner.set_show_tabs(False)
+        page = 0
+
+        notebook_overlay = Gtk.Overlay()
+        l['notebook_overlay'] = notebook_overlay
+        notebook_overlay.add(notebook_corner)
+        next_label = Gtk.Label(label=">>>")
+        l['notebook_corner_next'] = next_label
+        next_label.set_size_request(24, 24)
+        next_label.set_halign(Gtk.Align.END)
+        next_label.set_valign(Gtk.Align.END)
+        next_label.set_margin_end(4)
+        next_label.set_margin_bottom(8)
+        next_label.set_opacity(0.65)
+        notebook_overlay.add_overlay(next_label)
+        notebook_overlay.set_overlay_pass_through(next_label, True)
+
         # Manage frame
         manage_grid = Gtk.Grid()
         manage_grid.set_vexpand(True)
         manage_grid.set_column_homogeneous(True)
-        manage_grid.set_row_homogeneous(True)
-        manage_grid.attach(l['manage'],   1, 0, 6, 3)
-        manage_grid.attach(Gtk.Label(),   0, 3, 6, 3)
+        manage_grid.set_row_homogeneous(False)
+        manage_grid.attach(l['manage'], 1, 0, 6, 1)
+        manage_grid.attach(Gtk.Label(), 0, 1, 6, 1)
         l['manage_frame'] = manage_frame = Gtk.Frame()
         manage_frame.set_label("Unit0")
         manage_frame.set_label_align(0.6, 0)
         manage_frame.add(manage_grid)
+        notebook_corner.insert_page(self._clickable_page(manage_frame), None, page)
+        page += 1
 
         # In print Encoder gauge
-        l['encoder_gauge'] = encoder_gauge = EncoderDialGauge()
-        l['encoder_frame'] = encoder_frame = Gtk.Frame()
-        encoder_frame.set_label("Encoder")
-        encoder_frame.set_label_align(0.5, 0)
-        encoder_frame.add(encoder_gauge)
+        if self.has_encoder():
+            l['encoder_gauge'] = encoder_gauge = EncoderDialGauge()
+            l['encoder_frame'] = encoder_frame = Gtk.Frame()
+            encoder_frame.set_label("Encoder")
+            encoder_frame.set_label_align(0.5, 0)
+            encoder_frame.add(encoder_gauge)
+            notebook_corner.insert_page(self._clickable_page(encoder_frame), None, page)
+            page += 1
 
         # In print sync-feedback flowguard gauge
-        l['flowguard_gauge'] = flowguard_gauge = FlowGuardDialGauge()
-        l['flowguard_frame'] = flowguard_frame = Gtk.Frame()
-        flowguard_frame.set_label("FlowGuard")
-        flowguard_frame.set_label_align(0.5, 0)
-        flowguard_frame.add(flowguard_gauge)
+        if self.has_buffer():
+            l['flowguard_gauge'] = flowguard_gauge = FlowGuardDialGauge()
+            l['flowguard_frame'] = flowguard_frame = Gtk.Frame()
+            flowguard_frame.set_label("FlowGuard")
+            flowguard_frame.set_label_align(0.5, 0)
+            flowguard_frame.add(flowguard_gauge)
+            notebook_corner.insert_page(self._clickable_page(flowguard_frame), None, page)
+            page += 1
 
-        # Notebook corner "layers" ---------------------------------
-        notebook_corner = Gtk.Notebook()
-        l['notebook_corner'] = notebook_corner
-        notebook_corner.set_show_tabs(False)
-        notebook_corner.insert_page(self._clickable_page(manage_frame), None, 0)
-        notebook_corner.insert_page(self._clickable_page(flowguard_frame), None, 1)
-        notebook_corner.insert_page(self._clickable_page(encoder_frame), None, 2)
+        # Selected spool details
+        l['spool_details'] = spool_details = MmuSpoolDetails(self._printer, self)
+        l['spool_details_frame'] = spool_details_frame = Gtk.Frame()
+        spool_details_frame.set_label("Spool Details")
+        spool_details_frame.set_label_align(0.5, 0)
+        spool_details_frame.add(spool_details)
+        notebook_corner.insert_page(self._clickable_page(spool_details_frame), None, page)
+        page += 1
+
         notebook_corner.set_current_page(0)
+        next_label.set_text(self._notebook_page_indicator(0, page))
+
 
         # Pause button "layers" ------------------------------------
         pause_layer = Gtk.Notebook()
@@ -194,30 +228,30 @@ class Panel(ScreenPanel, MmuMixin):
             top_grid.set_vexpand(False)
             top_grid.set_column_homogeneous(True)
 
-            top_grid.attach(top_box,            0, 0,  9, 1)
-            top_grid.attach(notebook_corner,    9, 0,  3, 3)
-            top_grid.attach(status_box,         0, 1, 10, 1) # Should be 9, not 10 (but this prevents screen expansion)
-            top_grid.attach(l['filament_pos'],  0, 2, 12, 1) # Allows filament line line to extend
+            top_grid.attach(top_box,               0, 0,  9, 1)
+            top_grid.attach(l['notebook_overlay'], 9, 0,  3, 3)
+            top_grid.attach(status_box,            0, 1, 10, 1) # Should be 9, not 10 (but this prevents accidental screen expansion)
+            top_grid.attach(l['filament_pos'],     0, 2, 12, 1) # Allows filament line line to extend
 
             # Assemble the two primary button rows ------------
             tool_grid = Gtk.Grid()
             tool_grid.set_column_homogeneous(False)
-            tool_grid.attach(l['t_decrease'],   0, 0, 1, 1)
-            tool_grid.attach(l['tool'],         1, 0, 1, 1)
-            tool_grid.attach(l['t_increase'],   2, 0, 1, 1)
+            tool_grid.attach(l['t_decrease'],      0, 0, 1, 1)
+            tool_grid.attach(l['tool'],            1, 0, 1, 1)
+            tool_grid.attach(l['t_increase'],      2, 0, 1, 1)
 
             main_grid = Gtk.Grid()
             main_grid.set_vexpand(True)
             main_grid.set_column_homogeneous(True)
-            main_grid.attach(tool_grid,                   0, 0, 6, 1)
-            main_grid.attach(l['picker'],       6, 0, 2, 1)
-            main_grid.attach(l['unload'],       8, 0, 2, 1)
-            main_grid.attach(l['check_gates'], 10, 0, 2, 1)
-            main_grid.attach(l['pause_layer'],  0, 1, 3, 1)
-            main_grid.attach(l['unlock'],       3, 1, 2, 1)
-            main_grid.attach(l['resume'],       5, 1, 2, 1)
-            main_grid.attach(l['extrude'],      7, 1, 2, 1)
-            main_grid.attach(l['more'],         9, 1, 3, 1)
+            main_grid.attach(tool_grid,            0, 0, 6, 1)
+            main_grid.attach(l['picker'],          6, 0, 2, 1)
+            main_grid.attach(l['unload'],          8, 0, 2, 1)
+            main_grid.attach(l['check_gates'],    10, 0, 2, 1)
+            main_grid.attach(l['pause_layer'],     0, 1, 3, 1)
+            main_grid.attach(l['unlock'],          3, 1, 2, 1)
+            main_grid.attach(l['resume'],          5, 1, 2, 1)
+            main_grid.attach(l['extrude'],         7, 1, 2, 1)
+            main_grid.attach(l['more'],            9, 1, 3, 1)
 
             box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
             box.pack_start(top_grid, False, True, 0)
@@ -264,47 +298,20 @@ class Panel(ScreenPanel, MmuMixin):
             main_grid.set_vexpand(True)
             main_grid.set_column_homogeneous(True)
 
-            main_grid.attach(l['spool_frame'],     0,  0,  9,  5)
-            main_grid.attach(l['notebook_corner'], 9,  0,  3,  5)
-            main_grid.attach(fil_row,              0,  5,  12, 1)
-            main_grid.attach(l['pause_layer'],     0,  6,  3,  2)
-            main_grid.attach(l['unlock'],          3,  6,  2,  2)
-            main_grid.attach(l['resume'],          5,  6,  2,  2)
-            main_grid.attach(l['extrude'],         7,  6,  2,  2)
-            main_grid.attach(l['more'],            9,  6,  3,  2)
+            main_grid.attach(l['spool_frame'],      0,  0,  9,  5)
+            main_grid.attach(l['notebook_overlay'], 9,  0,  3,  5)
+            main_grid.attach(fil_row,               0,  5,  12, 1)
+            main_grid.attach(l['pause_layer'],      0,  6,  3,  2)
+            main_grid.attach(l['unlock'],           3,  6,  2,  2)
+            main_grid.attach(l['resume'],           5,  6,  2,  2)
+            main_grid.attach(l['extrude'],          7,  6,  2,  2)
+            main_grid.attach(l['more'],             9,  6,  3,  2)
 
             # Precautionary - make area scrollable
             scroll = self._gtk.ScrolledWindow()
             scroll.add(main_grid)
 
             self.content.add(scroll)
-
-
-    def _next_notebook_corner_page(self, widget, event):
-        notebook = self.labels["notebook_corner"]
-
-        page = notebook.get_current_page()
-        n_pages = notebook.get_n_pages()
-
-        for i in range(1, n_pages + 1):
-            candidate = (page + i) % n_pages
-            if self._is_clickable_page(notebook, candidate):
-                notebook.set_current_page(candidate)
-                break
-
-        return True
-
-
-    def _is_clickable_page(self, notebook, page_num):
-        child = notebook.get_nth_page(page_num)
-        return isinstance(child, Gtk.EventBox)
-
-
-    def _clickable_page(self, child):
-        event_box = Gtk.EventBox()
-        event_box.add(child)
-        event_box.connect("button-press-event", self._next_notebook_corner_page)
-        return event_box
 
 
     def activate(self):
@@ -330,6 +337,49 @@ class Panel(ScreenPanel, MmuMixin):
         self.bold_filament = self._config.get_main_config().getboolean("mmu_bold_filament", False)
         self.bold_filament = self._config.get_main_config().getboolean("mmu_bold_filament", False)
         self.show_spool_tray = self._config.get_main_config().getboolean("mmu_spool_tray", True)
+        self.show_spool_tray = False
+
+
+    def _next_notebook_corner_page(self, widget=None, event=None):
+        notebook = self.labels["notebook_corner"]
+        next_label = self.labels["notebook_corner_next"]
+        page = notebook.get_current_page()
+        n_pages = notebook.get_n_pages()
+        pages = range(0, n_pages)
+        mmu = self._printer.get_stat("mmu")
+        mmu_print_state = mmu['print_state']
+        printing = mmu_print_state in ("started",  "printing")
+
+        for i in range(1, n_pages + 1):
+            candidate = (page + i) % n_pages
+            if candidate == 0 and printing:
+                continue
+
+            if self._is_clickable_page(notebook, candidate):
+                notebook.set_current_page(candidate)
+                next_label.set_text(self._notebook_page_indicator(candidate, n_pages))
+                break
+
+        return True
+
+
+    def _notebook_page_indicator(self, page, n_pages):
+        return "".join(
+            "●" if i == page else "○"
+            for i in range(n_pages)
+        )
+
+
+    def _is_clickable_page(self, notebook, page_num):
+        child = notebook.get_nth_page(page_num)
+        return isinstance(child, Gtk.EventBox)
+
+
+    def _clickable_page(self, child):
+        event_box = Gtk.EventBox()
+        event_box.add(child)
+        event_box.connect("button-press-event", self._next_notebook_corner_page)
+        return event_box
 
 
     def process_update(self, action, data):
@@ -372,6 +422,15 @@ class Panel(ScreenPanel, MmuMixin):
                         )
                     ):
                         self.update_flowguard()
+
+                    # Selected spool/filament details
+                    if (
+                        any(
+                            key in e_data
+                            for key in ('gate', 'gate_color', 'gate_filament_name', 'gate_material', 'gate_speed_override', 'gate_spool_id', 'gate_temperature', "endless_spool_groups")
+                        )
+                    ):
+                        self.update_spool_details()
 
                     # Tool, gate or maps
                     if any(
@@ -685,6 +744,11 @@ class Panel(ScreenPanel, MmuMixin):
         self.labels['encoder_frame'].set_sensitive(detection_mode and enabled)
 
 
+    def update_spool_details(self):
+        mmu = self._printer.get_stat("mmu")
+        self.labels['spool_details'].set_gate(mmu['gate'])
+
+
     def update_movement(self, encoder_position=None):
         # Supports classic and visual layouts
         mmu = self._printer.get_stat("mmu")
@@ -758,6 +822,7 @@ class Panel(ScreenPanel, MmuMixin):
     def update_active_buttons(self):
         mmu = self._printer.get_stat("mmu")
         mmu_print_state = mmu['print_state']
+        printing = mmu_print_state in ("started",  "printing")
         enabled = mmu['enabled']
         tool = mmu['tool']
         action = mmu['action']
@@ -791,19 +856,11 @@ class Panel(ScreenPanel, MmuMixin):
             # Adjust "notebook corner" if necessary
             notebook = self.labels['notebook_corner']
             page = notebook.get_current_page()
-            new_page = None
-            if "printing" in ui_state:
-                # Any "clickable" page is good (just get off manage button)
-                if not self._is_clickable_page(notebook, page):
-                    if self.has_buffer():
-                        new_page = 2 # Flowguard display
-                    elif self.has_encoder():
-                        new_page = 3 # Encoder display
-            else:
-                if page >= 2:
-                    new_page = 0 # Manage recovery button
-            if new_page is not None:
-                notebook.set_current_page(new_page)
+            if page == 0 and printing:
+                # Get off manage button (which is hidden in print)
+                # Call twice to prefer one of the possible flowguard monitors
+                self._next_notebook_corner_page()
+                self._next_notebook_corner_page()
 
             if ("paused" not in ui_state and "pause_locked" not in ui_state) or "no_message" in ui_state:
                 self.labels['pause_layer'].set_current_page(0) # Pause button
@@ -946,14 +1003,15 @@ class Panel(ScreenPanel, MmuMixin):
                     avail = "?"
                 msg_avail += f"│ {avail} "
 
-                # Find tool associated with gate
+                # Find tool(s) associated with gate
                 tools = self.get_tools_for_gate(g)
-                if len(tools) > 1:
-                    multi_tool = True
-                tool_str = "+".join(f"T{tool}" for tool in tools)
-                if not tool_str:
-                    tool_str = "   "
-                msg_tools += ("│%s " % tool_str)[:4]
+                if tools:
+                    tool_str = f"T{tools[0]}"
+                    if len(tools) > 1:
+                        tool_str += "+"
+                else:
+                    tool_str = ""
+                msg_tools += f"│{tool_str:<3}"
 
             # Selected ("open") gate
             if gate_selected == g:
@@ -2152,11 +2210,11 @@ class MmuSpoolTray(Gtk.DrawingArea):
             can_crossload = unit.get('can_crossload', False)
 
         l['menu_select'].set_sensitive(unloaded and not selected)
-        l['menu_check'].set_sensitive(unloaded)
-        l['menu_preload'].set_sensitive(not bypass and (unloaded or can_crossload and not selected))
+        l['menu_check'].set_sensitive(unloaded and not bypass)
+        l['menu_preload'].set_sensitive((unloaded or can_crossload and not selected) and not bypass)
         l['menu_load'].set_sensitive(unloaded)
         l['menu_unload'].set_sensitive(loaded)
-        l['menu_eject'].set_sensitive(not bypass and (unloaded or can_crossload and not selected))
+        l['menu_eject'].set_sensitive((unloaded or can_crossload and not selected) and not bypass)
 
 
     def _handle_gate_action(self, gate, action):
@@ -2317,3 +2375,239 @@ class MmuSpoolTray(Gtk.DrawingArea):
         cr.arc(x + r, y + h - r, r, math.pi / 2, math.pi)
         cr.arc(x + r, y + r, r, math.pi, 3 * math.pi / 2)
         cr.close_path()
+
+
+
+# ---------------------------------------------------------------------------
+# Spool detail page widget
+# ---------------------------------------------------------------------------
+# Add this class outside MmuSpoolTray, near your other widget classes.
+#
+# Usage:
+#   details = MmuSpoolDetails(self._printer)
+#   notebook.append_page(details, Gtk.Label(label="Spool"))
+#
+# Then wire MmuSpoolTray to call details.set_gate(gate) when a spool is selected.
+#
+# The labels ellipsize automatically and never overflow their allocated width.
+
+class MmuSpoolDetails(Gtk.Box):
+
+    def __init__(self, printer, panel):
+        super().__init__(orientation=Gtk.Orientation.VERTICAL, spacing=2)
+        self._printer = printer
+        self._panel = panel
+        self._gate = None
+
+
+        self.set_hexpand(True)
+        self.set_vexpand(False)
+        self.set_margin_start(2)
+        self.set_margin_end(0)
+        self.set_margin_top(6)
+        self.set_margin_bottom(6)
+
+        self._line1 = self._make_label(["mmu-spool-detail-small", "mmu-spool-detail-margin"])
+        self._line2 = self._make_label(["mmu-spool-detail-important"], wrap=True)
+        self._line3 = self._make_label(["mmu-spool-detail-normal"])
+        self._line4 = self._make_label(["mmu-spool-detail-small"], wrap=self._panel.show_spool_tray)
+        self._line5 = self._make_label(["mmu-spool-detail-small"])
+
+        self._header_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
+        self._header_box.set_margin_start(4)
+        self._header_box.set_margin_end(4)
+        self._header_box.set_margin_top(4)
+        self._header_box.set_margin_bottom(4)
+
+        self._header_box.pack_start(self._line2, False, False, 0)
+        self._header_box.pack_start(self._line3, False, False, 0)
+
+        self._header_eventbox = Gtk.EventBox()
+        self._header_eventbox.set_hexpand(True)
+        self._header_eventbox.set_halign(Gtk.Align.FILL)
+        self._header_eventbox.get_style_context().add_class("mmu-spool-detail-header")
+        self._header_eventbox.add(self._header_box)
+
+        self.pack_start(self._line1, False, False, 0)
+        self.pack_start(self._header_eventbox, False, False, 0)
+        self.pack_start(self._line4, False, False, 0)
+        self.pack_start(self._line5, False, False, 0)
+
+        self.set_gate(None)
+
+
+    def _make_label(self, css_classes, wrap=False):
+        label = Gtk.Label()
+
+        label.set_xalign(0.0)
+        label.set_yalign(0.5)
+        label.set_hexpand(True)
+
+        if wrap:
+            label.set_line_wrap(True)
+            label.set_line_wrap_mode(Pango.WrapMode.WORD_CHAR)
+            label.set_lines(2)
+            label.set_max_width_chars(1) # use allocated width
+            label.set_justify(Gtk.Justification.LEFT)
+        else:
+            label.set_single_line_mode(True)
+            label.set_ellipsize(Pango.EllipsizeMode.END)
+            label.set_lines(1)
+
+        label.get_style_context().add_class("mmu-spool-detail")
+        for css in css_classes:
+            label.get_style_context().add_class(css)
+
+        return label
+
+
+    def set_gate(self, gate):
+        self._gate = gate
+        self.refresh()
+
+
+    def refresh(self):
+        if self._gate is None or self._gate == TOOL_GATE_BYPASS:
+            self._set_lines(
+                "Bypass",
+                "No spool selected",
+                "",
+                "",
+                "",
+            )
+            return
+
+        details = self._build_spool_details(self._gate)
+
+        self._set_lines(
+            details["line1"],
+            details["line2"],
+            details["line3"],
+            details["line4"],
+            details["line5"],
+        )
+
+
+    def _set_lines(self, line1, line2, line3, line4, line5):
+        self._line1.set_text(line1 or "")
+        self._line2.set_text(line2 or "")
+        self._line3.set_text(line3 or "")
+        self._line4.set_text(line4 or "")
+        self._line5.set_text(line5 or "")
+
+
+    def _build_spool_details(self, gate):
+        mmu = self._printer.get_stat("mmu") or {}
+
+        filament_name = self._get_gate_value(mmu, "gate_filament_name", gate, "Unknown")
+        material      = self._get_gate_value(mmu, "gate_material", gate, "?")
+        temperature   = self._get_gate_value(mmu, "gate_temperature", gate, None)
+        speed         = self._get_gate_value(mmu, "gate_speed_override", gate, 100)
+        spool_id      = self._get_gate_value(mmu, "gate_spool_id", gate, -1)
+
+        spool = self._spoolman_spool(spool_id)
+
+        vendor = spool.get("vendor") or "Unknown"
+        description = spool.get("description") or filament_name or "Unknown"
+
+        line1 = f"{gate} | {vendor}"
+        line2 = description
+
+        line3_parts = []
+        if material:
+            line3_parts.append(str(material))
+        if temperature is not None:
+            line3_parts.append(f"{temperature}°C")
+        if speed is not None and int(speed) != 100:
+            line3_parts.append(f"Speed: {speed}%")
+        line3 = " | ".join(line3_parts)
+
+        if spool_id is None or int(spool_id) < 0:
+            line4 = "No spool ID"
+        else:
+            if self._panel.show_spool_tray:
+                line4_parts = [f"ID #{spool_id}"]
+            else:
+                line4_parts = []
+
+            remaining_weight = spool.get("remaining_weight")
+            total_weight = spool.get("total_weight")
+            remaining_length = spool.get("remaining_length")
+
+            if remaining_weight is not None and total_weight is not None:
+                line4_parts.append(
+                    f"{self._format_weight(remaining_weight)}/{self._format_weight(total_weight)}"
+                )
+
+            if remaining_length is not None:
+                line4_parts.append(f"{self._format_length(remaining_length)}")
+
+            line4 = " | ".join(line4_parts)
+
+        es_gates = self._panel.get_endless_spool_group_order(gate)
+        if es_gates:
+            line5 = f"∞:{'>'.join(str(g) for g in es_gates)}"
+        else:
+            line5 = ""
+
+        return {
+            "line1": line1,
+            "line2": line2,
+            "line3": line3,
+            "line4": line4,
+            "line5": line5,
+        }
+
+
+    def _get_gate_value(self, mmu, key, gate, default=None):
+        values = mmu.get(key)
+        if isinstance(values, (list, tuple)) and 0 <= gate < len(values):
+            return values[gate]
+        return default
+
+
+    def _spoolman_spool(self, spool_id):
+        # TODO replace with real Spoolman lookup. Return a dict like:
+        #
+        # {
+        #     "vendor": "eSun",
+        #     "description": "KVS Midnight Green",
+        #     "remaining_weight": 750,   # grams
+        #     "total_weight": 1000,      # grams
+        #     "remaining_length": 104,   # meters
+        # }
+        #
+        # Example test data matching your sample:
+        if spool_id == 6:
+            return {
+                "vendor": "eSun",
+                "description": "KVS Midnight Green",
+                "remaining_weight": 750,
+                "total_weight": 1000,
+                "remaining_length": 104,
+            }
+
+        return {}
+
+
+    def _format_weight(self, grams):
+        try:
+            grams = float(grams)
+        except (TypeError, ValueError):
+            return str(grams)
+
+        if grams >= 1000 and grams % 1000 == 0:
+            return f"{int(grams / 1000)}kg"
+        if grams >= 1000:
+            return f"{grams / 1000:.1f}kg"
+        return f"{int(round(grams))}g"
+
+
+    def _format_length(self, meters):
+        try:
+            meters = float(meters)
+        except (TypeError, ValueError):
+            return str(meters)
+
+        return f"{int(round(meters))}m"
+

@@ -800,6 +800,14 @@ keyboard_box {
     padding: 0;
 }
 
+/* Filament status line */
+.mmu_status_filament {
+    font-size: 12pt;
+    margin-left: 8px;
+    margin-top: 16px;
+    margin-bottom: 16px;
+}
+
 .mmu_unicode_mono {
     font-family:
         "JetBrains Mono NL",
@@ -808,17 +816,6 @@ keyboard_box {
         "FreeMono",
         "Noto Sans Mono",
         monospace;
-}
-
-.mmu_status_filament {
-    font-size: 12pt;
-    margin-left: 8px;
-    margin-top: 8px;
-    margin-bottom: 8px;
-}
-
-.mmu_status_text {
-    margin-bottom: 8px;
 }
 
 .mmu_recover check {
@@ -901,4 +898,27 @@ keyboard_box {
 
     font-weight: bold;
     font-size: 1.1em;
+}
+
+.mmu-spool-detail-small {
+    font-size: 0.85em;
+}
+
+.mmu-spool-detail-normal {
+    font-size: 0.95em;
+}
+
+.mmu-spool-detail-important {
+    font-size: 1.1em;
+    font-weight: bold;
+}
+
+.mmu-spool-detail-margin {
+    margin-bottom: 0.2em;
+    margin-left: 4px;
+}
+
+.mmu-spool-detail-header {
+    background-color: rgba(0, 0, 0, 0.88);
+    border-radius: 8px;
 }

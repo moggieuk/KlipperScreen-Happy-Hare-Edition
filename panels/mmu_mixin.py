@@ -371,26 +371,35 @@ class MmuMixin:
 
     def get_tools_for_gate(self, gate):
         mmu = self._printer.get_stat("mmu")
-        tool_to_gate_map = mmu["tool_to_gate_map"]
+        ttg_map = mmu["ttg_map"]
 
         return [
             tool
-            for tool, mapped_gate in enumerate(tool_to_gate_map)
+            for tool, mapped_gate in enumerate(ttg_map)
             if mapped_gate == gate
         ]
 
 
-    def get_tools_for_gate_str(self, gate):
-        tools = self.get_tools_for_gate(g)
+    def get_endless_spool_group_order(self, gate):
+        mmu = self._printer.get_stat("mmu")
+        groups = mmu["endless_spool_groups"]
+        if gate < 0 or gate >= len(groups):
+            return []
 
-        if len(tools) > 1:
-            multi_tool = True
+        group = groups[gate]
+        if group is None or group < 0:
+            return [gate]
 
-        tool_str = "+".join(f"T{tool}" for tool in tools)
-        if not tool_str:
-            tool_str = "   "
+        gates = [
+            g for g, gate_group in enumerate(groups)
+            if gate_group == group
+        ]
 
-        msg_tools += ("│%s " % tool_str)[:4]
+        if gate not in gates:
+            return []
+
+        i = gates.index(gate)
+        return gates[i:] + gates[:i]
 
 
 # -------------------------------------------------------------------------------------------

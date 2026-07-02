@@ -379,6 +379,17 @@ class MmuMixin:
             if mapped_gate == gate
         ]
 
+    def get_tools_for_gate_str(self, gate):
+        # Find tool(s) associated with gate
+        tools = self.get_tools_for_gate(gate)
+        if tools:
+            tool_str = f"T{tools[0]}"
+            if len(tools) > 1:
+                tool_str += "+"
+        else:
+            tool_str = ""
+        return tool_str
+
 
     def get_endless_spool_group_order(self, gate):
         mmu = self._printer.get_stat("mmu")

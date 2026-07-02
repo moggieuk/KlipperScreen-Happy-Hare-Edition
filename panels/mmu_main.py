@@ -337,7 +337,6 @@ class Panel(ScreenPanel, MmuMixin):
         self.bold_filament = self._config.get_main_config().getboolean("mmu_bold_filament", False)
         self.bold_filament = self._config.get_main_config().getboolean("mmu_bold_filament", False)
         self.show_spool_tray = self._config.get_main_config().getboolean("mmu_spool_tray", True)
-        self.show_spool_tray = False
 
 
     def _next_notebook_corner_page(self, widget=None, event=None):
@@ -1004,13 +1003,7 @@ class Panel(ScreenPanel, MmuMixin):
                 msg_avail += f"│ {avail} "
 
                 # Find tool(s) associated with gate
-                tools = self.get_tools_for_gate(g)
-                if tools:
-                    tool_str = f"T{tools[0]}"
-                    if len(tools) > 1:
-                        tool_str += "+"
-                else:
-                    tool_str = ""
+                tool_str = self.get_tools_for_gate_str(g)
                 msg_tools += f"│{tool_str:<3}"
 
             # Selected ("open") gate
@@ -2536,7 +2529,7 @@ class MmuSpoolDetails(Gtk.Box):
 
             if remaining_weight is not None and total_weight is not None:
                 line4_parts.append(
-                    f"{self._format_weight(remaining_weight)}/{self._format_weight(total_weight)}"
+                    f"{self._format_weight(remaining_weight)} / {self._format_weight(total_weight)}"
                 )
 
             if remaining_length is not None:

@@ -213,7 +213,6 @@ class Panel(ScreenPanel, MmuMixin):
 
     def config_update(self):
         self.use_spoolman = self._printer.spoolman and self._config.get_main_config().getboolean("mmu_use_spoolman", False)
-        self.use_spoolman = True # PAUL
 
 
     def activate(self):
@@ -228,7 +227,6 @@ class Panel(ScreenPanel, MmuMixin):
 
 
     def refresh(self):
-        logging.info(f"PAUL: mmu_filaments.refresh()")
         self.gate_tool_map = self.build_gate_tool_map()
 
         mmu = self._printer.get_stat("mmu")

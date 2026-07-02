@@ -110,7 +110,6 @@ class Panel(ScreenPanel, MmuMixin):
 
 
     def refresh(self):
-        logging.info(f"PAUL: mmu_spoolman.refresh()")
         self.gate_tool_map = self.build_gate_tool_map()
         mmu = self._printer.get_stat("mmu")
         gate_status = mmu['gate_status']

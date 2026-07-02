@@ -329,7 +329,7 @@ class Panel(ScreenPanel, MmuMixin):
             if gate != TOOL_GATE_UNKNOWN:
                 self.labels['spool_tray'].scroll_gate_into_view(gate, center=True)
 
-        self.spoolman_start_polling(callback=self.process_spoolman_update, interval=10) # PAUL make 60
+        self.spoolman_start_polling(callback=self.process_spoolman_update, interval=60)
 
 
     def deactivate(self):
@@ -445,7 +445,7 @@ class Panel(ScreenPanel, MmuMixin):
                     # Tool, gate or maps
                     if any(
                         key in e_data
-                        for key in ('tool', 'gate', 'ttg_map', 'gate_status', 'gate_color', 'espooler') # PAUL: need heater(?), fil_% (spoolman)
+                        for key in ('tool', 'gate', 'ttg_map', 'gate_status', 'gate_color', 'espooler')
                     ):
                         self.update_status()
 
@@ -500,6 +500,7 @@ class Panel(ScreenPanel, MmuMixin):
 
     def process_spoolman_update(self):
         logging.info(f"PAUL: ******************************************* process_spoolman_update")
+        self.update_status()
 
 
     def init_tool_value(self):
@@ -1364,16 +1365,35 @@ class MmuSpoolTray(Gtk.DrawingArea):
         mmu = self._printer.get_stat("mmu")
         gate_status = mmu["gate_status"]
         gate_color = mmu["gate_color"]
+        gate_spool_id = mmu["gate_spool_id"]
         selected_gate = mmu["gate"]
         espooler = mmu.get("espooler") or [None] * len(gate_status)
 
         def build_gate(g):
+            spool_id = gate_spool_id[g]
+            spool = self._panel.spools.get(str(spool_id))
+            percent = None
+
+            if spool:
+                remaining_weight = getattr(spool, "remaining_weight", 0)
+                total_weight = (
+                    getattr(spool, "initial_weight", None)
+                    or getattr(getattr(spool, "filament", None), "weight", 0)
+                    or 0
+                )
+
+                percent = (
+                    max(0, min(100, round(remaining_weight / total_weight * 100)))
+                    if total_weight > 0
+                    else 0
+                )
+
             return self._gate_item(
                 g=g,
                 status=gate_status[g],
                 color=gate_color[g],
                 selected_gate=selected_gate,
-                percent=99, # PAUL TODO wire up to spoolman (set in _build_items)
+                percent=percent,
                 espooler=espooler[g],
             )
 
@@ -1855,7 +1875,7 @@ class MmuSpoolTray(Gtk.DrawingArea):
         badge_h = min(tray_h * 0.30, spool_h * 0.13)
 
         # Sit a little lower than before.
-        badge_y = tray_top + tray_h * 0.48 # PAUL was 0.38
+        badge_y = tray_top + tray_h * 0.48
         badge_x = cx - badge_w / 2
         radius = badge_h * 0.22
 
@@ -2545,10 +2565,24 @@ class MmuSpoolDetails(Gtk.Box):
         speed         = self._get_gate_value(mmu, "gate_speed_override", gate, 100)
         spool_id      = self._get_gate_value(mmu, "gate_spool_id", gate, -1)
 
-        spool = self._spoolman_spool(spool_id)
+        # Get Spoolman supplied details
+        spool = self._panel.spools.get(str(spool_id))
+        filament = getattr(spool, "filament", None)
 
-        vendor = spool.get("vendor") or "Unknown vendor"
-        description = spool.get("description") or filament_name or "Unknown"
+        vendor = (
+            filament.vendor.name
+            if filament and getattr(filament, "vendor", None)
+            else "Unknown vendor"
+        )
+
+        description = getattr(filament, "name", None) or filament_name or "Unknown"
+
+        remaining_weight = getattr(spool, "remaining_weight", None)
+        total_weight = (
+            getattr(spool, "initial_weight", None)
+            or getattr(filament, "weight", None)
+        )
+        remaining_length = getattr(spool, "remaining_length", None)
 
         line1 = f"{vendor}"
         line2 = description
@@ -2558,26 +2592,29 @@ class MmuSpoolDetails(Gtk.Box):
             line3_parts.append(str(material))
         if temperature is not None:
             line3_parts.append(f"{temperature}°C")
-        if speed is not None and int(speed) != 100:
+
+        try:
+            speed_value = int(speed)
+        except (TypeError, ValueError):
+            speed_value = 100
+
+        if speed_value != 100:
             line3_parts.append(f"Speed: {speed}%")
+
         line3 = " | ".join(line3_parts)
 
-        if spool_id is None or int(spool_id) < 0:
+        try:
+            spool_id_value = int(spool_id)
+        except (TypeError, ValueError):
+            spool_id_value = -1
+
+        if spool_id is None or spool_id_value < 0:
             line4 = "No spool ID"
         else:
-            if self._panel.show_spool_tray:
-                line4_parts = [f"ID #{spool_id}"]
-            else:
-                line4_parts = []
-
-            remaining_weight = spool.get("remaining_weight")
-            total_weight = spool.get("total_weight")
-            remaining_length = spool.get("remaining_length")
+            line4_parts = [f"ID #{spool_id}"] if self._panel.show_spool_tray else []
 
             if remaining_weight is not None and total_weight is not None:
-                line4_parts.append(
-                    f"{self._format_weight(remaining_weight)} / {self._format_weight(total_weight)}"
-                )
+                line4_parts.append(f"{self._format_weight(remaining_weight)} / {self._format_weight(total_weight)}")
 
             if remaining_length is not None:
                 line4_parts.append(f"{self._format_length(remaining_length)}")
@@ -2585,10 +2622,7 @@ class MmuSpoolDetails(Gtk.Box):
             line4 = " | ".join(line4_parts)
 
         es_gates = self._panel.get_endless_spool_group_order(gate)
-        if es_gates:
-            line5 = f"∞:{'>'.join(str(g) for g in es_gates)}"
-        else:
-            line5 = ""
+        line5 = f"∞:{'>'.join(str(g) for g in es_gates)}" if es_gates else ""
 
         return {
             "line1": line1,
@@ -2604,30 +2638,6 @@ class MmuSpoolDetails(Gtk.Box):
         if isinstance(values, (list, tuple)) and 0 <= gate < len(values):
             return values[gate]
         return default
-
-
-    def _spoolman_spool(self, spool_id):
-        # TODO replace with real Spoolman lookup. Return a dict like:
-        #
-        # {
-        #     "vendor": "eSun",
-        #     "description": "KVS Midnight Green",
-        #     "remaining_weight": 750,   # grams
-        #     "total_weight": 1000,      # grams
-        #     "remaining_length": 104,   # meters
-        # }
-        #
-        # Example test data matching your sample:
-        if spool_id == 6:
-            return {
-                "vendor": "eSun",
-                "description": "KVS Midnight Green",
-                "remaining_weight": 750,
-                "total_weight": 1000,
-                "remaining_length": 104,
-            }
-
-        return {}
 
 
     def _format_weight(self, grams):
@@ -2650,4 +2660,3 @@ class MmuSpoolDetails(Gtk.Box):
             return str(meters)
 
         return f"{int(round(meters))}m"
-

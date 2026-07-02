@@ -891,6 +891,7 @@ keyboard_box {
 }
 
 .mmu-popup-header label {
+    border-radius: 0.75em;
     margin-top: 4px;
     margin-bottom: 4px;
     margin-left: 8px;

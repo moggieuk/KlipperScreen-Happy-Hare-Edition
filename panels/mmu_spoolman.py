@@ -4,27 +4,25 @@
 # Copyright (C) 2023-2026  moggieuk#6538 (discord)
 #                          moggieuk@hotmail.com
 #
-import logging, gi
+import threading, time, logging, gi
 
 gi.require_version("Gtk", "3.0")
 
-from gi.repository import Gtk, GLib, Pango, Gdk, GdkPixbuf, GObject
+from gi.repository            import Gtk, Gdk
+
 from ks_includes.screen_panel import ScreenPanel
-from ks_includes.KlippyRest import KlippyRest
-from panels.spoolman import SpoolmanSpool
-from panels.mmu_mixin import *
-import threading, time
+from ks_includes.KlippyRest   import KlippyRest
+from panels.spoolman          import SpoolmanSpool
+from panels.mmu_mixin         import *
+
 
 class Panel(ScreenPanel, MmuMixin):
 
     def __init__(self, screen, title):
         super().__init__(screen, title)
-        self.ui_sel_tool = 0
 
-        self.spools={}
+        self.spools = {}
         SpoolmanSpool.theme_path = screen.theme
-        GObject.type_register(SpoolmanSpool)
-        self.load_spools()
 
         grid = Gtk.Grid()
         grid.set_column_homogeneous(True)
@@ -32,6 +30,7 @@ class Panel(ScreenPanel, MmuMixin):
 
         mmu = self._printer.get_stat("mmu")
         num_gates = len(mmu['gate_status'])
+        self.ui_sel_tool = 0
 
         for i in range(num_gates):
             status_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
@@ -103,42 +102,15 @@ class Panel(ScreenPanel, MmuMixin):
 
 
     def activate(self):
-        self.is_running = True
-        self._spool_refresh_timer_id = GLib.timeout_add_seconds(10, self.load_spools)
-        self.load_spools()
+        self.spoolman_start_polling(callback=self.refresh, interval=10)
 
 
     def deactivate(self):
-        self.is_running = False
-        if getattr(self, "_spool_refresh_timer_id", None):
-            GLib.source_remove(self._spool_refresh_timer_id)
-            self._spool_refresh_timer_id = None
-
-
-    def load_spools(self, *args):
-        hide_archived = self._config.get_config().getboolean(
-            "spoolman", "hide_archived", fallback=True
-        )
-        self._screen.spoolman_api.load_all_spools(
-            allow_archived=not hide_archived, callback=self._load_spools_cb
-        )
-        return True
-
-
-    def _load_spools_cb(self, spools):
-        if not spools:
-            self._screen.show_popup_message(_("Error trying to fetch spoolman spools"))
-            return
-
-        self.spools.clear()
-        for spool in spools:
-            spoolObject = SpoolmanSpool(**spool)
-            self.spools[str(spoolObject.id)] = spoolObject
-
-        self.refresh()
+        self.spoolman_stop_polling()
 
 
     def refresh(self):
+        logging.info(f"PAUL: mmu_spoolman.refresh()")
         self.gate_tool_map = self.build_gate_tool_map()
         mmu = self._printer.get_stat("mmu")
         gate_status = mmu['gate_status']

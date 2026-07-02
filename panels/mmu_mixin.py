@@ -12,9 +12,11 @@
 #
 # This file may be distributed under the terms of the GNU GPLv3 license.
 #
-
 import logging
-from gi.repository import Gdk
+
+from gi.repository   import Gdk, GLib
+
+from panels.spoolman import SpoolmanSpool
 
 
 TOOL_GATE_UNKNOWN = -1
@@ -411,6 +413,59 @@ class MmuMixin:
 
         i = gates.index(gate)
         return gates[i:] + gates[:i]
+
+
+# -------------------------------------------------------------------------------------------
+# Spoolman spool retriaval and updates
+# -------------------------------------------------------------------------------------------
+
+    def spoolman_start_polling(self, callback=None, interval=10):
+        logging.info(f"PAUL: spoolman_start_polling({callback}, {interval})")
+        self.spoolman_stop_polling()
+        self._spoolman_callback = callback
+        if not getattr(self, "spools", None):
+            self.spools={}
+        if interval is not None:
+            self._spoolman_refresh_timer_id = GLib.timeout_add_seconds(interval, self.spoolman_load_spools)
+        else:
+            self._spoolman_refresh_timer_id = None
+        self.spoolman_load_spools()
+
+
+    def spoolman_stop_polling(self):
+        logging.info(f"PAUL: spoolman_stop_polling()")
+        if getattr(self, "_spoolman_refresh_timer_id", None):
+            GLib.source_remove(self._spoolman_refresh_timer_id)
+            self._spoolman_refresh_timer_id = None
+
+
+    def spoolman_load_spools(self):
+        logging.info(f"PAUL: spoolman_load_spools()")
+        # Use spoolman config on whether to get archived spools
+        # TODO maybe this should be fixed to True for effeciency?
+        hide_archived = self._config.get_config().getboolean(
+            "spoolman", "hide_archived", fallback=True
+        )
+        self._screen.spoolman_api.load_all_spools(
+            allow_archived=not hide_archived, callback=self._spoolman_load_spools_cb
+        )
+        return True
+
+
+    def _spoolman_load_spools_cb(self, spools):
+        logging.info("PAUL: _spoolman_load_spools_cb")
+        if not spools:
+            self._screen.show_popup_message(_("Error trying to fetch spoolman spools"))
+            return
+
+        self.spools.clear()
+        for spool in spools:
+            spoolObject = SpoolmanSpool(**spool)
+            self.spools[str(spoolObject.id)] = spoolObject
+
+        if self._spoolman_callback is not None:
+            logging.info(f"PAUL: CALLING {self._spoolman_callback}")
+            self._spoolman_callback()
 
 
 # -------------------------------------------------------------------------------------------

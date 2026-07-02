@@ -32,6 +32,9 @@ class Panel(ScreenPanel, MmuMixin):
     def __init__(self, screen, title):
         super().__init__(screen, title)
 
+        # Updated by mixin spoolman refresh
+        self.spools = {}
+
         # We need to keep track of just a little bit of UI state
         self.ui_runout_mark = 0.
         self.min_tool = TOOL_GATE_BYPASS
@@ -315,6 +318,7 @@ class Panel(ScreenPanel, MmuMixin):
 
 
     def activate(self):
+        logging.info(f"PAUL: mmu_main.activate()")
         self.config_update()
         self.update_status()
         self.update_filament_status()
@@ -324,6 +328,13 @@ class Panel(ScreenPanel, MmuMixin):
             gate = mmu['gate']
             if gate != TOOL_GATE_UNKNOWN:
                 self.labels['spool_tray'].scroll_gate_into_view(gate, center=True)
+
+        self.spoolman_start_polling(callback=self.process_spoolman_update, interval=10) # PAUL make 60
+
+
+    def deactivate(self):
+        logging.info(f"PAUL: mmu_main.deactivate()")
+        self.spoolman_stop_polling()
 
 
     def post_attach(self):
@@ -485,6 +496,10 @@ class Panel(ScreenPanel, MmuMixin):
                 msg += "\n\nI'll bet this will work out for you :-)"
                 self._screen.show_popup_message(msg, 3, save=True)
                 logging.exception("MMU: KeyError")
+
+
+    def process_spoolman_update(self):
+        logging.info(f"PAUL: ******************************************* process_spoolman_update")
 
 
     def init_tool_value(self):
@@ -1835,20 +1850,26 @@ class MmuSpoolTray(Gtk.DrawingArea):
 
     def _draw_gate_status(self, cr, item, cx, tray_top, tray_h, slot_w, spool_h):
         badge_w = min(slot_w * 0.72, spool_h * 0.42)
-        badge_h = min(tray_h * 0.42, spool_h * 0.18)
+
+        # Less tall than before.
+        badge_h = min(tray_h * 0.30, spool_h * 0.13)
+
+        # Sit a little lower than before.
+        badge_y = tray_top + tray_h * 0.48 # PAUL was 0.38
         badge_x = cx - badge_w / 2
-        badge_y = tray_top + tray_h * 0.28
-        radius = badge_h * 0.25
+        radius = badge_h * 0.22
 
         selected_fill = (0.30, 1.00, 0.10)
         transparent_fill = (0, 0, 0, 0)
 
         if item["gate"] == TOOL_GATE_BYPASS:
-            label = "Byp"
+            badge_label = "Byp"
+            tool_label = ""
             fill_rgba = (*selected_fill, 1.0) if item["selected"] else transparent_fill
             stroke_rgb = None
         else:
-            label = str(item["gate"])
+            badge_label = str(item["gate"])
+            tool_label = self._panel.get_tools_for_gate_str(item["gate"])
             fill_rgba = (*selected_fill, 1.0) if item["selected"] else transparent_fill
 
             if item["status"] in (GATE_AVAILABLE, GATE_AVAILABLE_FROM_BUFFER):
@@ -1858,27 +1879,53 @@ class MmuSpoolTray(Gtk.DrawingArea):
             else:
                 stroke_rgb = (1.00, 0.55, 0.05)
 
-        self._draw_rounded_rect(cr, badge_x, badge_y, badge_w, badge_h, radius, fill_rgb=fill_rgba, stroke_rgb=stroke_rgb, stroke_width=2)
+        style = self.get_style_context()
+        fg = style.get_color(Gtk.StateFlags.NORMAL)
+
+        # Tool text above badge, e.g. T0, T11, T3+
+        if tool_label:
+            cr.save()
+            cr.select_font_face("Sans", cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_NORMAL)
+            tool_font_size = max(7, min(spool_h * 0.105, slot_w * 0.34))
+            cr.set_font_size(tool_font_size)
+            xb, yb, tw, th, xa, ya = cr.text_extents(tool_label)
+
+            badge_gap = spool_h * 0.045 # Space between tool text and badge
+            tool_y = badge_y - th - badge_gap
+            cr.set_source_rgba(fg.red, fg.green, fg.blue, fg.alpha)
+            cr.move_to(cx - tw / 2 - xb, tool_y - yb)
+            cr.show_text(tool_label)
+            cr.restore()
+
+        self._draw_rounded_rect(
+            cr,
+            badge_x,
+            badge_y,
+            badge_w,
+            badge_h,
+            radius,
+            fill_rgb=fill_rgba,
+            stroke_rgb=stroke_rgb,
+            stroke_width=2,
+        )
 
         cr.select_font_face("Sans", cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_BOLD)
-        font_size = max(8, min(badge_h * 0.68, spool_h * 0.12))
+        font_size = max(7, min(badge_h * 0.62, spool_h * 0.09))
         cr.set_font_size(font_size)
 
-        xb, yb, tw, th, xa, ya = cr.text_extents(label)
+        xb, yb, tw, th, xa, ya = cr.text_extents(badge_label)
 
         if item["selected"]:
-            # Black text on bright green background.
             cr.set_source_rgb(0.0, 0.0, 0.0)
         else:
-            style = self.get_style_context()
-            fg = style.get_color(Gtk.StateFlags.NORMAL)
             cr.set_source_rgba(fg.red, fg.green, fg.blue, fg.alpha)
 
         cr.move_to(
             cx - tw / 2 - xb,
             badge_y + badge_h / 2 - th / 2 - yb,
         )
-        cr.show_text(label)
+        cr.show_text(badge_label)
+
 
 
     # ---------------------------------------------------------------------------
@@ -2500,10 +2547,10 @@ class MmuSpoolDetails(Gtk.Box):
 
         spool = self._spoolman_spool(spool_id)
 
-        vendor = spool.get("vendor") or "Unknown"
+        vendor = spool.get("vendor") or "Unknown vendor"
         description = spool.get("description") or filament_name or "Unknown"
 
-        line1 = f"{gate} | {vendor}"
+        line1 = f"{vendor}"
         line2 = description
 
         line3_parts = []

@@ -22,8 +22,7 @@ gi.require_version("Gtk", "3.0")
 from gi.repository import Gtk, Gdk, GLib, Pango
 from ks_includes.screen_panel import ScreenPanel
 from panels.mmu_mixin import *
-
-NOT_SET = -99
+from panels.mmu_gauges import *
 
 
 class Panel(ScreenPanel, MmuMixin):
@@ -31,14 +30,21 @@ class Panel(ScreenPanel, MmuMixin):
     def __init__(self, screen, title):
         super().__init__(screen, title)
 
+        # Updated by mixin spoolman refresh
+        self.spools = {}
+
         # We need to keep track of just a little bit of UI state
         self.ui_runout_mark = 0.
-        self.ui_sel_tool = NOT_SET
         self.min_tool = TOOL_GATE_BYPASS
         self._last_sync_feedback_bias_rounded = -9.9
 
         self._select_gate_timer = None
         self._select_gate_delay_ms = 700
+
+        self.ui_sel_tool = NOT_SET
+        self.init_tool_value()
+
+        self.config_update() # Get preferences
 
         # btn_states: The "gaps" are what functionality the state takes away. Multiple states are combined
         self.btn_states = {
@@ -58,7 +64,7 @@ class Panel(ScreenPanel, MmuMixin):
             'disabled':        [                                                                                                              ],
         }
 
-        self.labels = {
+        self.labels = l = {
             'check_gates': self._gtk.Button('mmu_checkgates', "Gates", 'color1'),
             'manage': self._gtk.Button('mmu_manage', "Manage...",'color2'),
             't_decrease': self._gtk.Button('decrease', None, scale=self.bts * 1.2),
@@ -73,179 +79,258 @@ class Panel(ScreenPanel, MmuMixin):
             'extrude': self._gtk.Button('extrude', 'Extrude...', 'color4'),
             'more': self._gtk.Button('mmu_more', 'More...', 'color1'),
             'tool_icon': self._gtk.Image('mmu_extruder', self._gtk.img_width * 0.8, self._gtk.img_height * 0.8),
-            'tool_label': Gtk.Label('Unknown'),
+            'tool_label': Gtk.Label('T?'),
             'filament': Gtk.Label('Filament: Unknown'),
-            'unit_label': Gtk.Label('Unit0'),
             'select_bypass_img': self._gtk.Image('mmu_select_bypass'), # Alternative for tool
             'load_bypass_img': self._gtk.Image('mmu_load_bypass'),     # Alternative for picker
             'unload_bypass_img': self._gtk.Image('mmu_unload_bypass'), # Alternative for unload/eject
             'eject_img': self._gtk.Image('mmu_eject'),                 # Alternative for unload button to fully eject
             'sync_drive_img': self._gtk.Image('mmu_synced_extruder', self._gtk.img_width * 0.8, self._gtk.img_height * 0.8), # Alternative for tool_icon
         }
-        self.labels['unload_img'] = self.labels['unload'].get_image()
-        self.labels['tool_img'] = self.labels['tool'].get_image()
-        self.labels['tool_picker_img'] = self.labels['picker'].get_image()
-        self.labels['tool_icon_pixbuf'] = self.labels['tool_icon'].get_pixbuf()
-        self.labels['sync_drive_pixbuf'] = self.labels['sync_drive_img'].get_pixbuf()
+        l['unload_img'] = l['unload'].get_image()
+        l['tool_img'] = l['tool'].get_image()
+        l['tool_picker_img'] = l['picker'].get_image()
+        l['tool_icon_pixbuf'] = l['tool_icon'].get_pixbuf()
+        l['sync_drive_pixbuf'] = l['sync_drive_img'].get_pixbuf()
 
-        self.labels['check_gates'].connect("clicked", self.select_check_gates)
-        self.labels['manage'].connect("clicked", self.menu_item_clicked, {"panel": "mmu_manage", "name": "MMU Manage"})
-        self.labels['t_decrease'].connect("clicked", self.select_tool, -1)
-        self.labels['tool'].connect("clicked", self.select_tool, 0)
-        self.labels['t_increase'].connect("clicked", self.select_tool, 1)
-        self.labels['picker'].connect("clicked", self.select_picker)
-        self.labels['unload'].connect("clicked", self.select_unload_eject)
-        self.labels['pause'].connect("clicked", self.select_pause)
-        self.labels['message'].connect("clicked", self.select_message)
-        self.labels['unlock'].connect("clicked", self.select_unlock)
-        self.labels['resume'].connect("clicked", self.select_resume)
-        self.labels['extrude'].connect("clicked", self.menu_item_clicked, {"panel": "extrude", "name": "Extrude"})
-        self.labels['more'].connect("clicked", self._screen._go_to_submenu, "mmu")
+        l['check_gates'].connect("clicked", self.select_check_gates)
+        l['manage'].connect("clicked", self.menu_item_clicked, {"panel": "mmu_manage", "name": "MMU Manage"})
+        l['manage'].set_vexpand(False)
+        l['t_decrease'].connect("clicked", self.select_tool, -1)
+        l['tool'].connect("clicked", self.select_tool, 0)
+        l['t_increase'].connect("clicked", self.select_tool, 1)
+        l['picker'].connect("clicked", self.select_picker)
+        l['unload'].connect("clicked", self.select_unload_eject)
+        l['pause'].connect("clicked", self.select_pause)
+        l['message'].connect("clicked", self.select_message)
+        l['unlock'].connect("clicked", self.select_unlock)
+        l['resume'].connect("clicked", self.select_resume)
+        l['extrude'].connect("clicked", self.menu_item_clicked, {"panel": "extrude", "name": "Extrude"})
+        l['more'].connect("clicked", self._screen._go_to_submenu, "mmu")
 
-        self.labels['t_increase'].set_hexpand(False)
-        self.labels['t_increase'].get_style_context().add_class("mmu_sel_increase")
-        self.labels['t_decrease'].set_hexpand(False)
-        self.labels['t_decrease'].get_style_context().add_class("mmu_sel_decrease")
+        l['t_increase'].set_hexpand(False)
+        l['t_increase'].get_style_context().add_class("mmu_sel_increase")
+        l['t_decrease'].set_hexpand(False)
+        l['t_decrease'].get_style_context().add_class("mmu_sel_decrease")
 
-        self.labels['manage'].get_style_context().add_class("mmu_manage_button")
-        self.labels['manage'].set_valign(Gtk.Align.CENTER)
-        self.labels['tool_icon'].get_style_context().add_class("mmu_tool_image")
-        self.labels['tool_label'].get_style_context().add_class("mmu_tool_text")
-        self.labels['tool_label'].set_xalign(0)
-        self.labels['filament'].set_xalign(0)
-        self.labels['unit_label'].set_xalign(1)
-        self.labels["unit_label"].get_style_context().add_class("mmu_unit_text")
+        l['tool_icon'].get_style_context().add_class("mmu_tool_image")
+        l['tool_label'].get_style_context().add_class("mmu_tool_text")
+        l['tool_label'].set_xalign(0)
+        l['filament'].set_xalign(0)
 
-        # In print Encoder guage ---------
-        encoder_gauge = EncoderDialGauge()
-        self.labels['encoder_gauge'] = encoder_gauge
+        # Notebook corner "layers" ---------------------------------
 
-        encoder_frame = Gtk.Frame()
-        self.labels['encoder_frame'] = encoder_frame
-        encoder_frame.set_label("FlowGuard")
-        encoder_frame.set_label_align(0.5, 0)
-        encoder_frame.add(encoder_gauge)
-
-        # In print sync-feedback flowguard  guage ---------
-        flowguard_gauge = FlowGuardDialGauge()
-        self.labels['flowguard_gauge'] = flowguard_gauge
-
-        flowguard_frame = Gtk.Frame()
-        self.labels['flowguard_frame'] = flowguard_frame
-        flowguard_frame.set_label("FlowGuard")
-        flowguard_frame.set_label_align(0.5, 0)
-        flowguard_frame.add(flowguard_gauge)
-
-        # MMU Manage screen ---------
-        manage_grid = Gtk.Grid()
-        manage_grid.set_column_homogeneous(True)
-
-# No need for this now - status self scales
-#        mmu = self._printer.get_stat("mmu")
-#        num_gates = len(mmu['gate_status'])
-#        if num_gates > 9:
-#            manage_grid.attach(Gtk.Label(),           0, 0, 1, 3)
-#            manage_grid.attach(self.labels['manage'], 1, 0, 2, 3)
-#        else:
-#            manage_grid.attach(self.labels['manage'], 0, 0, 3, 3)
-        manage_grid.attach(self.labels['manage'], 0, 0, 3, 3)
-
-        # Notebook layers for three possible uses of top right corner ----------
         notebook_corner = Gtk.Notebook()
-        self.labels['notebook_corner'] = notebook_corner
+        l['notebook_corner'] = notebook_corner
         notebook_corner.set_show_tabs(False)
-        notebook_corner.insert_page(manage_grid, None, 0)
-        notebook_corner.insert_page(self._clickable_page(flowguard_frame), None, 1)
-        notebook_corner.insert_page(self._clickable_page(encoder_frame), None, 2)
+        page = 0
+
+        notebook_overlay = Gtk.Overlay()
+        l['notebook_overlay'] = notebook_overlay
+        notebook_overlay.add(notebook_corner)
+        next_label = Gtk.Label(label=">>>")
+        l['notebook_corner_next'] = next_label
+        next_label.set_size_request(24, 24)
+        next_label.set_halign(Gtk.Align.END)
+        next_label.set_valign(Gtk.Align.END)
+        next_label.set_margin_end(4)
+        next_label.set_margin_bottom(8)
+        next_label.set_opacity(0.65)
+        notebook_overlay.add_overlay(next_label)
+        notebook_overlay.set_overlay_pass_through(next_label, True)
+
+        # Manage frame
+        manage_grid = Gtk.Grid()
+        manage_grid.set_vexpand(True)
+        manage_grid.set_column_homogeneous(True)
+        manage_grid.set_row_homogeneous(False)
+        manage_grid.attach(l['manage'], 1, 0, 6, 1)
+        manage_grid.attach(Gtk.Label(), 0, 1, 6, 1)
+        l['manage_frame'] = manage_frame = Gtk.Frame()
+        manage_frame.set_label("Unit0")
+        manage_frame.set_label_align(0.6, 0)
+        manage_frame.add(manage_grid)
+        notebook_corner.insert_page(self._clickable_page(manage_frame), None, page)
+        page += 1
+
+        # In print Encoder gauge
+        if self.has_encoder():
+            l['encoder_gauge'] = encoder_gauge = EncoderDialGauge()
+            l['encoder_frame'] = encoder_frame = Gtk.Frame()
+            encoder_frame.set_label("Encoder")
+            encoder_frame.set_label_align(0.5, 0)
+            encoder_frame.add(encoder_gauge)
+            notebook_corner.insert_page(self._clickable_page(encoder_frame), None, page)
+            page += 1
+
+        # In print sync-feedback flowguard gauge
+        if self.has_buffer():
+            l['flowguard_gauge'] = flowguard_gauge = FlowGuardDialGauge()
+            l['flowguard_frame'] = flowguard_frame = Gtk.Frame()
+            flowguard_frame.set_label("FlowGuard")
+            flowguard_frame.set_label_align(0.5, 0)
+            flowguard_frame.add(flowguard_gauge)
+            notebook_corner.insert_page(self._clickable_page(flowguard_frame), None, page)
+            page += 1
+
+        # Selected spool details
+        l['spool_details'] = spool_details = MmuSpoolDetails(self._printer, self)
+        l['spool_details_frame'] = spool_details_frame = Gtk.Frame()
+        spool_details_frame.set_label("Spool Details")
+        spool_details_frame.set_label_align(0.5, 0)
+        spool_details_frame.add(spool_details)
+        notebook_corner.insert_page(self._clickable_page(spool_details_frame), None, page)
+        page += 1
+
         notebook_corner.set_current_page(0)
+        next_label.set_text(self._notebook_page_indicator(0, page))
 
-        # TextView has problems in this use case so use 5 separate labels... Simple!
-        status_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
-        for i in range(5):
-            name = (f'status{i+1}')
-            label = Gtk.Label()
-            self.labels[name] = label
-            label.get_style_context().add_class("mmu_unicode_mono")
-            label.set_xalign(0)
-            if i < 4:
-                label.get_style_context().add_class("mmu_status")
-                status_box.pack_start(label, False, True, 0)
-            else:
-                label.get_style_context().add_class("mmu_status_filament")
 
-        top_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
-        top_box.pack_start(self.labels['tool_icon'], False, True, 0)
-        top_box.pack_start(self.labels['tool_label'], True, True, 0)
-        top_box.pack_start(self.labels['filament'], True, True, 0)
-        top_box.pack_start(self.labels['unit_label'], False, True, 12)
-
+        # Pause button "layers" ------------------------------------
         pause_layer = Gtk.Notebook()
-        self.labels['pause_layer'] = pause_layer
+        l['pause_layer'] = pause_layer
         pause_layer.set_show_tabs(False)
         pause_layer.insert_page(self.labels['pause'], None, 0)
         pause_layer.insert_page(self.labels['message'], None, 1)
 
-        top_grid = Gtk.Grid()
-        top_grid.set_vexpand(False)
-        top_grid.set_column_homogeneous(True)
-        top_grid.attach(top_box,                0, 0,  9, 1)
-        top_grid.attach(notebook_corner,        9, 0,  3, 3)
-        top_grid.attach(status_box,             0, 1, 10, 1) # Should be 9, not 10 (but this prevents screen expansion)
-        top_grid.attach(self.labels['status5'], 0, 2, 12, 1) # Allows filament line line to extend
 
-        tool_grid = Gtk.Grid()
-        tool_grid.set_column_homogeneous(False)
-        tool_grid.attach(self.labels['t_decrease'], 0, 0, 1, 1)
-        tool_grid.attach(self.labels['tool'],       1, 0, 1, 1)
-        tool_grid.attach(self.labels['t_increase'], 2, 0, 1, 1)
+        # Assemble "classic" view --------------------------------------
 
-        main_grid = Gtk.Grid()
-        main_grid.set_vexpand(True)
-        main_grid.set_column_homogeneous(True)
-        main_grid.attach(tool_grid,                   0, 0, 6, 1)
-        main_grid.attach(self.labels['picker'],       6, 0, 2, 1)
-        main_grid.attach(self.labels['unload'],       8, 0, 2, 1)
-        main_grid.attach(self.labels['check_gates'], 10, 0, 2, 1)
-        main_grid.attach(self.labels['pause_layer'],  0, 1, 3, 1)
-        main_grid.attach(self.labels['unlock'],       3, 1, 2, 1)
-        main_grid.attach(self.labels['resume'],       5, 1, 2, 1)
-        main_grid.attach(self.labels['extrude'],      7, 1, 2, 1)
-        main_grid.attach(self.labels['more'],         9, 1, 3, 1)
+        if not self.show_spool_tray:
 
-        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
-        box.pack_start(top_grid, False, True, 0)
-        box.add(main_grid)
-
-        scroll = self._gtk.ScrolledWindow()
-        scroll.add(box)
-        self.content.add(scroll)
-
-        # Was in activate() but now process_update can occur before activate() !?
-        self.ui_sel_tool = NOT_SET
-        self.init_tool_value()
-        self.config_update()
+            # Top line status ------------------------------------------
+            top_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+            top_box.pack_start(l['tool_icon'], False, True, 0)
+            top_box.pack_start(l['tool_label'], True, True, 0)
+            top_box.pack_start(l['filament'], True, True, 0)
 
 
-    def _next_notebook_corner_page(self, widget, event):
-        notebook = self.labels["notebook_corner"]
-        if self.has_buffer() and self.has_encoder():
-            # Toggle flowguard monitor dials (unlikely user will have both)
-            page = notebook.get_current_page()
-            notebook.set_current_page(2 if page == 1 else 1)
-        return True
+            # Main textual status area ---------------------------------
+
+            status_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
+            # TextView has problems in this use case so use 5 separate labels...
+            for i in range(5):
+                name = (f'status{i+1}')
+                label = Gtk.Label()
+                l[name] = label
+                label.get_style_context().add_class("mmu_unicode_mono")
+                label.set_xalign(0)
+                if i < 4:
+                    label.get_style_context().add_class("mmu_status")
+                    status_box.pack_start(label, False, True, 0)
+                else:
+                    l['filament_pos'] = label # Alias for status5
+                    label.get_style_context().add_class("mmu_status_filament")
 
 
-    def _clickable_page(self, child):
-        event_box = Gtk.EventBox()
-        event_box.add(child)
-        event_box.connect("button-press-event", self._next_notebook_corner_page)
-        return event_box
+            # Assemble upper section of panel ---------------------------
+
+            top_grid = Gtk.Grid()
+            top_grid.set_vexpand(False)
+            top_grid.set_column_homogeneous(True)
+
+            top_grid.attach(top_box,               0, 0,  9, 1)
+            top_grid.attach(l['notebook_overlay'], 9, 0,  3, 3)
+            top_grid.attach(status_box,            0, 1, 10, 1) # Should be 9, not 10 (but this prevents accidental screen expansion)
+            top_grid.attach(l['filament_pos'],     0, 2, 12, 1) # Allows filament line line to extend
+
+            # Assemble the two primary button rows ------------
+            tool_grid = Gtk.Grid()
+            tool_grid.set_column_homogeneous(False)
+            tool_grid.attach(l['t_decrease'],      0, 0, 1, 1)
+            tool_grid.attach(l['tool'],            1, 0, 1, 1)
+            tool_grid.attach(l['t_increase'],      2, 0, 1, 1)
+
+            main_grid = Gtk.Grid()
+            main_grid.set_vexpand(True)
+            main_grid.set_column_homogeneous(True)
+            main_grid.attach(tool_grid,            0, 0, 6, 1)
+            main_grid.attach(l['picker'],          6, 0, 2, 1)
+            main_grid.attach(l['unload'],          8, 0, 2, 1)
+            main_grid.attach(l['check_gates'],    10, 0, 2, 1)
+            main_grid.attach(l['pause_layer'],     0, 1, 3, 1)
+            main_grid.attach(l['unlock'],          3, 1, 2, 1)
+            main_grid.attach(l['resume'],          5, 1, 2, 1)
+            main_grid.attach(l['extrude'],         7, 1, 2, 1)
+            main_grid.attach(l['more'],            9, 1, 3, 1)
+
+            box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
+            box.pack_start(top_grid, False, True, 0)
+            box.add(main_grid)
+
+            scroll = self._gtk.ScrolledWindow()
+            scroll.add(box)
+            self.content.add(scroll)
+
+
+        # Assemble new "visual" view -----------------------------------
+
+        else:
+            # Popup action buttons --------
+            l['menu_select']  = self._gtk.Button('mmu_select_gate', 'Select',      'color1')
+            l['menu_check']   = self._gtk.Button('mmu_checkgates',  'Check Gates', 'color1')
+            l['menu_preload'] = self._gtk.Button('mmu_reset',       'Preload',     'color2')
+            l['menu_load']    = self._gtk.Button('mmu_load',        'Load',        'color2')
+            l['menu_unload']  = self._gtk.Button('mmu_unload',      'Unload',      'color3')
+            l['menu_eject']   = self._gtk.Button('mmu_eject',       'Eject',       'color3')
+
+            # Spool visualization --------
+            l['spool_tray'] = MmuSpoolTray(self._printer, self)
+            spool_frame = l['spool_frame'] = Gtk.Frame()
+            spool_frame.set_label("Filament: Unknown")
+            spool_frame.set_label_align(0.5, 0)
+            spool_frame.add(l['spool_tray'])
+
+            l['filament_pos'] = label = Gtk.Label()
+            label.get_style_context().add_class("mmu_unicode_mono")
+            label.get_style_context().add_class("mmu_status_filament")
+            label.set_xalign(0)
+
+            fil_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+            fil_row.pack_start(l['tool_label'], False, False, 0)
+            l['filament_pos'].set_hexpand(True)
+            l['filament_pos'].set_halign(Gtk.Align.FILL)
+            l['filament_pos'].set_xalign(0.0)      # Left-justify the text
+            fil_row.pack_start(l['filament_pos'], True, True, 0)
+            l['tool_icon'].set_margin_end(6)       # Right padding
+            fil_row.pack_end(l['tool_icon'], False, False, 0)
+
+            main_grid = Gtk.Grid()
+            main_grid.set_vexpand(True)
+            main_grid.set_column_homogeneous(True)
+
+            main_grid.attach(l['spool_frame'],      0,  0,  9,  5)
+            main_grid.attach(l['notebook_overlay'], 9,  0,  3,  5)
+            main_grid.attach(fil_row,               0,  5,  12, 1)
+            main_grid.attach(l['pause_layer'],      0,  6,  3,  2)
+            main_grid.attach(l['unlock'],           3,  6,  2,  2)
+            main_grid.attach(l['resume'],           5,  6,  2,  2)
+            main_grid.attach(l['extrude'],          7,  6,  2,  2)
+            main_grid.attach(l['more'],             9,  6,  3,  2)
+
+            # Precautionary - make area scrollable
+            scroll = self._gtk.ScrolledWindow()
+            scroll.add(main_grid)
+
+            self.content.add(scroll)
 
 
     def activate(self):
         self.config_update()
         self.update_status()
         self.update_filament_status()
+
+        if self.show_spool_tray:
+            mmu = self._printer.get_stat("mmu")
+            gate = mmu['gate']
+            if gate != TOOL_GATE_UNKNOWN:
+                self.labels['spool_tray'].scroll_gate_into_view(gate, center=True)
+
+        self.spoolman_start_polling(callback=self.process_spoolman_update, interval=60)
+
+
+    def deactivate(self):
+        self.spoolman_stop_polling()
 
 
     def post_attach(self):
@@ -257,6 +342,50 @@ class Panel(ScreenPanel, MmuMixin):
         self.markup_status = self._config.get_main_config().getboolean("mmu_color_gates", True)
         self.markup_filament = self._config.get_main_config().getboolean("mmu_color_filament", False)
         self.bold_filament = self._config.get_main_config().getboolean("mmu_bold_filament", False)
+        self.bold_filament = self._config.get_main_config().getboolean("mmu_bold_filament", False)
+        self.show_spool_tray = self._config.get_main_config().getboolean("mmu_spool_tray", True)
+
+
+    def _next_notebook_corner_page(self, widget=None, event=None):
+        notebook = self.labels["notebook_corner"]
+        next_label = self.labels["notebook_corner_next"]
+        page = notebook.get_current_page()
+        n_pages = notebook.get_n_pages()
+        pages = range(0, n_pages)
+        mmu = self._printer.get_stat("mmu")
+        mmu_print_state = mmu['print_state']
+        printing = mmu_print_state in ("started",  "printing")
+
+        for i in range(1, n_pages + 1):
+            candidate = (page + i) % n_pages
+            if candidate == 0 and printing:
+                continue
+
+            if self._is_clickable_page(notebook, candidate):
+                notebook.set_current_page(candidate)
+                next_label.set_text(self._notebook_page_indicator(candidate, n_pages))
+                break
+
+        return True
+
+
+    def _notebook_page_indicator(self, page, n_pages):
+        return "".join(
+            "●" if i == page else "○"
+            for i in range(n_pages)
+        )
+
+
+    def _is_clickable_page(self, notebook, page_num):
+        child = notebook.get_nth_page(page_num)
+        return isinstance(child, Gtk.EventBox)
+
+
+    def _clickable_page(self, child):
+        event_box = Gtk.EventBox()
+        event_box.add(child)
+        event_box.connect("button-press-event", self._next_notebook_corner_page)
+        return event_box
 
 
     def process_update(self, action, data):
@@ -267,7 +396,7 @@ class Panel(ScreenPanel, MmuMixin):
                 # v3 encoder
                 if self.has_encoder() and 'mmu_encoder mmu_encoder' in data: # There is only one mmu_encoder on v3
                     ee_data = data['mmu_encoder mmu_encoder']
-                    self.update_encoder(ee_data)
+                    self.update_encoder()
 
                 # v4 contains everything required in 'printer.mmu'
                 if 'mmu' in data:
@@ -300,18 +429,31 @@ class Panel(ScreenPanel, MmuMixin):
                     ):
                         self.update_flowguard()
 
+                    # Selected spool/filament details
+                    if (
+                        any(
+                            key in e_data
+                            for key in ('gate', 'gate_color', 'gate_filament_name', 'gate_material', 'gate_speed_override', 'gate_spool_id', 'gate_temperature', "endless_spool_groups")
+                        )
+                    ):
+                        self.update_spool_details()
+
                     # Tool, gate or maps
                     if any(
                         key in e_data
-                        for key in ('tool', 'gate', 'ttg_map', 'gate_status', 'gate_color')
+                        for key in ('tool', 'gate', 'ttg_map', 'gate_status', 'gate_color', 'espooler')
                     ):
                         self.update_status()
+
+                        # The spool tray may need to be scrolled so new gate is visible
+                        if self.show_spool_tray and 'gate' in e_data:
+                            self.labels['spool_tray'].scroll_gate_into_view(e_data['gate'])
 
                     if (
                         not filament_status_updated
                         or any(
                             key in e_data
-                            for key in ('tool', 'filament_pos', 'filament_direction', 'sensors')
+                            for key in ('tool', 'filament_pos', 'filament_direction', 'sensors', 'filament_remaining_color', 'filament_remaining')
                         )
                     ):
                         self.update_filament_status()
@@ -328,7 +470,7 @@ class Panel(ScreenPanel, MmuMixin):
 
                     if any(
                         key in e_data
-                        for key in ('action', 'print_state')
+                        for key in ('action', 'print_state', 'filament')
                     ):
                         ee_data = self.get_encoder_data()
                         if ee_data:
@@ -341,7 +483,7 @@ class Panel(ScreenPanel, MmuMixin):
 
                     self.update_active_buttons()
 
-            except KeyError as ke:
+            except KeyError:
                 # Almost certainly a version mismatch of Happy Hare on the printer
                 msg = "You are probably trying to connect to an incompatible"
                 msg += "\nversion of Happy Hare on your printer. Ensure Happy Hare"
@@ -349,7 +491,11 @@ class Panel(ScreenPanel, MmuMixin):
                 msg += "\nprinter, then make sure you restart Klipper."
                 msg += "\n\nI'll bet this will work out for you :-)"
                 self._screen.show_popup_message(msg, 3, save=True)
-                logging.info("Happy Hare: KeyError: %s" % str(ke))
+                logging.exception("MMU: KeyError")
+
+
+    def process_spoolman_update(self):
+        self.update_status()
 
 
     def init_tool_value(self):
@@ -480,12 +626,15 @@ class Panel(ScreenPanel, MmuMixin):
 
     def update_enabled(self):
         enabled = self._printer.get_stat('mmu', 'enabled')
-        for i in range(5):
-            name = (f'status{i+1}')
-            if enabled:
-                self.labels[name].get_style_context().remove_class("mmu_disabled_text")
-            else:
-                self.labels[name].get_style_context().add_class("mmu_disabled_text")
+        if not self.show_spool_tray:
+            for i in range(5):
+                name = (f'status{i+1}')
+                if enabled:
+                    self.labels[name].get_style_context().remove_class("mmu_disabled_text")
+                else:
+                    self.labels[name].get_style_context().add_class("mmu_disabled_text")
+        else:
+            self.labels["spool_frame"].set_sensitive(enabled)
 
 
     def update_tool(self):
@@ -497,10 +646,10 @@ class Panel(ScreenPanel, MmuMixin):
         filament = mmu['filament']
         if next_tool != TOOL_GATE_UNKNOWN:
             # Change in progress
-            text = ("T%d " % last_tool) if (last_tool >= 0 and last_tool != next_tool) else "Bypass " if last_tool == -2 else "Unknown " if last_tool == -1 else ""
+            text = ("T%d " % last_tool) if (last_tool >= 0 and last_tool != next_tool) else "Byp " if last_tool == -2 else "T? " if last_tool == -1 else ""
             text += ("> T%d" % next_tool) if next_tool >= 0 else ""
         else:
-            text = ("T%d " % tool) if tool >= 0 else "Bypass " if tool == -2 else "Unknown " if tool == -1 else ""
+            text = ("T%d " % tool) if tool >= 0 else "Byp " if tool == -2 else "T? " if tool == -1 else ""
         self.labels['tool_label'].set_text(text)
         if sync_drive:
             self.labels['tool_icon'].set_from_pixbuf(self.labels['sync_drive_pixbuf'])
@@ -570,9 +719,6 @@ class Panel(ScreenPanel, MmuMixin):
 
 
     def update_flowguard(self):
-        if self._printer.get_stat("print_stats")['state'] != "printing":
-            return
-
         mmu = self._printer.get_stat("mmu")
         data = mmu['flowguard']
         flowrate = mmu["sync_feedback_flow_rate"]
@@ -582,23 +728,16 @@ class Panel(ScreenPanel, MmuMixin):
 
         # Update frame heading
         enabled = data['enabled']
-        active = data['active']
-        if not enabled:
-            mode_str = "FlowGuard"
-        elif active:
-            mode_str = "FlowGuard Active"
-        else:
-            mode_str = "FlowGuard Inactive"
-        self.labels['flowguard_frame'].set_label(f'{mode_str}')
         self.labels['flowguard_frame'].set_sensitive(enabled)
 
 
-    def update_encoder(self, data=None):
-        if self._printer.get_stat("print_stats")['state'] != "printing":
-            return
+    def update_encoder(self):
+        data = self.get_encoder_data()
+
+        # Encoder pos is displayed in filament position status
+        self.update_movement(data['encoder_pos'])
 
         mmu = self._printer.get_stat("mmu")
-        data = data or mmu['encoder']
         gauge = self.labels['encoder_gauge']
         gauge.update(data)
 
@@ -606,19 +745,22 @@ class Panel(ScreenPanel, MmuMixin):
         detection_mode = data['detection_mode']
         enabled = data['enabled']
         if detection_mode == 2:
-            mode_str = "Encoder (Clog Auto)"
+            mode_str = "Encoder (Auto)"
         elif detection_mode == 1:
-            mode_str = "Encoder (Clog Man)"
+            mode_str = "Encoder (Manual)"
         else:
-            mode_str = "Encoder Off"
+            mode_str = "Encoder (Off)"
         self.labels['encoder_frame'].set_label(f'{mode_str}')
         self.labels['encoder_frame'].set_sensitive(detection_mode and enabled)
 
-        # Encoder pos is displayed in filament position status
-        self.update_movement(data['encoder_pos'])
+
+    def update_spool_details(self):
+        mmu = self._printer.get_stat("mmu")
+        self.labels['spool_details'].set_gate(mmu['gate'])
 
 
     def update_movement(self, encoder_position=None):
+        # Supports classic and visual layouts
         mmu = self._printer.get_stat("mmu")
         print_state = mmu["print_state"]
         action = mmu["action"]
@@ -645,32 +787,52 @@ class Panel(ScreenPanel, MmuMixin):
         else:
             label = action
 
-        self.labels["filament"].set_label(label)
+        if self.show_spool_tray:
+            self.labels["spool_frame"].set_label(label)
+        else:
+            self.labels["filament"].set_label(label)
 
 
     def update_filament_status(self):
+        # Supports classic and visual layouts
         if self.markup_filament:
-            self.labels['status5'].set_markup(self.get_filament_text(markup=True, bold=self.bold_filament))
+            self.labels['filament_pos'].set_markup(self.get_filament_text(markup=True, bold=self.bold_filament))
         else:
-            self.labels['status5'].set_label(self.get_filament_text(bold=self.bold_filament))
+            self.labels['filament_pos'].set_label(self.get_filament_text(bold=self.bold_filament))
 
 
     def update_status(self, show_gate=None):
-        text, current_unit_name, multi_tool = self.get_status_text(show_gate=show_gate, markup=self.markup_status)
-        for i in range(4):
-            name = (f'status{i+1}')
-            if self.markup_status:
-                self.labels[name].set_markup(text[i])
-            else:
-                self.labels[name].set_label(text[i])
+        # Supports classic and visual layouts
 
-        self.labels['unit_label'].set_label(current_unit_name)
+        if not self.show_spool_tray:
+            text, current_unit_name, multi_tool = self.get_status_text(show_gate=show_gate, markup=self.markup_status)
+            for i in range(4):
+                name = (f'status{i+1}')
+                if self.markup_status:
+                    self.labels[name].set_markup(text[i])
+                else:
+                    self.labels[name].set_label(text[i])
+
+            self.labels['manage_frame'].set_label(current_unit_name)
+        else:
+            self.labels['spool_tray'].refresh()
+
+            # Update unit name
+            mmu = self._printer.get_stat("mmu")
+            mmu_machine = self._printer.get_stat("mmu_machine")
+            unit_index = mmu.get("unit")
+            unit = mmu_machine.get(f"unit_{unit_index}")
+            if unit:
+                current_unit_name = unit.get("display_name") or unit.get("name")
+                current_unit_name = current_unit_name[:1].upper() + current_unit_name[1:]
+                self.labels['manage_frame'].set_label(current_unit_name)
 
 
     # Dynamically update button sensitivity based on state
     def update_active_buttons(self):
         mmu = self._printer.get_stat("mmu")
         mmu_print_state = mmu['print_state']
+        printing = mmu_print_state in ("started",  "printing")
         enabled = mmu['enabled']
         tool = mmu['tool']
         action = mmu['action']
@@ -701,14 +863,14 @@ class Panel(ScreenPanel, MmuMixin):
             if not self._screen.have_last_popup_message():
                 ui_state.append("no_message")
 
-            page = 0 # Manage recovery button
-            if "printing" in ui_state:
-                page = self.labels['notebook_corner'].get_current_page()
-                if page == 0 and self.has_buffer():
-                    page = 1 # Flowguard display
-                elif page == 0 and self.has_encoder():
-                    page = 2 # Encoder display
-            self.labels['notebook_corner'].set_current_page(page)
+            # Adjust "notebook corner" if necessary
+            notebook = self.labels['notebook_corner']
+            page = notebook.get_current_page()
+            if page == 0 and printing:
+                # Get off manage button (which is hidden in print)
+                # Call twice to prefer one of the possible flowguard monitors
+                self._next_notebook_corner_page()
+                self._next_notebook_corner_page()
 
             if ("paused" not in ui_state and "pause_locked" not in ui_state) or "no_message" in ui_state:
                 self.labels['pause_layer'].set_current_page(0) # Pause button
@@ -738,25 +900,9 @@ class Panel(ScreenPanel, MmuMixin):
         self.update_tool_buttons(tool_sensitive)
 
 
-    def get_rgb_color(self, gate_color):
-        if gate_color and len(gate_color) == 8:
-            try:
-                int(gate_color, 16)
-                gate_color = gate_color[:6]
-            except ValueError:
-                pass
-        color = Gdk.RGBA()
-        if not Gdk.RGBA.parse(color, gate_color.lower() if gate_color else ""):
-            if not Gdk.RGBA.parse(color, '#' + gate_color if gate_color else ""):
-                return ""
-        rgb_color = "#{:02x}{:02x}{:02x}".format(int(color.red * 255), int(color.green * 255), int(color.blue * 255))
-        return rgb_color
-
-
     def get_status_text(self, show_gate=None, markup=False):
         mmu = self._printer.get_stat("mmu")
         gate_status = mmu['gate_status']
-        tool_to_gate_map = mmu['ttg_map']
         gate_selected = mmu['gate']
         tool_selected = mmu['tool']
         gate_color = mmu['gate_color']
@@ -800,12 +946,13 @@ class Panel(ScreenPanel, MmuMixin):
             num_gates = len(gate_status)
             current_unit_name = "Unit0"
 
-        # Trim displayed gates to the display limit
+        # Format unit name
         current_unit_name = current_unit_name[:1].upper() + current_unit_name[1:]
 
         if show_gate is None:
             show_gate = gate_selected
 
+        # Trim displayed gates to the display limit
         display_offset = 0
         if len(gate_indices) > display_limit:
             try:
@@ -854,7 +1001,7 @@ class Panel(ScreenPanel, MmuMixin):
 
             else:
                 # Regular gate
-                color = self.get_rgb_color(gate_color[g])
+                color = MmuUtils.get_rgb_color(gate_color[g])
                 filament_icon = ("█") if not markup or color == "" else (f"<span color='{color}'>█</span>")
                 msg_gates += ("│#%d " % g)[:4]
 
@@ -866,16 +1013,9 @@ class Panel(ScreenPanel, MmuMixin):
                     avail = "?"
                 msg_avail += f"│ {avail} "
 
-                # Find tool associated with gate
-                tool_str = ""
-                prefix = ""
-                for t in range(num_gates):
-                    if tool_to_gate_map[t] == g:
-                        if len(prefix) > 0: multi_tool = True
-                        tool_str += "%sT%d" % (prefix, t)
-                        prefix = "+"
-                if tool_str == "": tool_str = "   "
-                msg_tools += ("│%s " % tool_str)[:4]
+                # Find tool(s) associated with gate
+                tool_str = self.get_tools_for_gate_str(g)
+                msg_tools += f"│{tool_str:<3}"
 
             # Selected ("open") gate
             if gate_selected == g:
@@ -915,6 +1055,12 @@ class Panel(ScreenPanel, MmuMixin):
         gate = mmu["gate"]
         gate_color = mmu["gate_color"]
 
+        # Old filament color in extruder if information is available
+        if mmu.get("filament_remaining"):
+            residual_filament_color = mmu.get("filament_remaining_color")
+        else:
+            residual_filament_color = ""
+
         unit = self.get_mmu_unit(gate)
         cs = None
         if unit is not None:
@@ -923,6 +1069,8 @@ class Panel(ScreenPanel, MmuMixin):
         if not cs:
             # V3...
             cs = self._printer.get_config_section("mmu")
+        if not cs:
+            return "Unknown"
         gate_homing_endstop = cs.get("gate_homing_endstop")
         if gate_homing_endstop is None:
             raise KeyError("gate_homing_endstop not found in mmu_parameters or mmu config")
@@ -931,6 +1079,7 @@ class Panel(ScreenPanel, MmuMixin):
         gate_mark = "┤"
         empty_sensor = "◯"
         trig_sensor = "◉"
+        residual_line = "═"
 
         if bold:
             home, line, arrow = "▌", "█", "▌"
@@ -970,6 +1119,8 @@ class Panel(ScreenPanel, MmuMixin):
         def nozzle_segment():
             if pos >= FILAMENT_POS_LOADED:
                 return arrow + home + "Nz" + arrow * 2
+            if residual_filament_color:
+                return residual_line + gate_mark + "Nz"
             return space + gate_mark + "Nz"
 
         def buffer_segment():
@@ -1001,12 +1152,14 @@ class Panel(ScreenPanel, MmuMixin):
 
         # Impl --------
 
-        if tool >= 0:
-            tool_text = f"T{tool} "[:3]
-        elif tool == TOOL_GATE_BYPASS:
-            tool_text = "BYPASS "
-        else:
-            tool_text = "T? "
+        tool_text = ""
+        if not self.show_spool_tray:
+            if tool >= 0:
+                tool_text = f"T{tool} "[:3]
+            elif tool == TOOL_GATE_BYPASS:
+                tool_text = "BYPASS "
+            else:
+                tool_text = "T? "
 
         bowden_length = max(1, 12 - len(tool_text))
         bowden_half = bowden_length // 2
@@ -1072,11 +1225,22 @@ class Panel(ScreenPanel, MmuMixin):
         if last_arrow != -1 and (last_home == -1 or not bold):
             visual = visual[:last_arrow] + arrow + visual[last_arrow + 1:]
 
+        # Post process filament color
         if markup and gate >= 0:
-            color = self.get_rgb_color(gate_color[gate])
-            if color:
-                visual = self._add_color_markup(visual, color, line)
+            if residual_filament_color:
+                rgb_hex = MmuUtils.get_rgb_color(residual_filament_color)
+                if rgb_hex:
+                    visual = self._add_color_markup(visual, rgb_hex, residual_line)
+            else:
+                # No special color treatment
+                visual = visual.replace(residual_line, line)
 
+            rgb_hex = MmuUtils.get_rgb_color(gate_color[gate])
+            if rgb_hex:
+                visual = self._add_color_markup(visual, rgb_hex, line)
+
+            # Get rid of special residual filament character
+            visual = visual.replace(residual_line, line)
         return visual
 
 
@@ -1106,411 +1270,1404 @@ class Panel(ScreenPanel, MmuMixin):
 
 
 # -------------------------------------------------------------------------------------------
-# ENCODER DIAL GUAGE
+# MMU SPOOL TRAY WIDGET
 # -------------------------------------------------------------------------------------------
 
-class EncoderDialGauge(Gtk.DrawingArea):
-    def __init__(self):
+class MmuSpoolTray(Gtk.DrawingArea):
+
+    def __init__(self, printer, panel):
         super().__init__()
+        self._printer = printer
+        self._panel = panel
+        self._items = None
 
-        self.value = 0.0
-        self.max_value = 30.0
-        self.desired_headroom = 10.0
-        self.min_headroom = 30.0
-        self.flowrate = None
+        # Spool images are always cached
+        self._spool_cache = {}
 
-        # Colors
-        self.green = (0.25, 0.60, 0.32)
-        self.amber = (0.78, 0.55, 0.16)
-        self.red   = (0.70, 0.20, 0.20)
-        self.white = (0.95, 0.95, 0.95)
-        self.grey  = (0.45, 0.45, 0.45)
+        # MMU unit display can optionally be cached
+        self._render_cache = None
+        self._render_cache_key = None
+        self._enable_render_cache = True
 
-        # Geometry / styling
-        self.arc_width = 10
-        self.needle_width = 4
-        self.marker_width = 4
-        self.hub_radius = 6
-        self.marker_inner_offset = 7
-        self.marker_outer_offset = 12
-        self.needle_inset = 12
+        # Pop-up menus support
+        self._hitboxes = []  # list of (gate, x, y, w, h)
+        self._popover = None
+        self._popover_timeout_id = None
 
-        self.arc_start_deg = -20.0
-        self.arc_sweep_deg = -140.0
 
-        self.set_size_request(50, 30)
-        self.set_hexpand(True)
-        self.set_vexpand(True)
+        # Drag scrolling
+        self._scroll_x = 0
+        self._drag_active = False
+        self._drag_start_x = 0
+        self._drag_start_y = 0
+        self._drag_start_scroll_x = 0
 
+        self.add_events(
+            Gdk.EventMask.BUTTON_PRESS_MASK |
+            Gdk.EventMask.BUTTON_RELEASE_MASK |
+            Gdk.EventMask.POINTER_MOTION_MASK |
+            Gdk.EventMask.SCROLL_MASK
+        )
+        self.connect("button-press-event", self._on_button_press)
+        self.connect("button-release-event", self._on_button_release)
+        self.connect("motion-notify-event", self._on_motion)
+        self.connect("scroll-event", self._on_scroll)
+
+        self.set_app_paintable(True)
         self.connect("draw", self._draw)
 
-    def update(self, data):
-        new_max = max(1.0, float(data.get("detection_length", 10.0)))
-        new_min = float(data.get("min_headroom", 0.0))
-        new_desired = float(data.get("desired_headroom", 5.0))
-        new_value = float(data.get("headroom", 0.0))
-        new_enabled = bool(data.get("enabled", False))
-        new_flowrate = float(data.get("flow_rate", 0.0))
+        # Pop-up menu construction ---------------
 
-        changed = (
-            abs(self.max_value - new_max) > 0.01 or
-            abs(self.min_headroom - new_min) > 0.01 or
-            abs(self.desired_headroom - new_desired) > 0.01 or
-            abs(self.value - new_value) > 0.05 or
-            self.enabled != new_enabled or
-            self.flowrate != new_flowrate
-        )
+        self._popover = Gtk.Popover.new(self)
+        self._popover.connect("show", self._on_popover_show)
+        self._popover.connect("closed", self._on_popover_closed)
+        self._popover.set_position(Gtk.PositionType.BOTTOM)
+        self._popover.set_border_width(0)
+        self._popover.get_style_context().add_class("mmu-popup")
 
-        if not changed:
-            return
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=3)
 
-        self.max_value = new_max
-        self.min_headroom = new_min
-        self.desired_headroom = new_desired
-        self.value = new_value
-        self.enabled = new_enabled
-        self.flowrate = new_flowrate
+        # Menu header
+        header = Gtk.EventBox()
+        header.get_style_context().add_class("mmu-popup-header")
+        self._popover_title = Gtk.Label()
+        self._popover_title.set_xalign(0.0)
+        header.add(self._popover_title)
 
+        box.pack_start(header, False, False, 0)
+
+        # Action buttons
+        button_grid = Gtk.Grid()
+        button_grid.set_row_spacing(4)
+        button_grid.set_column_spacing(4)
+        button_grid.set_margin_top(4)
+        button_grid.set_margin_bottom(4)
+        button_grid.set_margin_start(4)
+        button_grid.set_margin_end(4)
+        button_grid.set_column_homogeneous(True)
+
+        l = self._panel.labels
+        button_grid.attach(l['menu_select'],   0, 0, 1, 1)
+        button_grid.attach(l['menu_check'],    1, 0, 1, 1)
+        button_grid.attach(l['menu_preload'],  2, 0, 1, 1)
+        button_grid.attach(l['menu_load'],     0, 1, 1, 1)
+        button_grid.attach(l['menu_unload'],   1, 1, 1, 1)
+        button_grid.attach(l['menu_eject'],    2, 1, 1, 1)
+
+        self._popover_gate = None
+        l['menu_select'].connect( "clicked", self._on_gate_menu_clicked, "select")
+        l['menu_preload'].connect("clicked", self._on_gate_menu_clicked, "preload")
+        l['menu_load'].connect("clicked",    self._on_gate_menu_clicked, "load")
+        l['menu_unload'].connect("clicked",  self._on_gate_menu_clicked, "unload")
+        l['menu_eject'].connect("clicked",   self._on_gate_menu_clicked, "eject")
+        l['menu_check'].connect("clicked",   self._on_gate_menu_clicked, "check")
+
+        box.pack_start(button_grid, False, False, 0)
+        self._popover.add(box)
+        self._button_handlers = {}
+
+
+    def do_get_preferred_height(self):
+        return (72, 128) # minimum, natural
+
+
+    def refresh(self):
+        self._items = self._build_items()
         self.queue_draw()
 
-    def _clamp(self, value, low, high):
-        return max(low, min(high, value))
 
-    def _angle(self, value):
-        # left = max_value, right = 0, across the top
-        value = self._clamp(value, 0.0, self.max_value)
-        fraction = value / self.max_value
-        degrees = self.arc_start_deg + self.arc_sweep_deg * fraction
-        return math.radians(degrees)
+    def _build_items(self):
+        mmu = self._printer.get_stat("mmu")
+        gate_status = mmu["gate_status"]
+        gate_color = mmu["gate_color"]
+        gate_spool_id = mmu["gate_spool_id"]
+        selected_gate = mmu["gate"]
+        ttg_map = mmu["ttg_map"]
+        espooler = mmu.get("espooler") or [None] * len(gate_status)
 
-    def _color_for_headroom(self, value):
-        warning = self.desired_headroom
-        danger = self.desired_headroom / 2.0
+        def build_gate(g):
+            spool_id = gate_spool_id[g]
+            spool = self._panel.spools.get(str(spool_id))
+            percent = None
 
-        if value <= danger:
-            return self.red
-        if value <= warning:
-            return self.amber
-        return self.green
+            if spool:
+                remaining_weight = getattr(spool, "remaining_weight", 0)
+                total_weight = (
+                    getattr(spool, "initial_weight", None)
+                    or getattr(getattr(spool, "filament", None), "weight", 0)
+                    or 0
+                )
 
-    def _point_on_arc(self, cx, cy, radius, value):
-        a = self._angle(value)
-        return (
-            cx + radius * math.cos(a),
-            cy + radius * math.sin(a),
-        )
+                percent = (
+                    max(0, min(100, round(remaining_weight / total_weight * 100)))
+                    if total_weight > 0
+                    else 0
+                )
 
-    def _draw_arc(self, cr, cx, cy, r, start, end, color):
-        cr.set_source_rgb(*color)
-        cr.arc(cx, cy, r, self._angle(start), self._angle(end))
-        cr.stroke()
+            return self._gate_item(
+                gate=g,
+                tool=ttg_map[g],
+                status=gate_status[g],
+                color=gate_color[g],
+                selected_gate=selected_gate,
+                percent=percent,
+                espooler=espooler[g],
+            )
 
-    def _draw_marker(self, cr, cx, cy, r, value):
-        x1, y1 = self._point_on_arc(cx, cy, r + self.marker_inner_offset, value)
-        x2, y2 = self._point_on_arc(cx, cy, r + self.marker_outer_offset, value)
+        groups = []
 
-        cr.set_source_rgb(*self._color_for_headroom(value))
-        cr.set_line_width(self.marker_width)
-        cr.set_line_cap(cairo.LINE_CAP_ROUND)
-        cr.move_to(x1, y1)
-        cr.line_to(x2, y2)
-        cr.stroke()
+        if mmu.get("unit") is not None:
+            machine = self._printer.get_stat("mmu_machine")
+            has_bypass = False
 
-    def _draw_text_centered(self, cr, text, x, y):
-        ext = cr.text_extents(text)
-        cr.move_to(x - ext.width / 2, y)
-        cr.show_text(text)
+            for unit_index in range(machine["num_units"]):
+                unit = machine[f"unit_{unit_index}"]
+                first = unit["first_gate"]
+                count = unit["num_gates"]
+
+                group = [build_gate(g) for g in range(first, first + count)]
+
+                if unit.get("has_bypass", False):
+                    group.append(self._bypass_item(selected_gate))
+                    has_bypass = True
+
+                groups.append(group)
+
+            if not has_bypass:
+                groups.append([self._bypass_item(selected_gate)])
+
+        else:
+            groups.append([build_gate(g) for g in range(len(gate_status))])
+
+        return groups
+
+
+    def _gate_item(self, gate, tool, status, color, selected_gate, percent, espooler):
+        return {
+            "gate": gate,
+            "tool": tool,
+            "color": MmuUtils.get_rgb_color(color) or NO_FILAMENT_COLOR,
+            "empty": status == GATE_EMPTY,
+            "selected": gate == selected_gate,
+            "status": status,
+            "percent": percent,
+            "espooler": espooler,
+        }
+
+
+    def _bypass_item(self, selected_gate):
+        return {
+            "gate": TOOL_GATE_BYPASS,
+            "tool": TOOL_GATE_BYPASS,
+            "color": NO_FILAMENT_COLOR,
+            "empty": False,
+            "selected": selected_gate == TOOL_GATE_BYPASS,
+            "status": GATE_EMPTY,
+            "percent": None,
+            "espooler": None,
+        }
+
 
     def _draw(self, widget, cr):
-        w = self.get_allocated_width()
-        h = self.get_allocated_height()
+        alloc = self.get_allocation()
+        width = alloc.width
+        height = alloc.height
 
-        # Shape of arc (circle center and radius)
-        cx = w * 0.5
-        cy = h * 0.62 # 62% down
-        r = min(w * 0.40, h * 0.50)
+        if self._items is None:
+            self._items = self._build_items()
 
-        warning = self.desired_headroom
-        danger = self.desired_headroom / 2.0
+        groups = self._items
+        total_spools = sum(len(g) for g in groups)
+        if total_spools == 0:
+            return False
 
-        cr.set_line_width(self.arc_width)
-        cr.set_line_cap(cairo.LINE_CAP_ROUND)
+        layout = self._get_layout(width, height)
 
-        # Zones:
-        # max_value -> desired_headroom       = green
-        # desired_headroom -> desired / 2     = amber
-        # desired / 2 -> 0                    = red
-        self._draw_arc(cr, cx, cy, r, self.max_value, warning, self.green)
-        self._draw_arc(cr, cx, cy, r, warning, danger, self.amber)
-        self._draw_arc(cr, cx, cy, r, danger, 0.0, self.red)
+        spool_h = layout["spool_h"]
+        spool_w = layout["spool_w"]
+        tray_pad_ratio = layout["tray_pad_ratio"]
+        group_gap = layout["group_gap"]
+        margin = layout["margin"]
+        top_margin = layout["top_margin"]
+        bottom_margin = layout["bottom_margin"]
+        slot_w = layout["slot_w"]
+        scroll_pad = layout["scroll_pad"]
+        spool_cy = layout["spool_cy"]
+        tray_top = layout["tray_top"]
+        tray_h = layout["tray_h"]
 
-        # Endpoint labels
-        cr.set_source_rgb(*self.white)
-        cr.select_font_face("Sans", cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_NORMAL)
-        cr.set_font_size(14)
+        viewport_w = width - margin * 2
 
-        x, y = self._point_on_arc(cx, cy, r, self.max_value)
-        self._draw_text_centered(cr, f"{int(self.max_value)}", x, y + 24)
+        content_w = (
+            total_spools * slot_w +
+            max(0, len(groups) - 1) * group_gap +
+            scroll_pad * 2
+        )
 
-        x, y = self._point_on_arc(cx, cy, r, 0.0)
-        self._draw_text_centered(cr, "0", x, y + 24)
+        max_scroll_x = max(0, content_w - viewport_w)
+        self._scroll_x = max(0, min(self._scroll_x, max_scroll_x))
 
-        # Min headroom marker
-        self._draw_marker(cr, cx, cy, r, self.min_headroom)
+        # To make very efficient on rpi (paranoia), cache the entire render context
+        # and invalidate only when necessary. Caching can be disabled with by setting:
+        #   self._enable_render_cache = False
+        # Note: this key must be synced with every element that could cause need to
+        #       redraw in update_status() else the image can go stale.
+        key = (
+            width,
+            height,
+            round(self._scroll_x),
+            tuple(
+                tuple(
+                    (
+                        i["gate"],
+                        i["tool"],
+                        i["color"],
+                        i["empty"],
+                        i["selected"],
+                        i["status"],
+                        i["percent"],
+                        i["espooler"],
+                    )
+                    for i in group
+                )
+                for group in groups
+            ),
+        )
+        if self._render_cache is not None and self._render_cache_key == key:
+            cr.set_source_surface(self._render_cache, 0, 0)
+            cr.paint()
+            return False
 
-        # Needle
-        a = self._angle(self.value)
-        nx = cx + (r - self.needle_inset) * math.cos(a)
-        ny = cy + (r - self.needle_inset) * math.sin(a)
+        surface = cairo.ImageSurface(cairo.FORMAT_ARGB32, width, height)
+        cache_cr = cairo.Context(surface)
 
-        cr.set_source_rgb(*self._color_for_headroom(self.value))
-        cr.set_line_width(self.needle_width)
-        cr.set_line_cap(cairo.LINE_CAP_ROUND)
-        cr.move_to(cx, cy)
-        cr.line_to(nx, ny)
-        cr.stroke()
+        # Draw everything using cache_cr also rebuild self._hitboxes during this pass
+        self._hitboxes.clear()
 
-        cr.arc(cx, cy, self.hub_radius, 0, 2 * math.pi)
-        cr.fill()
+        spool_start_x = margin + scroll_pad - self._scroll_x
 
-        # Main value
-        cr.set_source_rgb(*self.white)
-        cr.select_font_face("Sans", cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_BOLD)
-        cr.set_font_size(16)
+        tray_rects = []
+        lid_rects = []
+        gate_badges = []
 
-        value_y = h * 0.40
-        self._draw_text_centered(cr, f"{self.value:.1f}", cx, value_y)
+        cache_cr.save()
+        cache_cr.rectangle(0, 0, width, height)
+        cache_cr.clip()
 
-        # Unit
-        cr.select_font_face("Sans", cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_NORMAL)
-        cr.set_font_size(12)
-        self._draw_text_centered(cr, "mm", cx, value_y + 12)
+        x = spool_start_x
 
-        # Gauge label
-        cr.set_font_size(14)
-        if not self.enabled:
-            cr.set_source_rgb(*self.grey)
-            text = "Disabled"
-        else:
-            cr.set_source_rgb(*self.white)
-            text = "Encoder"
-        self._draw_text_centered(cr, text, cx, cy - cr.text_extents(text).y_bearing + 14)
+        for group in groups:
+            group_start = x
+            group_w = slot_w * len(group)
 
-        # Flowrate / Trigger
-        if self.value <= 0:
-            cr.select_font_face("Sans", cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_BOLD)
-            cr.set_source_rgb(*self.red)
-            bottom_text = "CLOG / TANGLE"
-        elif self.flowrate is not None:
-            cr.set_source_rgb(*self.white)
-            bottom_text = f"Flowrate: {int(self.flowrate)}%"
-        else:
-            cr.set_source_rgb(*self.grey)
-            bottom_text = "Flowrate: --%"
-        self._draw_text_centered(cr, bottom_text, cx, cy - cr.text_extents(bottom_text).y_bearing + 34)
+            positioned_items = []
+
+            for item in group:
+                cx = x + slot_w / 2
+
+                # Lift selected spool upward from tray
+                selected_lift = spool_h * 0.05 if item["selected"] else 0
+                item_spool_cy = spool_cy - selected_lift
+
+                spool_x = cx - spool_w / 2 - 7
+                spool_y = item_spool_cy - spool_h / 2 - 7
+
+                # Use non-overlapping slot hitboxes, not full spool image hitboxes.
+                # The spools overlap visually, but each gate should own one click slot.
+                hitbox_x = x
+                hitbox_y = top_margin
+                hitbox_w = slot_w
+                hitbox_h = height - bottom_margin - hitbox_y
+
+                positioned_items.append((item, cx, item_spool_cy, spool_x, spool_y))
+
+                visible_x = max(0, hitbox_x)
+                visible_w = min(width, hitbox_x + hitbox_w) - visible_x
+
+                if visible_w > 0:
+                    self._hitboxes.append((item["gate"], visible_x, hitbox_y, visible_w, hitbox_h))
+
+                gate_badges.append((item, cx, tray_top, tray_h, slot_w, spool_h))
+
+                x += slot_w
+
+            # Draw right-to-left so leftward spools visually overlap correctly.
+            for item, cx, item_spool_cy, spool_x, spool_y in reversed(positioned_items):
+                self._draw_spool(
+                    cache_cr,
+                    cx,
+                    item_spool_cy,
+                    spool_w,
+                    spool_h,
+                    item["color"],
+                    empty=item["empty"],
+                    selected=item["selected"],
+                    percent=item.get("percent"),
+                    espooler=item.get("espooler"),
+                )
+
+            tray_pad = slot_w * tray_pad_ratio
+            tray_x = group_start - tray_pad
+            tray_w = group_w + tray_pad * 2
+
+            tray_rects.append((tray_x, tray_top, tray_w, tray_h))
+
+            lid_top = top_margin
+            lid_bottom = tray_top + tray_h * 0.15
+            lid_height = lid_bottom - lid_top
+
+            lid_rects.append((tray_x, lid_top, tray_w, lid_height, spool_h))
+
+            x += group_gap
+
+        # Draw glass lids after spools but before trays.
+        for rect in lid_rects:
+            self._draw_unit_lid(cache_cr, *rect)
+
+        # Draw trays in foreground so they cover the lower part of the spools.
+        for rect in tray_rects:
+            self._draw_tray(cache_cr, *rect)
+
+        # Draw gate badges on top of the tray.
+        for item, cx, tray_top, tray_h, slot_w, spool_h in gate_badges:
+            self._draw_gate_status(cache_cr, item, cx, tray_top, tray_h, slot_w, spool_h)
+
+        # Fade left/right edges when more content is available off-screen.
+        fade_w = slot_w * 0.40
+        fade_a = 0.95
+
+        # Introduce fade progressively
+        left_fade_a = fade_a * min(1.0, self._scroll_x / fade_w)
+        right_fade_a = fade_a * min(1.0, (max_scroll_x - self._scroll_x) / fade_w)
+
+        if self._scroll_x > 0:
+            grad = cairo.LinearGradient(0, 0, fade_w, 0)
+            grad.add_color_stop_rgba(0.00, 0, 0, 0, left_fade_a)
+            grad.add_color_stop_rgba(1.00, 0, 0, 0, 0.00)
+
+            cache_cr.save()
+            cache_cr.rectangle(0, top_margin, fade_w, height - top_margin - bottom_margin)
+            cache_cr.clip()
+            cache_cr.set_operator(cairo.OPERATOR_DEST_OUT)
+            cache_cr.set_source(grad)
+            cache_cr.paint()
+            cache_cr.restore()
+
+        if self._scroll_x < max_scroll_x:
+            grad = cairo.LinearGradient(width - fade_w, 0, width, 0)
+            grad.add_color_stop_rgba(0.00, 0, 0, 0, 0.00)
+            grad.add_color_stop_rgba(1.00, 0, 0, 0, right_fade_a)
+
+            cache_cr.save()
+            cache_cr.rectangle(width - fade_w, top_margin, fade_w, height - top_margin - bottom_margin)
+            cache_cr.clip()
+            cache_cr.set_operator(cairo.OPERATOR_DEST_OUT)
+            cache_cr.set_source(grad)
+            cache_cr.paint()
+            cache_cr.restore()
+
+        cache_cr.restore()
+
+        self._render_cache = surface
+        self._render_cache_key = key
+
+        if not self._enable_render_cache:
+            self._invalidate_render_cache()
+
+        cr.set_source_surface(surface, 0, 0)
+        cr.paint()
 
         return False
 
 
-# -------------------------------------------------------------------------------------------
-# FLOWGUARD TANGLE / CLOG METER
-# -------------------------------------------------------------------------------------------
+    # ---------------------------------------------------------------------------
+    # Draw colored spool with annotions
+    # ---------------------------------------------------------------------------
 
-class FlowGuardDialGauge(Gtk.DrawingArea):
-    def __init__(self):
-        super().__init__()
+    def _draw_spool(self, cr, cx, cy, w, h, color, empty=False, selected=False, percent=None, espooler=None):
+        key = (round(w), round(h), color, empty, percent)
+        surface = self._spool_cache.get(key)
 
-        self.level = 0.0
-        self.max_clog = 0.0
-        self.max_tangle = 0.0
-        self.active = False
-        self.enabled = False
-        self.trigger = ""
-        self.flowrate = None
+        if surface is None:
+            surface = cairo.ImageSurface(
+                cairo.FORMAT_ARGB32,
+                int(w + 14),
+                int(h + 14),
+            )
+            c = cairo.Context(surface)
+            c.translate(7, 7)
+            self._render_spool(c, w, h, color, empty, percent)
+            self._spool_cache[key] = surface
 
-        # Colors
-        self.green = (0.25, 0.60, 0.32)
-        self.amber = (0.78, 0.55, 0.16)
-        self.red   = (0.70, 0.20, 0.20)
-        self.white = (0.95, 0.95, 0.95)
-        self.grey  = (0.45, 0.45, 0.45)
+            if len(self._spool_cache) > 64:
+                self._spool_cache.clear()
 
-        # Geometry / styling
-        self.arc_width = 10
-        self.needle_width = 4
-        self.marker_width = 4
-        self.hub_radius = 6
-        self.arc_start_deg = -160.0
-        self.arc_sweep_deg = 140.0
+        cr.set_source_surface(surface, cx - w / 2 - 7, cy - h / 2 - 7)
+        cr.paint()
 
-        # Thresholds
-        self.amber_threshold = 0.5
-        self.red_threshold = 0.9
+        if espooler in ['rewind', 'assist']:
+            self._draw_espooler_overlay(cr, cx, cy, w, h, espooler)
 
-        self.set_size_request(50, 30)
-        self.set_hexpand(True)
-        self.set_vexpand(True)
+        if selected:
+            # Lighted-from-below effect
+            grad = cairo.RadialGradient(
+                cx,
+                cy + h * 0.40,
+                h * 0.02,      # inner radius
+                cx,
+                cy + h * 0.28,
+                h * 0.30,      # outer radius
+            )
+            grad.add_color_stop_rgba(0.00, 1.00, 1.00, 1.00, 0.90)  # pure white
+            grad.add_color_stop_rgba(0.18, 1.00, 0.98, 0.88, 0.70)  # warm white
+            grad.add_color_stop_rgba(0.45, 1.00, 0.90, 0.45, 0.35)  # warm yellow
+            grad.add_color_stop_rgba(1.00, 1.00, 0.65, 0.00, 0.00)  # deep yellow, transparent
 
-        self.connect("draw", self._draw)
+            cr.save()
+            cr.arc(cx, cy + h * 0.08, h * 0.42, 0, math.tau)
+            cr.clip()
+            cr.set_source(grad)
+            cr.paint()
+            cr.restore()
 
-    def update(self, flowguard_status, flowrate=None):
-        new_level = float(flowguard_status.get("level", 0.0))
-        new_max_clog = float(flowguard_status.get("max_clog", 0.0))
-        new_max_tangle = float(flowguard_status.get("max_tangle", 0.0))
-        new_active = bool(flowguard_status.get("active", False))
-        new_enabled = bool(flowguard_status.get("enabled", False))
-        new_trigger = flowguard_status.get("trigger", "")
-        new_flowrate = None if flowrate is None else float(flowrate)
 
-        changed = (
-            abs(self.level - new_level) > 0.01 or
-            abs(self.max_clog - new_max_clog) > 0.01 or
-            abs(self.max_tangle - new_max_tangle) > 0.01 or
-            self.active != new_active or
-            self.enabled != new_enabled or
-            self.trigger != new_trigger or
-            self.flowrate != new_flowrate
-        )
+    def _render_spool(self, cr, w, h, color, empty, percent):
+        rgb_color = MmuUtils.get_rgb_color(color)    # #rrggbbaa form
+        fr, fg, fb, fa = MmuUtils.parse_color(color) # rgba tuple form
+        filament_pct = 100
+        if percent is not None:
+            filament_pct = max(0, min(100, percent))
 
-        if not changed:
-            return
+        # Cardboard colors
+        cardboard      = (0.70, 0.52, 0.30)
+        cardboard_dark = (0.38, 0.25, 0.12) # Recess on cardboard joins
+        cardboard_edge = (0.20, 0.13, 0.06)
 
-        self.level = new_level
-        self.max_clog = new_max_clog
-        self.max_tangle = new_max_tangle
-        self.active = new_active
-        self.enabled = new_enabled
-        self.trigger = new_trigger
-        self.flowrate = new_flowrate
+        spool_cx = w / 2
 
-        self.queue_draw()
+        body_w = w * 0.38 # width of filament
+        body_x = spool_cx - body_w / 2
 
-    def _clamp(self, value):
-        return max(-1.0, min(1.0, value))
+        left_x = body_x
+        right_x = body_x + body_w
 
-    def _angle(self, value):
-        fraction = (self._clamp(value) + 1.0) / 2.0
-        degrees = self.arc_start_deg + self.arc_sweep_deg * fraction
-        return math.radians(degrees)
+        outer_w = w * 0.16 # Orientation of spools to viewer
+        outer_h = h * 0.88
 
-    def _color_for_value(self, value):
-        abs_value = abs(value)
+        # Use the outer oval aspect ratio for all smaller ovals
+        oval_ratio = outer_w / outer_h
 
-        if abs_value > self.red_threshold:
-            return self.red
-        if abs_value > self.amber_threshold:
-            return self.amber
-        return self.green
+        # Tube / center hole dimensions
+        tube_h = outer_h * 0.38
+        tube_w = tube_h * oval_ratio
 
-    def _point_on_arc(self, cx, cy, radius, value):
-        a = self._angle(value)
-        return (
-            cx + radius * math.cos(a),
-            cy + radius * math.sin(a),
-        )
+        # Core rectangle
+        core_y = h / 2 - tube_h / 2
+        core_h = tube_h
 
-    def _draw_arc(self, cr, cx, cy, r, start, end, color):
-        cr.set_source_rgb(*color)
-        cr.arc(cx, cy, r, self._angle(start), self._angle(end))
-        cr.stroke()
+        # Filament diameter varies with remaining amount.
+        # 0%  = same height as the core/tube
+        # 100% = slightly smaller than cardboard flange
+        max_filament_h = outer_h * 0.8
+        inner_h = tube_h + (max_filament_h - tube_h) * (filament_pct / 100)
+        inner_w = inner_h * oval_ratio * 0.75 # * 0.75 provides more cardboard view for full filament in low resolution
 
-    def _draw_marker(self, cr, cx, cy, r, value):
-        x1, y1 = self._point_on_arc(cx, cy, r + 7, value)
-        x2, y2 = self._point_on_arc(cx, cy, r + 12, value)
+        # Filament bulk rectangle matches the oval height.
+        filament_h = inner_h
+        filament_y = h / 2 - filament_h / 2
 
-        cr.set_source_rgb(*self._color_for_value(value))
-        cr.set_line_width(self.marker_width)
-        cr.set_line_cap(cairo.LINE_CAP_ROUND)
-        cr.move_to(x1, y1)
-        cr.line_to(x2, y2)
-        cr.stroke()
+        # 1. Right cardboard oval (with edge)
+        self._draw_oval(cr, right_x, h / 2, outer_w, outer_h, cardboard, cardboard_edge, stroke_width=2)
 
-    def _draw_text_centered(self, cr, text, x, y):
-        ext = cr.text_extents(text)
-        cr.move_to(x - ext.width / 2, y)
-        cr.show_text(text)
+        # 2. Right core rounded tube end
+        self._draw_oval(cr, right_x, h / 2, tube_w, tube_h, cardboard, cardboard_dark, stroke_width=2)
 
-    def _draw(self, widget, cr):
-        w = self.get_allocated_width()
-        h = self.get_allocated_height()
-
-        cx = w * 0.5
-        cy = h * 0.62
-        r = min(w * 0.40, h * 0.50)
-
-        cr.set_line_width(self.arc_width)
-        cr.set_line_cap(cairo.LINE_CAP_ROUND)
-
-        self._draw_arc(cr, cx, cy, r, -0.5,  0.5, self.green)
-        self._draw_arc(cr, cx, cy, r, -0.9, -0.5, self.amber)
-        self._draw_arc(cr, cx, cy, r, -1.0, -0.9, self.red)
-        self._draw_arc(cr, cx, cy, r,  0.5,  0.9, self.amber)
-        self._draw_arc(cr, cx, cy, r,  0.9,  1.0, self.red)
-
-        cr.set_source_rgb(*self.white)
-        cr.select_font_face("Sans", cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_NORMAL)
-        cr.set_font_size(14)
-
-        x, y = self._point_on_arc(cx, cy, r, -1.0)
-        self._draw_text_centered(cr, "Tangle", x + 2, y + 24)
-
-        x, y = self._point_on_arc(cx, cy, r, 1.0)
-        self._draw_text_centered(cr, "Clog", x - 2, y + 24)
-
-        self._draw_marker(cr, cx, cy, r, self.max_tangle)
-        self._draw_marker(cr, cx, cy, r, self.max_clog)
-
-        # Needle
-        a = self._angle(self.level)
-        nx = cx + (r - 12) * math.cos(a)
-        ny = cy + (r - 12) * math.sin(a)
-
-        cr.set_source_rgb(*self._color_for_value(self.level))
-        cr.set_line_width(self.needle_width)
-        cr.move_to(cx, cy)
-        cr.line_to(nx, ny)
-        cr.stroke()
-
-        cr.arc(cx, cy, self.hub_radius, 0, 2 * math.pi)
+        # 3. Core body (rectangle)
+        cr.set_source_rgb(*cardboard)
+        cr.rectangle(body_x, core_y, body_w, core_h)
         cr.fill()
 
-        # Main value
-        cr.set_source_rgb(*self.white)
-        cr.select_font_face("Sans", cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_BOLD)
-        cr.set_font_size(16)
+        if not empty:
+            # 4. Filament oval on right face
+            self._draw_oval(cr, right_x, h / 2, inner_w, inner_h, (fr, fg, fb, fa), cardboard_dark, stroke_width=3)
 
-        value_y = h * 0.40
-        self._draw_text_centered(cr, f"{self.level:+.2f}", cx, value_y)
+            # 5. Filament body (rectangle)
+            cr.set_source_rgba(fr, fg, fb, fa)
+            cr.rectangle(body_x, filament_y, body_w, filament_h)
+            cr.fill()
 
-        cr.select_font_face("Sans", cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_NORMAL)
+        # 6. Left cardboard oval
+        self._draw_oval(cr, left_x, h / 2, outer_w, outer_h, cardboard, cardboard_edge)
 
-        if self.active:
-            cr.set_font_size(12)
-            self._draw_text_centered(cr, "Active", cx, value_y + 14)
+        # 7. Left black hole
+        self._draw_oval(cr, left_x, h / 2, tube_w, tube_h, (0.03, 0.025, 0.02), cardboard_edge)
 
-        cr.set_font_size(14)
-        if not self.enabled:
-            cr.set_source_rgb(*self.grey)
-            text = "Disabled"
-        elif self.active:
-            cr.set_source_rgb(*self.white)
-            text = "Active"
-        else:
-            cr.set_source_rgb(*self.grey)
-            text = "Inactive"
-        self._draw_text_centered(cr, text, cx, cy - cr.text_extents(text).y_bearing + 14)
-
-        # Flowrate / Trigger
-        if self.trigger:
+        # 8. Percent text on filament body
+        if not empty and percent is not None and filament_pct > 0:
+            label = f"{percent}%"
+            cr.save()
             cr.select_font_face("Sans", cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_BOLD)
-            cr.set_source_rgb(*self.red)
-            bottom_text = f"{self.trigger.upper()}"
-        elif self.flowrate is not None:
-            cr.set_source_rgb(*self.white)
-            bottom_text = f"Flowrate: {int(self.flowrate)}%"
-        else:
-            cr.set_source_rgb(*self.grey)
-            bottom_text = "Flowrate: --%"
-        self._draw_text_centered(cr, bottom_text, cx, cy - cr.text_extents(bottom_text).y_bearing + 34)
+            font_size = max(6, min(body_w * 0.25, filament_h * 0.19))
+            cr.set_font_size(font_size)
+            text_cx = spool_cx + body_w * 0.18
+            xb, yb, tw, th, xa, ya = cr.text_extents(label)
 
+            contrast_color = MmuUtils.filament_text_color(rgb_color)
+            cr.set_source_rgba(*contrast_color)
+            cr.move_to(
+                text_cx - tw / 2 - xb,
+                h / 2 - th / 2 - yb,
+            )
+            cr.show_text(label)
+            cr.restore()
+
+
+    # ---------------------------------------------------------------------------
+    # Draw espooler movement arrows
+    # ---------------------------------------------------------------------------
+
+    def _draw_espooler_overlay(self, cr, cx, cy, w, h, direction):
+        if direction not in ("rewind", "assist"):
+            return
+
+        arrow_scale = h * 0.0038
+
+        # Position relative to spool center.
+        x_off = w * 0.06
+        y_off = h * 0.24
+
+        cr.save()
+
+        if direction == "rewind":
+            # Down arrow
+            cr.translate(cx + x_off, cy - y_off)
+            cr.rotate(math.pi / 2)
+            cr.scale(arrow_scale, arrow_scale)
+        else:
+            # Up arrow
+            cr.translate(cx + x_off, cy + y_off)
+            cr.rotate(3 * math.pi / 2)
+            cr.scale(arrow_scale, -arrow_scale)
+
+        # Center the SVG arrow artwork around its local bounding box.
+        cr.translate(-45, -37)
+
+        self._espool_arrow_path(cr)
+
+        cr.set_source_rgba(0.50, 0.50, 0.50, 0.70)
+        cr.fill_preserve()
+
+        cr.set_source_rgba(0.80, 0.80, 0.80, 0.45)
+        cr.set_line_width(3.0)
+        cr.stroke()
+
+        cr.restore()
+
+
+    def _espool_arrow_path(self, cr):
+        cr.move_to(89.561, 35.5)
+        cr.line_to(60.333, 15.734)
+        cr.curve_to(60.025, 15.526, 59.629, 15.505, 59.304, 15.679)
+        cr.curve_to(58.977, 15.852, 58.773, 16.192, 58.773, 16.562)
+        cr.line_to(58.773, 24.549)
+        cr.curve_to(46.735, 24.811, 32.467, 29.750, 21.272, 37.572)
+        cr.curve_to(7.554, 47.155, 0, 59.894, 0, 73.438)
+        cr.curve_to(0, 73.909, 0.329, 74.316, 0.790, 74.416)
+        cr.curve_to(0.860, 74.432, 0.931, 74.438, 1.000, 74.438)
+        cr.curve_to(1.386, 74.438, 1.747, 74.213, 1.911, 73.850)
+        cr.curve_to(9.734, 56.538, 28.863, 47.667, 58.772, 47.474)
+        cr.line_to(58.772, 56.094)
+        cr.curve_to(58.772, 56.464, 58.976, 56.804, 59.303, 56.977)
+        cr.curve_to(59.628, 57.150, 60.025, 57.130, 60.332, 56.922)
+        cr.line_to(89.560, 37.156)
+        cr.curve_to(89.835, 36.971, 90.000, 36.661, 90.000, 36.329)
+        cr.curve_to(90.000, 35.997, 89.835, 35.686, 89.561, 35.500)
+        cr.close_path()
+
+
+    # ---------------------------------------------------------------------------
+    # Draw gate status / filament availability and number
+    # ---------------------------------------------------------------------------
+
+    def _draw_gate_status(self, cr, item, cx, tray_top, tray_h, slot_w, spool_h):
+        badge_w = min(slot_w * 0.72, spool_h * 0.42)
+
+        # Less tall than before.
+        badge_h = min(tray_h * 0.30, spool_h * 0.13)
+
+        # Sit a little lower than before.
+        badge_y = tray_top + tray_h * 0.48
+        badge_x = cx - badge_w / 2
+        radius = badge_h * 0.22
+
+        selected_fill = (0.30, 1.00, 0.10)
+        transparent_fill = (0, 0, 0, 0)
+
+        if item["gate"] == TOOL_GATE_BYPASS:
+            badge_label = "Byp"
+            tool_label = ""
+            fill_rgba = (*selected_fill, 1.0) if item["selected"] else transparent_fill
+            stroke_rgb = None
+        else:
+            badge_label = str(item["gate"])
+            tool_label = self._panel.get_tools_for_gate_str(item["gate"])
+            fill_rgba = (*selected_fill, 1.0) if item["selected"] else transparent_fill
+
+            if item["status"] in (GATE_AVAILABLE, GATE_AVAILABLE_FROM_BUFFER):
+                stroke_rgb = (0.20, 0.85, 0.20)
+            elif item["status"] == GATE_EMPTY:
+                stroke_rgb = (0.55, 0.55, 0.55)
+            else:
+                stroke_rgb = (1.00, 0.55, 0.05)
+
+        style = self.get_style_context()
+        fg = style.get_color(Gtk.StateFlags.NORMAL)
+
+        # Tool text above badge, e.g. T0, T11, T3+
+        if tool_label:
+            cr.save()
+            cr.select_font_face("Sans", cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_NORMAL)
+            tool_font_size = max(7, min(spool_h * 0.105, slot_w * 0.34))
+            cr.set_font_size(tool_font_size)
+            xb, yb, tw, th, xa, ya = cr.text_extents(tool_label)
+
+            badge_gap = spool_h * 0.045 # Space between tool text and badge
+            tool_y = badge_y - th - badge_gap
+            cr.set_source_rgba(fg.red, fg.green, fg.blue, fg.alpha)
+            cr.move_to(cx - tw / 2 - xb, tool_y - yb)
+            cr.show_text(tool_label)
+            cr.restore()
+
+        self._draw_rounded_rect(
+            cr,
+            badge_x,
+            badge_y,
+            badge_w,
+            badge_h,
+            radius,
+            fill_rgb=fill_rgba,
+            stroke_rgb=stroke_rgb,
+            stroke_width=2,
+        )
+
+        cr.select_font_face("Sans", cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_BOLD)
+        font_size = max(7, min(badge_h * 0.62, spool_h * 0.09))
+        cr.set_font_size(font_size)
+
+        xb, yb, tw, th, xa, ya = cr.text_extents(badge_label)
+
+        if item["selected"]:
+            cr.set_source_rgb(0.0, 0.0, 0.0)
+        else:
+            cr.set_source_rgba(fg.red, fg.green, fg.blue, fg.alpha)
+
+        cr.move_to(
+            cx - tw / 2 - xb,
+            badge_y + badge_h / 2 - th / 2 - yb,
+        )
+        cr.show_text(badge_label)
+
+
+
+    # ---------------------------------------------------------------------------
+    # Draw spool tray clipping lower part of spool
+    # ---------------------------------------------------------------------------
+
+    def _draw_tray(self, cr, x, y, w, h):
+        tray_grad = cairo.LinearGradient(0, y, 0, y + h)
+        tray_grad.add_color_stop_rgb(0.0, 0.34, 0.35, 0.36)  # mid grey top
+        tray_grad.add_color_stop_rgb(1.0, 0.06, 0.07, 0.08)  # very dark bottom
+
+        self._draw_rounded_rect(
+            cr, x, y, w, h, 7,
+            fill_rgb=tray_grad,
+            stroke_rgb=(0.18, 0.19, 0.20),
+            stroke_width=1.0,
+        )
+
+        # Bright top highlight / lip
+        cr.save()
+        cr.set_source_rgba(1, 1, 1, 0.32)
+        cr.set_line_width(1.0)
+        cr.move_to(x + 7, y + 1.5)
+        cr.line_to(x + w - 7, y + 1.5)
+        cr.stroke()
+        cr.restore()
+
+        # Soft darker line just under the lip
+        cr.save()
+        cr.set_source_rgba(0, 0, 0, 0.30)
+        cr.set_line_width(1.0)
+        cr.move_to(x + 7, y + 3.0)
+        cr.line_to(x + w - 7, y + 3.0)
+        cr.stroke()
+        cr.restore()
+
+
+    def _draw_unit_lid(self, cr, x, y, w, h, spool_h):
+        radius = spool_h * 0.10
+
+        # Main glass tint.
+        glass_grad = cairo.LinearGradient(0, y, 0, y + h)
+        glass_grad.add_color_stop_rgba(0.00, 1.00, 1.00, 1.00, 0.10)
+        glass_grad.add_color_stop_rgba(0.25, 0.80, 0.90, 1.00, 0.04)
+        glass_grad.add_color_stop_rgba(1.00, 0.20, 0.24, 0.28, 0.05)
+
+        self._draw_rounded_rect(
+            cr, x, y, w, h, radius,
+            fill_rgb=glass_grad,
+            stroke_rgb=(1.0, 1.0, 1.0, 0.14),
+            stroke_width=max(1.0, spool_h * 0.012),
+        )
+
+        # Top glossy reflection band.
+        highlight_h = spool_h * 0.16
+        highlight_grad = cairo.LinearGradient(0, y, 0, y + highlight_h)
+        highlight_grad.add_color_stop_rgba(0.00, 1.0, 1.0, 1.0, 0.18)
+        highlight_grad.add_color_stop_rgba(1.00, 1.0, 1.0, 1.0, 0.00)
+
+        cr.save()
+        self._rounded_rect_path(cr, x + 1, y + 1, w - 2, highlight_h, radius * 0.75)
+        cr.clip()
+        cr.set_source(highlight_grad)
+        cr.paint()
+        cr.restore()
+
+
+    def scroll_gate_into_view(self, gate, center=False):
+        if self._items is None:
+            self._items = self._build_items()
+
+        alloc = self.get_allocation()
+        width = alloc.width
+        height = alloc.height
+
+        groups = self._items
+        total_spools = sum(len(g) for g in groups)
+        if total_spools == 0 or width <= 0:
+            return
+
+        layout = self._get_layout(width, height)
+
+        slot_w = layout["slot_w"]
+        group_gap = layout["group_gap"]
+        margin = layout["margin"]
+        scroll_pad = layout["scroll_pad"]
+
+        viewport_w = width - margin * 2
+
+        content_w = (
+            total_spools * slot_w +
+            max(0, len(groups) - 1) * group_gap +
+            scroll_pad * 2
+        )
+
+        max_scroll_x = max(0, content_w - viewport_w)
+
+        ordered_items = []
+        x = margin + scroll_pad
+
+        for group in groups:
+            for item in group:
+                ordered_items.append((item, x))
+                x += slot_w
+
+            x += group_gap
+
+        first_gate = ordered_items[0][0]["gate"]
+        last_gate = ordered_items[-1][0]["gate"]
+
+        if gate == first_gate:
+            target_scroll_x = 0
+
+        elif gate == last_gate:
+            target_scroll_x = max_scroll_x
+
+        else:
+            target_scroll_x = None
+
+            for item, slot_x in ordered_items:
+                if item["gate"] != gate:
+                    continue
+
+                slot_right = slot_x + slot_w
+                slot_center = slot_x + slot_w / 2
+
+                visible_left = margin + self._scroll_x
+                visible_right = visible_left + viewport_w
+
+                fully_visible = (
+                    slot_x >= visible_left and
+                    slot_right <= visible_right
+                )
+
+                if fully_visible and not center:
+                    return
+
+                if center:
+                    target_scroll_x = slot_center - viewport_w / 2 - margin
+                else:
+                    if slot_x < visible_left:
+                        target_scroll_x = slot_x - margin
+                    elif slot_right > visible_right:
+                        target_scroll_x = slot_right - margin - viewport_w
+                    else:
+                        target_scroll_x = self._scroll_x
+
+                break
+
+            if target_scroll_x is None:
+                return
+
+        new_scroll_x = max(0, min(target_scroll_x, max_scroll_x))
+
+        if new_scroll_x != self._scroll_x:
+            self._scroll_x = new_scroll_x
+            self._invalidate_render_cache()
+            self.queue_draw()
+
+
+    def _invalidate_render_cache(self):
+        self._render_cache = None
+        self._render_cache_key = None
+
+
+    # ---------------------------------------------------------------------------
+    # Scrolling and Pop-up action handling
+    # ---------------------------------------------------------------------------
+
+    def _hit_test_spool(self, px, py):
+        # Hitboxes are stored left-to-right, which matches the visual topmost
+        # order when spools are drawn right-to-left.
+        for gate, x, y, w, h in self._hitboxes:
+            if x <= px <= x + w and y <= py <= y + h:
+                return gate
+        return None
+
+
+    def _on_button_press(self, widget, event):
+        if event.button != 1:
+            return False
+
+        self._drag_active = True
+        self._drag_start_x = event.x
+        self._drag_start_y = event.y
+        self._drag_start_scroll_x = self._scroll_x
+        return True
+
+
+    def _on_motion(self, widget, event):
+        if not self._drag_active:
+            return False
+
+        dx = event.x - self._drag_start_x
+        dy = event.y - self._drag_start_y
+
+        moved = abs(dx) > 8 or abs(dy) > 8
+        if not moved:
+            return True
+
+        new_scroll_x = self._drag_start_scroll_x - dx
+        if new_scroll_x != self._scroll_x:
+            self._scroll_x = new_scroll_x
+            self._invalidate_render_cache()
+            self.queue_draw()
+
+        return True
+
+
+    def _on_button_release(self, widget, event):
+        if not self._drag_active:
+            return False
+
+        self._drag_active = False
+
+        dx = event.x - self._drag_start_x
+        dy = event.y - self._drag_start_y
+        moved = abs(dx) > 8 or abs(dy) > 8
+
+        if not moved:
+            gate = self._hit_test_spool(event.x, event.y)
+            if gate is not None:
+                self._show_gate_popover(gate, event.x, event.y)
+
+        return True
+
+
+    def _on_scroll(self, widget, event):
+        step = self.get_allocation().height * 0.45
+
+        if event.direction == Gdk.ScrollDirection.LEFT:
+            self._scroll_x -= step
+        elif event.direction == Gdk.ScrollDirection.RIGHT:
+            self._scroll_x += step
+        elif event.direction == Gdk.ScrollDirection.UP:
+            self._scroll_x -= step
+        elif event.direction == Gdk.ScrollDirection.DOWN:
+            self._scroll_x += step
+        else:
+            return False
+
+        self._invalidate_render_cache()
+        self.queue_draw()
+        return True
+
+
+    def _show_gate_popover(self, gate, x, y):
+        if self._popover_timeout_id is not None:
+            GLib.source_remove(self._popover_timeout_id)
+            self._popover_timeout_id = None
+
+        mmu = self._printer.get_stat("mmu")
+        print_state = mmu.get("print_state")
+        if print_state == "printing":
+            return
+
+        self._popover_gate = gate
+
+        rect = Gdk.Rectangle()
+        rect.x = int(x)
+        rect.y = int(y)
+        rect.width = 1
+        rect.height = 1
+        self._popover.set_pointing_to(rect)
+
+        self._popover_title.set_text(f"Gate {gate}" if gate != TOOL_GATE_BYPASS else "Bypass")
+        self._update_popover_button_sensitivity(gate)
+        self._popover.show_all()
+        self._popover.popup()
+        self._popover_timeout_id = GLib.timeout_add_seconds(3, self._on_popover_timeout)
+
+
+    def _close_gate_popover(self):
+        if self._popover_timeout_id is not None:
+            GLib.source_remove(self._popover_timeout_id)
+            self._popover_timeout_id = None
+
+        if self._popover is not None:
+            self._popover.popdown()
+
+
+    def _on_popover_show(self, popover):
+        self._panel._screen.show_popup_dimmer()
+
+
+    def _on_popover_closed(self, popover):
+        if self._popover_timeout_id is not None:
+            GLib.source_remove(self._popover_timeout_id)
+            self._popover_timeout_id = None
+
+        self._panel._screen.hide_popup_dimmer()
+
+
+    def _on_popover_timeout(self):
+        self._popover_timeout_id = None
+        self._close_gate_popover()
         return False
+
+
+    def _on_gate_menu_clicked(self, button, action):
+        gate = self._popover_gate
+        if gate is None:
+            return
+
+        self._handle_gate_action(gate, action)
+        self._popover.popdown()
+
+
+    def _update_popover_button_sensitivity(self, gate):
+        mmu = self._printer.get_stat("mmu")
+        l = self._panel.labels
+
+        # We should only get here if not printing
+        printing = (mmu['print_state'] == "printing")
+        loaded = (mmu['filament'] == "Loaded")
+        unloaded = (mmu['filament'] == "Unloaded")
+        selected = (mmu['gate'] == gate)
+        bypass = (gate == TOOL_GATE_BYPASS)
+        unit = self._panel.get_mmu_unit(gate)
+        can_crossload = False
+        if unit is not None:
+            can_crossload = unit.get('can_crossload', False)
+
+        l['menu_select'].set_sensitive(unloaded and not selected)
+        l['menu_check'].set_sensitive(unloaded and not bypass)
+        l['menu_preload'].set_sensitive((unloaded or can_crossload and not selected) and not bypass)
+        l['menu_load'].set_sensitive(unloaded)
+        l['menu_unload'].set_sensitive(loaded)
+        l['menu_eject'].set_sensitive((unloaded or can_crossload and not selected) and not bypass)
+
+
+    def _handle_gate_action(self, gate, action):
+        self._close_gate_popover()
+        api = self._panel._screen._ws.api
+
+        mmu = self._printer.get_stat("mmu")
+
+        if action == "select":
+            if gate == TOOL_GATE_BYPASS:
+                api.gcode_script("MMU_SELECT BYPASS=1 QUIET=1")
+            else:
+                api.gcode_script(f"MMU_SELECT GATE={gate} QUIET=1")
+            return
+
+        if action == "preload":
+            api.gcode_script(f"MMU_PRELOAD GATE={gate}")
+            return
+
+        if action == "load":
+            if gate == TOOL_GATE_BYPASS:
+                api.gcode_script(f"MMU_LOAD EXTRUDER_ONLY=1")
+            else:
+                api.gcode_script(f"MMU_LOAD")
+            return
+
+        if action == "unload":
+            if gate == TOOL_GATE_BYPASS:
+                api.gcode_script(f"MMU_UNLOAD EXTRUDER_ONLY=1")
+            else:
+                api.gcode_script(f"MMU_UNLOAD")
+            return
+
+        if action == "eject":
+            api.gcode_script(f"MMU_EJECT GATE={gate}")
+            return
+
+        if action == "check":
+            api.gcode_script(f"MMU_CHECK_GATE GATE={gate}")
+            return
+
+        # Shouldn't get here
+        logging.error(f"MMU: Illegal action {action} on gate {gate}")
+
+
+    # ---------------------------------------------------------------------------
+    # Drawing helpers
+    # ---------------------------------------------------------------------------
+
+    def _get_layout(self, width, height):
+        """
+        Centralized layout sizing logic for tweaking look and feel of major components
+        """
+        top_margin = height * 0.04       # Top padding
+        bottom_margin = height * 0.01    # Bottom padding
+
+        spool_aspect = 0.77              # Overall spool width/height ratio
+        slot_overlap = 0.47              # Spool centre spacing
+
+        content_h = height - top_margin - bottom_margin
+
+        spool_h = content_h * 0.86       # Height drives spool size. Everything else is derived from spool_h
+        spool_w = spool_h * spool_aspect # Overall drawing width allocated to one spool image
+        slot_w = spool_w * slot_overlap  # Horizontal spacing between spool centers; Smaller = tighter overlap inside a unit.
+
+        margin = spool_w * 0.1           # Left/right outer margin
+        scroll_pad = slot_w * 0.10       # Extra scroll padding before first and after last spool
+
+        tray_pad_ratio = 0.25
+        group_gap = spool_w * 0.10       # Gap between separate MMU units, in spool-height units
+
+        spool_cy = top_margin + content_h * 0.44
+
+        # Tray anchored to spool position.
+        tray_top = spool_cy + spool_h * 0.24
+        tray_h = height - bottom_margin - tray_top
+
+        return {
+            "spool_h": spool_h,
+            "spool_w": spool_w,
+            "tray_pad_ratio": tray_pad_ratio,
+            "group_gap": group_gap,
+            "margin": margin,
+            "slot_w": slot_w,
+            "top_margin": top_margin,
+            "bottom_margin": bottom_margin,
+            "scroll_pad": scroll_pad,
+            "spool_cy": spool_cy,
+            "tray_top": tray_top,
+            "tray_h": tray_h,
+        }
+
+
+    def _draw_oval(self, cr, cx, cy, w, h, fill_rgb, stroke_rgb=None, stroke_width=1.0):
+        cr.save()
+        cr.translate(cx, cy)
+        cr.scale(w / 2, h / 2)
+        cr.arc(0, 0, 1, 0, math.tau)
+        cr.restore()
+
+        if len(fill_rgb) == 4:
+            cr.set_source_rgba(*fill_rgb)
+        else:
+            cr.set_source_rgb(*fill_rgb)
+
+        cr.fill_preserve()
+
+        if stroke_rgb is not None:
+            cr.set_line_width(stroke_width)
+
+            if len(stroke_rgb) == 4:
+                cr.set_source_rgba(*stroke_rgb)
+            else:
+                cr.set_source_rgb(*stroke_rgb)
+            cr.stroke()
+        else:
+            cr.new_path()
+
+
+    def _draw_rounded_rect(self, cr, x, y, w, h, r, fill_rgb=None, stroke_rgb=None, stroke_width=1.0):
+        cr.new_sub_path()
+        cr.arc(x + w - r, y + r, r, -math.pi / 2, 0)
+        cr.arc(x + w - r, y + h - r, r, 0, math.pi / 2)
+        cr.arc(x + r, y + h - r, r, math.pi / 2, math.pi)
+        cr.arc(x + r, y + r, r, math.pi, 3 * math.pi / 2)
+        cr.close_path()
+
+        if fill_rgb is not None:
+            if isinstance(fill_rgb, cairo.Pattern):
+                cr.set_source(fill_rgb)
+            elif len(fill_rgb) == 4:
+                cr.set_source_rgba(*fill_rgb)
+            else:
+                cr.set_source_rgb(*fill_rgb)
+
+            if stroke_rgb is not None:
+                cr.fill_preserve()
+            else:
+                cr.fill()
+
+        if stroke_rgb is not None:
+            cr.set_line_width(stroke_width)
+
+            if isinstance(stroke_rgb, cairo.Pattern):
+                cr.set_source(stroke_rgb)
+            elif len(stroke_rgb) == 4:
+                cr.set_source_rgba(*stroke_rgb)
+            else:
+                cr.set_source_rgb(*stroke_rgb)
+
+            cr.stroke()
+
+
+    def _rounded_rect_path(self, cr, x, y, w, h, r):
+        cr.new_sub_path()
+        cr.arc(x + w - r, y + r, r, -math.pi / 2, 0)
+        cr.arc(x + w - r, y + h - r, r, 0, math.pi / 2)
+        cr.arc(x + r, y + h - r, r, math.pi / 2, math.pi)
+        cr.arc(x + r, y + r, r, math.pi, 3 * math.pi / 2)
+        cr.close_path()
+
+
+
+# ---------------------------------------------------------------------------
+# SPOOL/FILAMENT DETAILS WIDGET
+# ---------------------------------------------------------------------------
+
+class MmuSpoolDetails(Gtk.Box):
+
+    def __init__(self, printer, panel):
+        super().__init__(orientation=Gtk.Orientation.VERTICAL, spacing=2)
+        self._printer = printer
+        self._panel = panel
+        self._gate = None
+
+        self.set_hexpand(True)
+        self.set_vexpand(False)
+        self.set_margin_start(2)
+        self.set_margin_end(0)
+        self.set_margin_top(6)
+        self.set_margin_bottom(6)
+
+        self._line1 = self._make_label(["mmu-spool-detail-small", "mmu-spool-detail-margin"])
+        self._line2 = self._make_label(["mmu-spool-detail-important"], wrap=True)
+        self._line3 = self._make_label(["mmu-spool-detail-normal"])
+        self._line4 = self._make_label(["mmu-spool-detail-small", "mmu-spool-detail-margin"], wrap=self._panel.show_spool_tray)
+        self._line5 = self._make_label(["mmu-spool-detail-small", "mmu-spool-detail-margin"])
+
+        self._header_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
+        self._header_box.set_margin_start(4)
+        self._header_box.set_margin_end(4)
+        self._header_box.set_margin_top(4)
+        self._header_box.set_margin_bottom(4)
+
+        self._header_box.pack_start(self._line2, False, False, 0)
+        self._header_box.pack_start(self._line3, False, False, 0)
+
+        self._header_eventbox = Gtk.EventBox()
+        self._header_eventbox.set_hexpand(True)
+        self._header_eventbox.set_halign(Gtk.Align.FILL)
+        self._header_eventbox.get_style_context().add_class("mmu-spool-detail-header")
+        self._header_eventbox.add(self._header_box)
+
+        self.pack_start(self._line1, False, False, 0)
+        self.pack_start(self._header_eventbox, False, False, 0)
+        self.pack_start(self._line4, False, False, 0)
+        self.pack_start(self._line5, False, False, 0)
+
+        self.set_gate(None)
+
+
+    def _make_label(self, css_classes, wrap=False):
+        label = Gtk.Label()
+
+        label.set_xalign(0.0)
+        label.set_yalign(0.5)
+        label.set_hexpand(True)
+
+        if wrap:
+            label.set_line_wrap(True)
+            label.set_line_wrap_mode(Pango.WrapMode.WORD_CHAR)
+            label.set_lines(2)
+            label.set_max_width_chars(1) # use allocated width
+            label.set_justify(Gtk.Justification.LEFT)
+        else:
+            label.set_single_line_mode(True)
+            label.set_ellipsize(Pango.EllipsizeMode.END)
+            label.set_lines(1)
+
+        label.get_style_context().add_class("mmu-spool-detail")
+        for css in css_classes:
+            label.get_style_context().add_class(css)
+
+        return label
+
+
+    def set_gate(self, gate):
+        self._gate = gate
+        self.refresh()
+
+
+    def refresh(self):
+        if self._gate is None or self._gate == TOOL_GATE_BYPASS:
+            self._set_lines(
+                "Bypass",
+                "No spool selected",
+                "",
+                "",
+                "",
+            )
+            return
+
+        details = self._build_spool_details(self._gate)
+
+        self._set_lines(
+            details["line1"],
+            details["line2"],
+            details["line3"],
+            details["line4"],
+            details["line5"],
+        )
+
+
+    def _set_lines(self, line1, line2, line3, line4, line5):
+        self._line1.set_text(line1 or "")
+        self._line2.set_text(line2 or "")
+        self._line3.set_text(line3 or "")
+        self._line4.set_text(line4 or "")
+        self._line5.set_text(line5 or "")
+
+
+    def _build_spool_details(self, gate):
+        mmu = self._printer.get_stat("mmu") or {}
+
+        filament_name = self._get_gate_value(mmu, "gate_filament_name", gate, "Unknown")
+        material      = self._get_gate_value(mmu, "gate_material", gate, "?")
+        temperature   = self._get_gate_value(mmu, "gate_temperature", gate, None)
+        speed         = self._get_gate_value(mmu, "gate_speed_override", gate, 100)
+        spool_id      = self._get_gate_value(mmu, "gate_spool_id", gate, -1)
+
+        # Get Spoolman supplied details
+        spool = self._panel.spools.get(str(spool_id))
+        filament = getattr(spool, "filament", None)
+
+        vendor = (
+            filament.vendor.name
+            if filament and getattr(filament, "vendor", None)
+            else "Unknown vendor"
+        )
+
+        description = getattr(filament, "name", None) or filament_name or "Unknown"
+
+        remaining_weight = getattr(spool, "remaining_weight", None)
+        total_weight = (
+            getattr(spool, "initial_weight", None)
+            or getattr(filament, "weight", None)
+        )
+        remaining_length = getattr(spool, "remaining_length", None)
+
+        line1 = f"{vendor}"
+        line2 = description
+
+        line3_parts = []
+        if material:
+            line3_parts.append(str(material))
+        if temperature is not None:
+            line3_parts.append(f"{temperature}°C")
+
+        try:
+            speed_value = int(speed)
+        except (TypeError, ValueError):
+            speed_value = 100
+
+        if speed_value != 100:
+            line3_parts.append(f"Speed: {speed}%")
+
+        line3 = " | ".join(line3_parts)
+
+        try:
+            spool_id_value = int(spool_id)
+        except (TypeError, ValueError):
+            spool_id_value = -1
+
+        if spool_id is None or spool_id_value < 0:
+            line4 = "No spool ID"
+        else:
+            line4_parts = [f"ID #{spool_id}"] if self._panel.show_spool_tray else []
+
+            if remaining_weight is not None and total_weight is not None:
+                line4_parts.append(f"{self._format_weight(remaining_weight)} / {self._format_weight(total_weight)}")
+
+            if remaining_length is not None:
+                line4_parts.append(f"{self._format_length(remaining_length)}")
+
+            line4 = " | ".join(line4_parts)
+
+        es_gates = self._panel.get_endless_spool_group_order(gate)
+        line5 = f"∞:{'>'.join(str(g) for g in es_gates)}" if es_gates else ""
+
+        return {
+            "line1": line1,
+            "line2": line2,
+            "line3": line3,
+            "line4": line4,
+            "line5": line5,
+        }
+
+
+    def _get_gate_value(self, mmu, key, gate, default=None):
+        values = mmu.get(key)
+        if isinstance(values, (list, tuple)) and 0 <= gate < len(values):
+            return values[gate]
+        return default
+
+
+    def _format_weight(self, grams):
+        try:
+            grams = float(grams)
+        except (TypeError, ValueError):
+            return str(grams)
+
+        if grams >= 1000 and grams % 1000 == 0:
+            return f"{int(grams / 1000)}kg"
+        if grams >= 1000:
+            return f"{grams / 1000:.1f}kg"
+        return f"{int(round(grams))}g"
+
+
+    def _format_length(self, meters):
+        try:
+            meters = float(meters)
+        except (TypeError, ValueError):
+            return str(meters)
+
+        return f"{int(round(meters))}m"

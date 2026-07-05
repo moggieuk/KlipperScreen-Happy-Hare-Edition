@@ -38,6 +38,7 @@ from ks_includes.widgets.lockscreen import LockScreen
 from ks_includes.widgets.prompts import Prompt
 from ks_includes.widgets.screensaver import ScreenSaver
 from panels.base_panel import BasePanel
+from ks_includes.widgets.background_manager import BackgroundManager
 
 logging.getLogger("urllib3").setLevel(logging.WARNING)
 
@@ -162,6 +163,14 @@ class KlipperScreen(Gtk.ApplicationWindow):
         self.change_theme(self.theme)
         self.overlay = Gtk.Overlay()
         self.add(self.overlay)
+
+        logging.warning(f"Current theme is: '{self.theme}'")
+
+        self.background = BackgroundManager(self)
+        self.overlay.add(self.background)
+
+        self.update_background_manager()
+
         self.overlay.add_overlay(self.base_panel.main_grid)
         self.show_all()
         self.update_cursor(self.show_cursor)
@@ -193,6 +202,21 @@ class KlipperScreen(Gtk.ApplicationWindow):
         if self._config.get_main_config().getboolean("start_locked", False):
             self.lock_screen.lock(None)
         self.set_screenblanking_timeout(self._config.get_main_config().get("screen_blanking"))
+
+    def update_background_manager(self):
+        logging.warning(f"style_options dynamic_background = {self.style_options.get('dynamic_background')}")
+
+        self.background.configure(self.style_options)
+
+        bg = self.style_options.get("dynamic_background", {})
+        dynamic_enabled = bool(bg.get("enabled", False))
+
+        logging.warning(f"dynamic_enabled = {dynamic_enabled}")
+
+        if dynamic_enabled:
+            self.background.enable()
+        else:
+            self.background.disable()
 
     def update_cursor(self, show: bool):
         self.show_cursor = show
@@ -687,12 +711,19 @@ class KlipperScreen(Gtk.ApplicationWindow):
     def change_theme(self, theme_name=None):
         if not theme_name:
             theme_name = self._config.get_main_config().get("theme")
+        self.theme = theme_name
         self.gtk.update_themedir(theme_name)
         theme_css, theme_options = self.load_custom_theme(theme_name)
+
+        self.style_options["dynamic_background"] = {}
+
         self.style_options.update(theme_options)
         self.gtk.color_list = self.style_options["graph_colors"]
         self.update_style_provider(theme_css)
         self.reload_icon_theme()
+
+        if hasattr(self, "background"):
+            self.update_background_manager()
 
     def reload_icon_theme(self):
         self.panels_reinit = list(self.panels)

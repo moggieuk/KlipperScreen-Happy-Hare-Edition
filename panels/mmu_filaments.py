@@ -19,10 +19,6 @@ class Panel(ScreenPanel, MmuMixin):
     def __init__(self, screen, title):
         super().__init__(screen, title)
 
-        self.config_update() # Get preferences
-
-        self.spools = {}
-
         img_width = img_height = self._gtk.img_scale * self.bts * 1.5
         grid = Gtk.Grid()
         grid.set_column_homogeneous(True)
@@ -30,6 +26,7 @@ class Panel(ScreenPanel, MmuMixin):
 
         mmu = self._printer.get_stat("mmu")
         num_gates = len(mmu['gate_status'])
+        self.spools = {}
 
         self.w3c_colors = list(sorted(W3C_COLORS))
 
@@ -211,19 +208,9 @@ class Panel(ScreenPanel, MmuMixin):
         self.labels['layers'].set_current_page(0) # Gate list layer
 
 
-    def config_update(self):
-        self.use_spoolman = self._printer.spoolman and self._config.get_main_config().getboolean("mmu_use_spoolman", False)
-
-
     def activate(self):
-        self.config_update() # Get preferences
         self.refresh()
-        if self.use_spoolman:
-            self.spoolman_start_polling(callback=self.refresh, interval=None)
-
-
-    def deactivate(self):
-       self.use_spoolman = False
+        self.spoolman_start_polling(callback=self.refresh, interval=None)
 
 
     def refresh(self):
@@ -352,7 +339,7 @@ class Panel(ScreenPanel, MmuMixin):
             self.labels['c_selector'].set_active(-1)
         self.labels['filament'].set_active(self.ui_gate_status in (GATE_AVAILABLE, GATE_AVAILABLE_FROM_BUFFER))
 
-        allow_edit = False if self.use_spoolman else True
+        allow_edit = False if self.can_use_spoolman() else True
         self.labels['c_selector'].set_sensitive(allow_edit)
         self.labels['c_picker'].set_sensitive(allow_edit)
         self.labels['m_entry'].set_sensitive(allow_edit)
@@ -426,7 +413,7 @@ class Panel(ScreenPanel, MmuMixin):
         self.labels['id_entry'].set_text(spool_id)
         try:
             self.ui_gate_spool_id = int(spool_id)
-            if self.use_spoolman:
+            if self.can_use_spoolman():
                 sp = self.spools.get(str(self.ui_gate_spool_id), None)
                 if sp is not None:
                     # Reset material and color from spoolman

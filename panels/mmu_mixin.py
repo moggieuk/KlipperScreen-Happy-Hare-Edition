@@ -421,11 +421,18 @@ class MmuMixin:
 # Spoolman spool retriaval and updates
 # -------------------------------------------------------------------------------------------
 
+    def can_use_spoolman(self):
+        return self._printer.spoolman and self._config.get_main_config().getboolean("mmu_use_spoolman", False)
+
+
     def spoolman_start_polling(self, callback=None, interval=10):
         """
         Initiate spoolman polling. If intervate is None that it is a single poll
         """
         self.spoolman_stop_polling()
+        if not self.can_use_spoolman():
+            return
+
         self._spoolman_callback = callback
         if not getattr(self, "spools", None):
             self.spools={}

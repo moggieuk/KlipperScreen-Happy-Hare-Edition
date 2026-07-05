@@ -723,8 +723,9 @@ class Panel(ScreenPanel, MmuMixin):
         data = mmu['flowguard']
         flowrate = mmu["sync_feedback_flow_rate"]
 
-        gauge = self.labels['flowguard_gauge']
-        gauge.update(data, flowrate)
+        gauge = self.labels.get('flowguard_gauge')
+        if gauge:
+            gauge.update(data, flowrate)
 
         # Update frame heading
         enabled = data['enabled']
@@ -738,8 +739,9 @@ class Panel(ScreenPanel, MmuMixin):
         self.update_movement(data['encoder_pos'])
 
         mmu = self._printer.get_stat("mmu")
-        gauge = self.labels['encoder_gauge']
-        gauge.update(data)
+        gauge = self.labels.get('encoder_gauge')
+        if gauge:
+            gauge.update(data)
 
         # Update frame heading
         detection_mode = data['detection_mode']

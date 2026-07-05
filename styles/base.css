@@ -731,6 +731,7 @@ keyboard_box {
 .mmu_tool_image {
     margin-top: 12px;
     margin-bottom: 12px;
+    margin-right: 12px;
 }
 
 .mmu_entry_text {
@@ -764,7 +765,7 @@ keyboard_box {
 .mmu_tool_text {
     margin-top: 6px;
     margin-bottom: 6px;
-    font-size: 1.8em;
+    font-size: 1.6em;
 }
 
 .mmu_gate_text {
@@ -799,6 +800,14 @@ keyboard_box {
     padding: 0;
 }
 
+/* Filament status line */
+.mmu_status_filament {
+    font-size: 12pt;
+    margin-left: 8px;
+    margin-top: 16px;
+    margin-bottom: 16px;
+}
+
 .mmu_unicode_mono {
     font-family:
         "JetBrains Mono NL",
@@ -807,17 +816,6 @@ keyboard_box {
         "FreeMono",
         "Noto Sans Mono",
         monospace;
-}
-
-.mmu_status_filament {
-    font-size: 12pt;
-    margin-left: 8px;
-    margin-top: 8px;
-    margin-bottom: 8px;
-}
-
-.mmu_status_text {
-    margin-bottom: 8px;
 }
 
 .mmu_recover check {
@@ -841,24 +839,19 @@ keyboard_box {
     border-bottom-left-radius: .5em;
     border-top-right-radius: .5em;
     border-bottom-right-radius: .5em;
-    min-height: 2em;
+    min-height: 1.8em;
+}
+
+.mmu_es_gate_reset {
+    background: @active;
 }
 
 .mmu_es_gate_selected {
     background: @active;
 }
 
-.mmu_es_gate_reset {
-    padding-top: 1em;
-    background: @active;
-}
-
 .mmu_endless_spool_toggle {
     padding-bottom: .6em;
-}
-
-.mmu_unit_text {
-    font-weight: bold;
 }
 
 .mmu_spoolman_gate_text {
@@ -886,4 +879,46 @@ keyboard_box {
 .mmu_combobox box button {
     border: 0;
     padding: 0 1em;
+}
+
+.mmu-popup {
+    border-radius: 0.75em;
+}
+
+.mmu-popup-header {
+    background-color: rgba(255,255,255,0.10);
+}
+
+.mmu-popup-header label {
+    border-radius: 0.75em;
+    margin-top: 4px;
+    margin-bottom: 4px;
+    margin-left: 8px;
+    margin-right: 8px;
+
+    font-weight: bold;
+    font-size: 1.1em;
+}
+
+.mmu-spool-detail-small {
+    font-size: 0.85em;
+}
+
+.mmu-spool-detail-normal {
+    font-size: 0.95em;
+}
+
+.mmu-spool-detail-important {
+    font-size: 1.1em;
+    font-weight: bold;
+}
+
+.mmu-spool-detail-margin {
+    margin-bottom: 0.2em;
+    margin-left: 4px;
+}
+
+.mmu-spool-detail-header {
+    background-color: rgba(0, 0, 0, 0.2);
+    border-radius: 8px;
 }

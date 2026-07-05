@@ -156,9 +156,7 @@ class Panel(ScreenPanel, MmuMixin):
 
     def process_update(self, action, data):
         if action == "notify_status_update":
-            if 'configfile' in data:
-                return
-            elif 'mmu' in data:
+            if 'mmu' in data:
                 e_data = data['mmu']
                 if 'tool' in e_data or 'gate' in e_data or 'gate_status' in e_data or 'gate_material' in e_data or 'gate_color' in e_data:
                     self.activate()

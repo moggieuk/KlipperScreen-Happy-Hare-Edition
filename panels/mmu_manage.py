@@ -12,7 +12,6 @@ from gi.repository import Gtk, GLib, Pango
 from ks_includes.screen_panel import ScreenPanel
 from panels.mmu_mixin import *
 
-NOT_SET = -99
 
 class Panel(ScreenPanel, MmuMixin):
 

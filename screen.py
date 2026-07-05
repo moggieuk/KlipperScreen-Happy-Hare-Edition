@@ -163,6 +163,18 @@ class KlipperScreen(Gtk.ApplicationWindow):
         self.overlay = Gtk.Overlay()
         self.add(self.overlay)
         self.overlay.add_overlay(self.base_panel.main_grid)
+
+        # Happy Hare: Allow screen to be dimmed when showing popover
+        self.popup_dimmer = Gtk.DrawingArea()
+        self.popup_dimmer.set_no_show_all(True)
+        self.popup_dimmer.set_hexpand(True)
+        self.popup_dimmer.set_vexpand(True)
+        self._popup_dimmer_draw_handler = self.popup_dimmer.connect("draw", self._draw_popup_dimmer)
+        self.overlay.add_overlay(self.popup_dimmer)
+        self.overlay.set_overlay_pass_through(self.popup_dimmer, True)
+        self.popup_dimmer.hide()
+        # Happy Hare ^^^
+
         self.show_all()
         self.update_cursor(self.show_cursor)
         min_ver = (3, 8)
@@ -1513,6 +1525,25 @@ class KlipperScreen(Gtk.ApplicationWindow):
             self.gtk.update_layout(width, height, new_mode)
             self.base_panel._reconfigure_main_grid()
             self.reload_panels()
+
+# Happy Hare: Added support for screen dimming with popup
+    def _draw_popup_dimmer(self, widget, cr):
+        alloc = widget.get_allocation()
+        if alloc.width <= 0 or alloc.height <= 0:
+            return True
+        cr.set_source_rgba(0, 0, 0, 0.50)
+        cr.rectangle(0, 0, alloc.width, alloc.height)
+        cr.fill()
+        return True
+
+    def show_popup_dimmer(self):
+        if not self.popup_dimmer.get_visible():
+            self.popup_dimmer.show()
+
+    def hide_popup_dimmer(self):
+        if self.popup_dimmer.get_visible():
+            self.popup_dimmer.hide()
+# Happy Hare: Added ^^^
 
 
 class KlipperScreenApplication(Gtk.Application):

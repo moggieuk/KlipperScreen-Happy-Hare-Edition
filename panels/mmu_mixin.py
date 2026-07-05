@@ -12,9 +12,11 @@
 #
 # This file may be distributed under the terms of the GNU GPLv3 license.
 #
-
 import logging
-from gi.repository import Gdk
+
+from gi.repository   import Gdk, GLib
+
+from panels.spoolman import SpoolmanSpool
 
 
 TOOL_GATE_UNKNOWN = -1
@@ -234,6 +236,8 @@ W3C_COLORS = {
     'yellowgreen': '#9ACD32',
 }
 
+NO_FILAMENT_COLOR = '#808182E3'
+
 COLOR_RED        = Gdk.RGBA(1,0,0,1)
 COLOR_GREEN      = Gdk.RGBA(0,1,0,1)
 COLOR_DARK_GREY  = Gdk.RGBA(0.2,0.2,0.2,1)
@@ -242,6 +246,8 @@ COLOR_ORANGE     = Gdk.RGBA(1,0.8,0,1)
 
 COLOR_SWATCH = '⬤'
 EMPTY_SWATCH = '◯'
+
+NOT_SET = -99
 
 
 class MmuMixin:
@@ -346,6 +352,9 @@ class MmuMixin:
         mmu_machine = self._printer.get_stat("mmu_machine")
         if mmu_machine is None: return None
 
+        if gate == TOOL_GATE_UNKNOWN:
+            return mmu_machine['unit_0']
+
         for key, unit in mmu_machine.items():
             if not key.startswith("unit_"):
                 continue
@@ -362,3 +371,146 @@ class MmuMixin:
                 return unit
 
         return None
+
+
+    def get_tools_for_gate(self, gate):
+        mmu = self._printer.get_stat("mmu")
+        ttg_map = mmu["ttg_map"]
+
+        return [
+            tool
+            for tool, mapped_gate in enumerate(ttg_map)
+            if mapped_gate == gate
+        ]
+
+    def get_tools_for_gate_str(self, gate):
+        # Find tool(s) associated with gate
+        tools = self.get_tools_for_gate(gate)
+        if tools:
+            tool_str = f"T{tools[0]}"
+            if len(tools) > 1:
+                tool_str += "+"
+        else:
+            tool_str = ""
+        return tool_str
+
+
+    def get_endless_spool_group_order(self, gate):
+        mmu = self._printer.get_stat("mmu")
+        groups = mmu["endless_spool_groups"]
+        if gate < 0 or gate >= len(groups):
+            return []
+
+        group = groups[gate]
+        if group is None or group < 0:
+            return [gate]
+
+        gates = [
+            g for g, gate_group in enumerate(groups)
+            if gate_group == group
+        ]
+
+        if gate not in gates:
+            return []
+
+        i = gates.index(gate)
+        return gates[i:] + gates[:i]
+
+
+# -------------------------------------------------------------------------------------------
+# Spoolman spool retriaval and updates
+# -------------------------------------------------------------------------------------------
+
+    def spoolman_start_polling(self, callback=None, interval=10):
+        """
+        Initiate spoolman polling. If intervate is None that it is a single poll
+        """
+        self.spoolman_stop_polling()
+        self._spoolman_callback = callback
+        if not getattr(self, "spools", None):
+            self.spools={}
+        if interval is not None:
+            self._spoolman_refresh_timer_id = GLib.timeout_add_seconds(interval, self.spoolman_load_spools)
+        else:
+            self._spoolman_refresh_timer_id = None
+        self.spoolman_load_spools()
+
+
+    def spoolman_stop_polling(self):
+        if getattr(self, "_spoolman_refresh_timer_id", None):
+            GLib.source_remove(self._spoolman_refresh_timer_id)
+            self._spoolman_refresh_timer_id = None
+
+
+    def spoolman_load_spools(self):
+        self._screen.spoolman_api.load_all_spools(allow_archived=False, callback=self._spoolman_load_spools_cb)
+        return True
+
+
+    def _spoolman_load_spools_cb(self, spools):
+        if not spools:
+            self._screen.show_popup_message(_("Error trying to fetch spoolman spools"))
+            return
+
+        self.spools.clear()
+        for spool in spools:
+            spoolObject = SpoolmanSpool(**spool)
+            self.spools[str(spoolObject.id)] = spoolObject
+
+        if self._spoolman_callback is not None:
+            self._spoolman_callback()
+
+
+# -------------------------------------------------------------------------------------------
+# Common helper/utilities methods
+# -------------------------------------------------------------------------------------------
+
+class MmuUtils:
+
+    @staticmethod
+    def parse_color(color):
+        rgba = Gdk.RGBA()
+        if color and rgba.parse(color):
+            return rgba.red, rgba.green, rgba.blue, rgba.alpha
+        return 0.502, 0.506, 0.510, 0.890 # #808182E3 convention I used in other UI's
+
+
+    @staticmethod
+    def get_rgb_color(gate_color):
+        if gate_color and len(gate_color) == 8:
+            try:
+                int(gate_color, 16)
+                gate_color = gate_color[:6]
+            except ValueError:
+                pass
+        color = Gdk.RGBA()
+        if not Gdk.RGBA.parse(color, gate_color.lower() if gate_color else ""):
+            if not Gdk.RGBA.parse(color, '#' + gate_color if gate_color else ""):
+                return "" # TODO: NO_FILAMENT_COLOR better?
+        rgb_color = "#{:02x}{:02x}{:02x}".format(int(color.red * 255), int(color.green * 255), int(color.blue * 255))
+        return rgb_color
+
+
+    @staticmethod
+    def filament_text_color(filament_color):
+        """
+        Returns an RGB tuple for text that contrasts with the filament color.
+
+        Accepts CSS colors such as:
+            #RRGGBB
+            #RRGGBBAA
+            #RGB
+        """
+        r, g, b, a = MmuUtils.parse_color(filament_color)
+
+        # W3C relative luminance weighting.
+        perceived_lightness = (
+            r * 0.2126 +
+            g * 0.7152 +
+            b * 0.0722
+        )
+
+        if perceived_lightness > 0.6:
+            return (0.13, 0.13, 0.13)   # #222222
+        else:
+            return (1.0, 1.0, 1.0)      # White

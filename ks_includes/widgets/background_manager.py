@@ -3,6 +3,7 @@ import logging
 import os
 import pathlib
 import random
+import json
 
 from gi.repository import GdkPixbuf, GLib, Gtk
 
@@ -29,6 +30,34 @@ class BackgroundManager(Gtk.Image):
         self.set_hexpand(True)
         self.set_vexpand(True)
         self.set_visible(False)
+        self.state_file = os.path.expanduser("~/.config/KlipperScreen/background_state.json")
+
+    def _load_state(self):
+        try:
+            with open(self.state_file) as f:
+                return json.load(f)
+        except Exception:
+            return {}
+
+    def _save_state(self):
+        try:
+            os.makedirs(os.path.dirname(self.state_file), exist_ok=True)
+            state = self._load_state()
+            state[self.screen.theme] = {
+                "index": self.index
+            }
+            with open(self.state_file, "w") as f:
+                json.dump(state, f)
+        except Exception as e:
+            logging.debug(f"BackgroundManager failed saving state: {e}")
+
+    def _restore_index(self):
+        state = self._load_state()
+        theme_state = state.get(self.screen.theme, {})
+        self.index = int(theme_state.get("index", -1))
+
+        if self.images:
+            self.index %= len(self.images)
 
     def configure(self, options):
         """Apply dynamic background settings from the active theme options."""
@@ -51,6 +80,7 @@ class BackgroundManager(Gtk.Image):
 
         self.enabled = True
         self._find_images()
+        self._restore_index()
         self._show_next()
         self.set_visible(True)
         self._start_timer()
@@ -116,6 +146,7 @@ class BackgroundManager(Gtk.Image):
             return
 
         self.set_from_pixbuf(pixbuf)
+        self._save_state()
         logging.debug(f"BackgroundManager showing {path}")
 
     def _get_next_image_path(self):
@@ -125,17 +156,17 @@ class BackgroundManager(Gtk.Image):
         mode = self.settings["mode"].lower()
 
         if mode == "random":
-            return random.choice(self.images)
+            self.index = random.randrange(len(self.images))
+            return self.images[self.index]
 
         if mode == "sequential":
             self.index = (self.index + 1) % len(self.images)
             return self.images[self.index]
 
-        logging.warning(
-            f"Unknown background mode '{mode}', using random."
-        )
-        return random.choice(self.images)
-    
+        logging.warning(f"Unknown background mode '{mode}', using random")
+        self.index = random.randrange(len(self.images))
+        return self.images[self.index]
+        
     def _load_pixbuf(self, path):
         try:
             pixbuf = self.screen.gtk.PixbufFromFile(path)

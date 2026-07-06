@@ -1,3 +1,5 @@
+/* Dynamic Background theme based on Colorized theme */
+/* Modified to use transparent colors */
 /* Colorized theme created by Alfredo Monclus 2021 */
 /* Using solarized colors */
 @define-color solarized-base0   rgba(131, 148, 150, 0.2);  /*#839496;*/

@@ -1,20 +1,24 @@
 import glob
 import logging
 import os
-import random
 import pathlib
+import random
 
-from gi.repository import GdkPixbuf, GLib, Gtk
+from gi.repository import GLib, Gtk
 
 
 class BackgroundManager(Gtk.Image):
+    """Theme-controlled slideshow background widget for KlipperScreen."""
+    IMAGE_PATTERNS = ("*.png", "*.jpg", "*.jpeg", "*.webp")
+
     def __init__(self, screen):
         super().__init__()
 
         self.screen = screen
-        self.image_dir = os.path.expanduser("~/backgrounds")
+        self.image_dir = ""
         self.interval = 300
         self.randomize = True
+
         self.images = []
         self.index = -1
         self.timer = None
@@ -25,85 +29,119 @@ class BackgroundManager(Gtk.Image):
         self.set_visible(False)
 
     def configure(self, options):
+        """Apply dynamic background settings from the active theme options."""
         bg = options.get("dynamic_background", {})
-
-        directory = bg.get("directory", "backgrounds")
-
-        if os.path.isabs(directory) or directory.startswith("~"):
-            self.image_dir = os.path.expanduser(directory)
-        else:
-            self.image_dir = os.path.join(
-                pathlib.Path(__file__).parent.resolve().parent.parent,
-                "styles",
-                self.screen.theme,
-                directory,
-            )
-            logging.warning(f"BackgroundManager image_dir = {self.image_dir}")
 
         self.interval = int(bg.get("interval", 300))
         self.randomize = bool(bg.get("random", True))
 
+        self.set_image_directory(bg.get("directory", "backgrounds"))
+    
+    def set_image_directory(self, directory):
+        """Set the image directory, resolving relative paths inside the active theme."""
+        self.image_dir = self._resolve_image_dir(directory)
+        logging.debug(f"BackgroundManager image_dir = {self.image_dir}")
+
     def enable(self):
+        """Enable the slideshow and start rotating backgrounds."""
         if self.enabled:
             return
 
         self.enabled = True
-        self.load_images()
-        self.rotate_background()
+        self._find_images()
+        self._show_next()
         self.set_visible(True)
+        self._start_timer()
 
-        if self.timer is None:
-            self.timer = GLib.timeout_add_seconds(self.interval, self.rotate_background)
-
-        logging.warning("BackgroundManager enabled")
+        logging.debug("BackgroundManager enabled")
 
     def disable(self):
+        """Disable the slideshow and hide the background image."""
         if not self.enabled:
             return
 
         self.enabled = False
         self.clear()
         self.set_visible(False)
+        self._stop_timer()
 
-        if self.timer is not None:
-            GLib.source_remove(self.timer)
-            self.timer = None
-
-        logging.warning("BackgroundManager disabled")
-
-    def load_images(self):
-        patterns = ["*.png", "*.jpg", "*.jpeg", "*.webp"]
-        self.images = []
-
-        for pattern in patterns:
-            self.images.extend(glob.glob(os.path.join(self.image_dir, pattern)))
-
-        self.images.sort()
-        logging.warning(f"BackgroundManager found {len(self.images)} images")
+        logging.debug("BackgroundManager disabled")
 
     def rotate_background(self):
         if not self.enabled:
             return False
 
+        self._show_next()
+        return True
+
+    def _resolve_image_dir(self, directory):
+        if os.path.isabs(directory) or directory.startswith("~"):
+            return os.path.expanduser(directory)
+
+        klipperscreen_dir = pathlib.Path(__file__).parent.resolve().parent.parent
+
+        return os.path.join(
+            klipperscreen_dir,
+            "styles",
+            self.screen.theme,
+            directory,
+        )
+
+    def _find_images(self):
+        self.images = []
+
+        if not os.path.isdir(self.image_dir):
+            logging.warning(f"BackgroundManager directory not found: {self.image_dir}")
+            return
+
+        for pattern in self.IMAGE_PATTERNS:
+            self.images.extend(glob.glob(os.path.join(self.image_dir, pattern)))
+
+        self.images.sort()
+        self.index = -1
+
+        logging.debug(f"BackgroundManager found {len(self.images)} images")
+
+    def _show_next(self):
+        path = self._get_next_image_path()
+
+        if path is None:
+            return
+
+        pixbuf = self._load_pixbuf(path)
+
+        if pixbuf is None:
+            return
+
+        self.set_from_pixbuf(pixbuf)
+        logging.debug(f"BackgroundManager showing {path}")
+
+    def _get_next_image_path(self):
         if not self.images:
-            return True
+            return None
 
         if self.randomize:
-            path = random.choice(self.images)
-        else:
-            self.index = (self.index + 1) % len(self.images)
-            path = self.images[self.index]
+            return random.choice(self.images)
 
+        self.index = (self.index + 1) % len(self.images)
+        return self.images[self.index]
+
+    def _load_pixbuf(self, path):
         try:
-            pixbuf = self.screen.gtk.PixbufFromFile(
+            return self.screen.gtk.PixbufFromFile(
                 path,
                 self.screen.width,
                 self.screen.height,
             )
-            if pixbuf is not None:
-                self.set_from_pixbuf(pixbuf)
-                logging.warning(f"BackgroundManager showing {path}")
         except Exception as e:
             logging.exception(f"BackgroundManager failed loading {path}: {e}")
+            return None
 
-        return True
+    def _start_timer(self):
+        if self.timer is None:
+            self.timer = GLib.timeout_add_seconds(self.interval, self.rotate_background)
+
+    def _stop_timer(self):
+        if self.timer is not None:
+            GLib.source_remove(self.timer)
+            self.timer = None

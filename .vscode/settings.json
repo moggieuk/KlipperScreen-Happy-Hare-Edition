@@ -1,0 +1,7 @@
+{
+  "python.defaultInterpreterPath": "/home/pete/.KlipperScreen-env/bin/python",
+  "python.analysis.diagnosticSeverityOverrides": {
+    "reportAttributeAccessIssue": "none",
+    "reportMissingImports": "none"
+  }
+}

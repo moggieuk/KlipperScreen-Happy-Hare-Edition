@@ -90,12 +90,16 @@ class BackgroundManager(Gtk.Image):
     def disable(self):
         """Disable the slideshow and hide the background image."""
         if not self.enabled:
+            self.clear()
+            self.set_from_pixbuf(None)
+            self.hide()
             return
 
         self.enabled = False
-        self.clear()
-        self.set_visible(False)
         self._stop_timer()
+        self.clear()
+        self.set_from_pixbuf(None)
+        self.hide()
 
         logging.debug("BackgroundManager disabled")
 

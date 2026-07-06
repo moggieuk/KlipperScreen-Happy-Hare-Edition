@@ -61,9 +61,8 @@ class ScreenSaver:
         box.pack_start(close, True, True, 0)
         box.get_style_context().add_class("screensaver")
         self.blackbox = box
-        for child in self.screen.overlay.get_children():
-            child.hide()
-        self.screen.overlay.add(self.blackbox)
+        self.screen.base_panel.main_grid.hide()
+        self.screen.overlay.add_overlay(self.blackbox)
 
         # Avoid leaving a cursor-handle
         close.grab_focus()
@@ -101,8 +100,7 @@ class ScreenSaver:
         self.screen.overlay.remove(self.blackbox)
         self.blackbox = None
         logging.debug("Closed Screensaver")
-        for child in self.screen.overlay.get_children():
-            child.show()
+        self.screen.base_panel.main_grid.show()
         for dialog in self.screen.dialogs:
             logging.info(f"Restoring Dialog {dialog}")
             dialog.show()

@@ -4,7 +4,7 @@ import os
 import pathlib
 import random
 
-from gi.repository import GLib, Gtk
+from gi.repository import GdkPixbuf, GLib, Gtk
 
 
 class BackgroundManager(Gtk.Image):
@@ -128,14 +128,48 @@ class BackgroundManager(Gtk.Image):
 
     def _load_pixbuf(self, path):
         try:
-            return self.screen.gtk.PixbufFromFile(
-                path,
+            pixbuf = self.screen.gtk.PixbufFromFile(path)
+
+            if pixbuf is None:
+                return None
+
+            return self._scale_pixbuf_cover(
+                pixbuf,
                 self.screen.width,
                 self.screen.height,
             )
+
         except Exception as e:
             logging.exception(f"BackgroundManager failed loading {path}: {e}")
             return None
+
+    def _scale_pixbuf_cover(self, pixbuf, target_width, target_height):
+        source_width = pixbuf.get_width()
+        source_height = pixbuf.get_height()
+
+        scale = max(
+            target_width / source_width,
+            target_height / source_height,
+        )
+
+        scaled_width = int(source_width * scale)
+        scaled_height = int(source_height * scale)
+
+        scaled = pixbuf.scale_simple(
+            scaled_width,
+            scaled_height,
+            GdkPixbuf.InterpType.BILINEAR,
+        )
+
+        crop_x = int((scaled_width - target_width) / 2)
+        crop_y = int((scaled_height - target_height) / 2)
+
+        return scaled.new_subpixbuf(
+            crop_x,
+            crop_y,
+            target_width,
+            target_height,
+        )
 
     def _start_timer(self):
         if self.timer is None:

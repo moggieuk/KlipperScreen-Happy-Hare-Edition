@@ -15,9 +15,11 @@ class BackgroundManager(Gtk.Image):
         super().__init__()
 
         self.screen = screen
-        self.image_dir = ""
-        self.interval = 300
-        self.randomize = True
+        self.settings = {
+            "directory": "",
+            "interval": 300,
+            "mode": "random",
+        }
 
         self.images = []
         self.index = -1
@@ -32,15 +34,15 @@ class BackgroundManager(Gtk.Image):
         """Apply dynamic background settings from the active theme options."""
         bg = options.get("dynamic_background", {})
 
-        self.interval = int(bg.get("interval", 300))
-        self.randomize = bool(bg.get("random", True))
+        self.settings["interval"] = int(bg.get("interval", 300))
+        self.settings["mode"] = bg.get("mode", "random")
 
         self.set_image_directory(bg.get("directory", "backgrounds"))
     
     def set_image_directory(self, directory):
         """Set the image directory, resolving relative paths inside the active theme."""
-        self.image_dir = self._resolve_image_dir(directory)
-        logging.debug(f"BackgroundManager image_dir = {self.image_dir}")
+        self.settings["directory"] = self._resolve_image_dir(directory)
+        logging.debug(f"BackgroundManager image_dir = {self.settings['directory']}")
 
     def enable(self):
         """Enable the slideshow and start rotating backgrounds."""
@@ -90,12 +92,12 @@ class BackgroundManager(Gtk.Image):
     def _find_images(self):
         self.images = []
 
-        if not os.path.isdir(self.image_dir):
-            logging.warning(f"BackgroundManager directory not found: {self.image_dir}")
+        if not os.path.isdir(self.settings["directory"]):
+            logging.warning(f"BackgroundManager directory not found: {self.settings['directory']}")
             return
 
         for pattern in self.IMAGE_PATTERNS:
-            self.images.extend(glob.glob(os.path.join(self.image_dir, pattern)))
+            self.images.extend(glob.glob(os.path.join(self.settings["directory"], pattern)))
 
         self.images.sort()
         self.index = -1
@@ -120,12 +122,20 @@ class BackgroundManager(Gtk.Image):
         if not self.images:
             return None
 
-        if self.randomize:
+        mode = self.settings["mode"].lower()
+
+        if mode == "random":
             return random.choice(self.images)
 
-        self.index = (self.index + 1) % len(self.images)
-        return self.images[self.index]
+        if mode == "sequential":
+            self.index = (self.index + 1) % len(self.images)
+            return self.images[self.index]
 
+        logging.warning(
+            f"Unknown background mode '{mode}', using random."
+        )
+        return random.choice(self.images)
+    
     def _load_pixbuf(self, path):
         try:
             pixbuf = self.screen.gtk.PixbufFromFile(path)
@@ -173,7 +183,10 @@ class BackgroundManager(Gtk.Image):
 
     def _start_timer(self):
         if self.timer is None:
-            self.timer = GLib.timeout_add_seconds(self.interval, self.rotate_background)
+            self.timer = GLib.timeout_add_seconds(
+                self.settings["interval"],
+                self.rotate_background,
+            )
 
     def _stop_timer(self):
         if self.timer is not None:

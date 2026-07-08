@@ -222,7 +222,6 @@ class BackgroundManager(Gtk.Image):
         self.index = self.shuffle_bag.pop()
         return self.images[self.index]
 
-
     def _get_sequential_image_path(self):
         self.index = (self.index + 1) % len(self.images)
         return self.images[self.index]

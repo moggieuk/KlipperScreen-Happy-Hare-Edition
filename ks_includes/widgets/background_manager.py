@@ -15,9 +15,9 @@ import logging
 import os
 import pathlib
 import random
+from collections import OrderedDict
 
 from gi.repository import GdkPixbuf, GLib, Gtk
-from collections import OrderedDict
 
 # Maximum number of fully scaled background images to retain.
 #
@@ -25,6 +25,7 @@ from collections import OrderedDict
 # keeping memory usage around 10–15 MB at 1024×600. Increasing this value
 # reduces image decode frequency at the expense of additional RAM.
 DEFAULT_PIXBUF_CACHE_SIZE = 5
+
 
 class BackgroundManager(Gtk.Image):
     """Theme-controlled slideshow background widget for KlipperScreen."""
@@ -44,6 +45,7 @@ class BackgroundManager(Gtk.Image):
 
         self.pixbuf_cache_limit = DEFAULT_PIXBUF_CACHE_SIZE
         self.images = []
+        self.shuffle_bag = []
         self.index = -1
         self.timer = None
         self.enabled = False
@@ -164,6 +166,7 @@ class BackgroundManager(Gtk.Image):
 
         self.images.sort()
         self.index = -1
+        self.shuffle_bag = []
 
         logging.debug(f"BackgroundManager found {len(self.images)} images")
 
@@ -176,8 +179,8 @@ class BackgroundManager(Gtk.Image):
         bounded memory footprint.
         """
         for path in self.images[: self.pixbuf_cache_limit]:
-           self._load_pixbuf(path)
-        
+            self._load_pixbuf(path)
+
         logging.debug(f"BackgroundManager primed {len(self.pixbuf_cache)} cached wallpapers")
 
     def _show_next(self):
@@ -193,7 +196,7 @@ class BackgroundManager(Gtk.Image):
 
         self.set_from_pixbuf(pixbuf)
         self._save_state()
-        #logging.debug(f"BackgroundManager showing {path}")
+        # logging.debug(f"BackgroundManager showing {path}")
 
     def _get_next_image_path(self):
         if not self.images:
@@ -202,15 +205,26 @@ class BackgroundManager(Gtk.Image):
         mode = self.settings["mode"].lower()
 
         if mode == "random":
-            self.index = random.randrange(len(self.images))
-            return self.images[self.index]
+            return self._get_random_image_path()
 
         if mode == "sequential":
-            self.index = (self.index + 1) % len(self.images)
-            return self.images[self.index]
+            return self._get_sequential_image_path()
 
         logging.warning(f"Unknown background mode '{mode}', using random")
-        self.index = random.randrange(len(self.images))
+        return self._get_random_image_path()
+
+    def _get_random_image_path(self):
+        if not self.shuffle_bag:
+            self.shuffle_bag = list(range(len(self.images)))
+            random.shuffle(self.shuffle_bag)
+            # logging.debug("BackgroundManager reshuffling image order")
+
+        self.index = self.shuffle_bag.pop()
+        return self.images[self.index]
+
+
+    def _get_sequential_image_path(self):
+        self.index = (self.index + 1) % len(self.images)
         return self.images[self.index]
 
     def _load_pixbuf(self, path):

@@ -104,28 +104,23 @@ class BackgroundManager(Gtk.Image):
 
     def enable(self):
         """Enable the slideshow and start rotating backgrounds."""
-        if self.enabled:
-            return
-
         self.enabled = True
+
+        self._stop_timer()
         self._find_images()
         self._restore_index()
+
         if self.settings["preload"]:
             self._prime_cache()
+
         self._show_next()
-        self.set_visible(True)
+        self.show()
         self._start_timer()
 
         logging.debug("BackgroundManager enabled")
 
     def disable(self):
         """Disable the slideshow and hide the background image."""
-        if not self.enabled:
-            self.clear()
-            self.set_from_pixbuf(None)
-            self.hide()
-            return
-
         self.enabled = False
         self._stop_timer()
         self.clear()

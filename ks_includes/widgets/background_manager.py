@@ -1,15 +1,34 @@
+"""
+Theme-controlled dynamic background widget for KlipperScreen.
+
+BackgroundManager displays a rotating image behind the main UI using the
+application Gtk.Overlay. It is configured by the active theme's style.conf
+file and supports theme-local background directories.
+
+Images are loaded through KlipperScreen's existing image helpers and scaled
+to cover the screen without stretching.
+"""
+
 import glob
+import json
 import logging
 import os
 import pathlib
 import random
-import json
 
 from gi.repository import GdkPixbuf, GLib, Gtk
+from collections import OrderedDict
 
+# Maximum number of fully scaled background images to retain.
+#
+# A cache size of 5 provides nearly instantaneous background changes while
+# keeping memory usage around 10–15 MB at 1024×600. Increasing this value
+# reduces image decode frequency at the expense of additional RAM.
+DEFAULT_PIXBUF_CACHE_SIZE = 5
 
 class BackgroundManager(Gtk.Image):
     """Theme-controlled slideshow background widget for KlipperScreen."""
+
     IMAGE_PATTERNS = ("*.png", "*.jpg", "*.jpeg", "*.webp")
 
     def __init__(self, screen):
@@ -20,8 +39,10 @@ class BackgroundManager(Gtk.Image):
             "directory": "",
             "interval": 300,
             "mode": "random",
+            "preload": False,
         }
 
+        self.pixbuf_cache_limit = DEFAULT_PIXBUF_CACHE_SIZE
         self.images = []
         self.index = -1
         self.timer = None
@@ -31,6 +52,8 @@ class BackgroundManager(Gtk.Image):
         self.set_vexpand(True)
         self.set_visible(False)
         self.state_file = os.path.expanduser("~/.config/KlipperScreen/background_state.json")
+        self.pixbuf_cache = OrderedDict()
+        self.pixbuf_cache_limit = 5
 
     def _load_state(self):
         try:
@@ -43,9 +66,7 @@ class BackgroundManager(Gtk.Image):
         try:
             os.makedirs(os.path.dirname(self.state_file), exist_ok=True)
             state = self._load_state()
-            state[self.screen.theme] = {
-                "index": self.index
-            }
+            state[self.screen.theme] = {"index": self.index}
             with open(self.state_file, "w") as f:
                 json.dump(state, f)
         except Exception as e:
@@ -67,10 +88,16 @@ class BackgroundManager(Gtk.Image):
         self.settings["mode"] = bg.get("mode", "random")
 
         self.set_image_directory(bg.get("directory", "backgrounds"))
-    
+        self.settings["preload"] = bool(bg.get("preload", False))
+
     def set_image_directory(self, directory):
         """Set the image directory, resolving relative paths inside the active theme."""
-        self.settings["directory"] = self._resolve_image_dir(directory)
+        image_dir = self._resolve_image_dir(directory)
+
+        if image_dir != self.settings["directory"]:
+            self.pixbuf_cache.clear()
+
+        self.settings["directory"] = image_dir
         logging.debug(f"BackgroundManager image_dir = {self.settings['directory']}")
 
     def enable(self):
@@ -81,6 +108,8 @@ class BackgroundManager(Gtk.Image):
         self.enabled = True
         self._find_images()
         self._restore_index()
+        if self.settings["preload"]:
+            self._prime_cache()
         self._show_next()
         self.set_visible(True)
         self._start_timer()
@@ -138,6 +167,19 @@ class BackgroundManager(Gtk.Image):
 
         logging.debug(f"BackgroundManager found {len(self.images)} images")
 
+    def _prime_cache(self):
+        """
+        Preload the pixbuf cache with the first N wallpapers.
+
+        Only enough images to fill the configured cache are loaded. This reduces
+        CPU usage during the first few background changes while maintaining a
+        bounded memory footprint.
+        """
+        for path in self.images[: self.pixbuf_cache_limit]:
+           self._load_pixbuf(path)
+        
+        logging.debug(f"BackgroundManager primed {len(self.pixbuf_cache)} cached wallpapers")
+
     def _show_next(self):
         path = self._get_next_image_path()
 
@@ -151,7 +193,7 @@ class BackgroundManager(Gtk.Image):
 
         self.set_from_pixbuf(pixbuf)
         self._save_state()
-        logging.debug(f"BackgroundManager showing {path}")
+        #logging.debug(f"BackgroundManager showing {path}")
 
     def _get_next_image_path(self):
         if not self.images:
@@ -170,19 +212,37 @@ class BackgroundManager(Gtk.Image):
         logging.warning(f"Unknown background mode '{mode}', using random")
         self.index = random.randrange(len(self.images))
         return self.images[self.index]
-        
+
     def _load_pixbuf(self, path):
+        cache_key = (
+            path,
+            self.screen.width,
+            self.screen.height,
+        )
+
+        if cache_key in self.pixbuf_cache:
+            self.pixbuf_cache.move_to_end(cache_key)
+            return self.pixbuf_cache[cache_key]
+
         try:
             pixbuf = self.screen.gtk.PixbufFromFile(path)
 
             if pixbuf is None:
                 return None
 
-            return self._scale_pixbuf_cover(
+            pixbuf = self._scale_pixbuf_cover(
                 pixbuf,
                 self.screen.width,
                 self.screen.height,
             )
+
+            self.pixbuf_cache[cache_key] = pixbuf
+            self.pixbuf_cache.move_to_end(cache_key)
+
+            while len(self.pixbuf_cache) > self.pixbuf_cache_limit:
+                self.pixbuf_cache.popitem(last=False)
+
+            return pixbuf
 
         except Exception as e:
             logging.exception(f"BackgroundManager failed loading {path}: {e}")

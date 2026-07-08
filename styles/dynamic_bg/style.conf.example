@@ -1,10 +1,10 @@
 {
   "dynamic_background": {
-  "enabled": true,
-  "directory": "backgrounds",
-  "interval": 10,
-  "mode": "random",
-  "preload": true
+    "enabled": true,            # Enable dynamic backgrounds for this theme
+    "directory": "backgrounds", # Relative to this theme folder, or absolute path
+    "interval": 300,            # Seconds between background changes
+    "mode": "random"            # Supported: random, sequential
+    "preload: "true"            # Preload background images to minimize CPU usage during changes 
   },
   "graph_colors": {
     "extruder": {

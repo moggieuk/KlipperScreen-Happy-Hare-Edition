@@ -61,6 +61,9 @@ class ScreenSaver:
         box.pack_start(close, True, True, 0)
         box.get_style_context().add_class("screensaver")
         self.blackbox = box
+
+        # Only hide the main UI layer. Other overlay children, such as optional
+        # background widgets, should not be blindly hidden or restored here.
         self.screen.base_panel.main_grid.hide()
         self.screen.overlay.add_overlay(self.blackbox)
 
@@ -100,6 +103,8 @@ class ScreenSaver:
         self.screen.overlay.remove(self.blackbox)
         self.blackbox = None
         logging.debug("Closed Screensaver")
+
+        # Restore the main UI layer hidden by ScreenSaver.show().
         self.screen.base_panel.main_grid.show()
         for dialog in self.screen.dialogs:
             logging.info(f"Restoring Dialog {dialog}")

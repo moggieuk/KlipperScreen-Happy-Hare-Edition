@@ -78,15 +78,33 @@ class Panel(ScreenPanel, MmuMixin):
             'resume': self._gtk.Button('resume', 'Resume', 'color3'),
             'extrude': self._gtk.Button('extrude', 'Extrude...', 'color4'),
             'more': self._gtk.Button('mmu_more', 'More...', 'color1'),
-            'tool_icon': self._gtk.Image('mmu_extruder', self._gtk.img_width * 0.8, self._gtk.img_height * 0.8),
+            'tool_icon': self._gtk.Image('mmu_extruder', self._gtk.img_width * 0.7, self._gtk.img_height * 0.7),
+            'tool_icon_overlay': Gtk.Overlay(),
             'tool_label': Gtk.Label('T?'),
             'filament': Gtk.Label('Filament: Unknown'),
             'select_bypass_img': self._gtk.Image('mmu_select_bypass'), # Alternative for tool
             'load_bypass_img': self._gtk.Image('mmu_load_bypass'),     # Alternative for picker
             'unload_bypass_img': self._gtk.Image('mmu_unload_bypass'), # Alternative for unload/eject
             'eject_img': self._gtk.Image('mmu_eject'),                 # Alternative for unload button to fully eject
-            'sync_drive_img': self._gtk.Image('mmu_synced_extruder', self._gtk.img_width * 0.8, self._gtk.img_height * 0.8), # Alternative for tool_icon
+            'sync_drive_img': self._gtk.Image('mmu_synced_extruder', self._gtk.img_width * 0.7, self._gtk.img_height * 0.7), # Alternative for tool_icon
         }
+
+        # Overlay for extruder temperature
+        image_box = Gtk.Box()
+        image_box.set_valign(Gtk.Align.START)
+        image_box.set_margin_right(8)
+        image_box.set_margin_bottom(12)
+        image_box.add(l["tool_icon"])
+        l['tool_icon_overlay'].add(image_box)
+
+        l['tool_badge'] = tb = Gtk.Label(label="-°C")
+        tb.set_halign(Gtk.Align.END)
+        tb.set_valign(Gtk.Align.END)
+        tb.set_margin_end(1)
+        tb.set_margin_bottom(1)
+        tb.get_style_context().add_class("mmu_tool_badge")
+        l['tool_icon_overlay'].add_overlay(tb)
+
         l['unload_img'] = l['unload'].get_image()
         l['tool_img'] = l['tool'].get_image()
         l['tool_picker_img'] = l['picker'].get_image()
@@ -113,7 +131,6 @@ class Panel(ScreenPanel, MmuMixin):
         l['t_decrease'].set_hexpand(False)
         l['t_decrease'].get_style_context().add_class("mmu_sel_decrease")
 
-        l['tool_icon'].get_style_context().add_class("mmu_tool_image")
         l['tool_label'].get_style_context().add_class("mmu_tool_text")
         l['tool_label'].set_xalign(0)
         l['filament'].set_xalign(0)
@@ -200,7 +217,7 @@ class Panel(ScreenPanel, MmuMixin):
 
             # Top line status ------------------------------------------
             top_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
-            top_box.pack_start(l['tool_icon'], False, True, 0)
+            top_box.pack_start(l['tool_icon_overlay'], False, True, 0)
             top_box.pack_start(l['tool_label'], True, True, 0)
             top_box.pack_start(l['filament'], True, True, 0)
 
@@ -290,10 +307,10 @@ class Panel(ScreenPanel, MmuMixin):
             fil_row.pack_start(l['tool_label'], False, False, 0)
             l['filament_pos'].set_hexpand(True)
             l['filament_pos'].set_halign(Gtk.Align.FILL)
-            l['filament_pos'].set_xalign(0.0)      # Left-justify the text
+            l['filament_pos'].set_xalign(0.0)        # Left-justify the text
             fil_row.pack_start(l['filament_pos'], True, True, 0)
-            l['tool_icon'].set_margin_end(6)       # Right padding
-            fil_row.pack_end(l['tool_icon'], False, False, 0)
+            l['tool_icon_overlay'].set_margin_end(2) # Right padding
+            fil_row.pack_end(l['tool_icon_overlay'], False, False, 0)
 
             main_grid = Gtk.Grid()
             main_grid.set_vexpand(True)
@@ -387,9 +404,23 @@ class Panel(ScreenPanel, MmuMixin):
         event_box.connect("button-press-event", self._next_notebook_corner_page)
         return event_box
 
+        for x in self._printer.get_tools():
+            if x in data:
+                self.update_temp(
+                    x,
+                    self._printer.get_stat(x, "temperature"),
+                    self._printer.get_stat(x, "target"),
+                    self._printer.get_stat(x, "power"),
+                )
+        if "current_extruder" in self.labels:
+            self.labels["current_extruder"].set_label(
+                self.labels[self.current_extruder].get_label()
+            )
+
 
     def process_update(self, action, data):
         if action == "notify_status_update" and data is not None:
+
             filament_status_updated = False
 
             try:
@@ -481,7 +512,10 @@ class Panel(ScreenPanel, MmuMixin):
                     if 'print_state' in e_data:
                         self.update_active_buttons()
 
-                    self.update_active_buttons()
+                current_extruder = self._printer.get_stat("toolhead", "extruder")
+                if 'configfile' not in data:
+                if current_extruder in data:
+                    self.update_extruder_temp()
 
             except KeyError:
                 # Almost certainly a version mismatch of Happy Hare on the printer
@@ -644,31 +678,72 @@ class Panel(ScreenPanel, MmuMixin):
         last_tool = mmu['last_tool']
         sync_drive = mmu['sync_drive']
         filament = mmu['filament']
+
+        # Tool text ----------
         if next_tool != TOOL_GATE_UNKNOWN:
             # Change in progress
-            text = ("T%d " % last_tool) if (last_tool >= 0 and last_tool != next_tool) else "Byp " if last_tool == -2 else "T? " if last_tool == -1 else ""
-            text += ("> T%d" % next_tool) if next_tool >= 0 else ""
+            self.labels["tool_label"].get_style_context().remove_class("mmu_tool_text") # Smaller
+
+            if last_tool >= 0 and last_tool != next_tool:
+                text = f"T{last_tool}"
+            elif last_tool == TOOL_GATE_BYPASS:
+                text = "Byp"
+            elif last_tool == TOOL_GATE_UNKNOWN:
+                text = "T?"
+            else:
+                text = ""
+
+            if next_tool >= 0:
+                text += f">T{next_tool}"
+
         else:
-            text = ("T%d " % tool) if tool >= 0 else "Byp " if tool == -2 else "T? " if tool == -1 else ""
-        self.labels['tool_label'].set_text(text)
+            self.labels['tool_label'].get_style_context().add_class("mmu_tool_text") # Larger
+
+            if tool >= 0:
+                text = f"T{tool}"
+            elif tool == TOOL_GATE_BYPASS:
+                text = "Byp"
+            elif tool == TOOL_GATE_UNKNOWN:
+                text = "T?"
+            else:
+                text = ""
+
+        self.labels["tool_label"].set_text(text)
+
+        # Extruder sync drive status --------
         if sync_drive:
             self.labels['tool_icon'].set_from_pixbuf(self.labels['sync_drive_pixbuf'])
         else:
             self.labels['tool_icon'].set_from_pixbuf(self.labels['tool_icon_pixbuf'])
+
+        # Adjust buttons (class display) ---------
         if tool == TOOL_GATE_BYPASS:
             self.labels['picker'].set_image(self.labels['load_bypass_img'])
             self.labels['picker'].set_label(f"Load")
             self.labels['unload'].set_image(self.labels['unload_bypass_img'])
             self.labels['unload'].set_label(f"Unload")
+
         else:
             self.labels['picker'].set_image(self.labels['tool_picker_img'])
             self.labels['picker'].set_label(f"Tools...")
+
             if filament != "Unloaded":
                 self.labels['unload'].set_image(self.labels['unload_img'])
                 self.labels['unload'].set_label("Unload")
             else:
                 self.labels['unload'].set_image(self.labels['eject_img'])
                 self.labels['unload'].set_label("Eject")
+
+
+    def update_extruder_temp(self):
+        current_extruder = self._printer.get_stat("toolhead", "extruder")
+        temp = float(self._printer.get_stat(current_extruder, "temperature"))
+        can_extrude = bool(self._printer.get_stat(current_extruder, "can_extrude"))
+        self.labels['tool_badge'].set_label(f"{temp:.0f}°C")
+        if not can_extrude:
+            self.labels['tool_badge'].get_style_context().add_class("mmu_tool_badge_warning")
+        else:
+            self.labels['tool_badge'].get_style_context().remove_class("mmu_tool_badge_warning")
 
 
     def update_tool_buttons(self, tool_sensitive=True):
@@ -694,7 +769,7 @@ class Panel(ScreenPanel, MmuMixin):
             else:
                 self.labels['t_increase'].set_sensitive(True)
 
-        # Set load button image and text
+        # Set load button image and text (classic view)
         if action == "Idle":
             if self.ui_sel_tool >= 0:
                 self.labels['tool'].set_label(f"T{self.ui_sel_tool}")

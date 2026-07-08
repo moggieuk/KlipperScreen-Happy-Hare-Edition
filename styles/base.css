@@ -728,10 +728,14 @@ keyboard_box {
     margin-top: 0;
 }
 
-.mmu_tool_image {
-    margin-top: 12px;
-    margin-bottom: 12px;
-    margin-right: 12px;
+.mmu_tool_badge {
+    font-size: 12px;
+    font-weight: bold;
+    padding: 0px 1px;
+}
+
+.mmu_tool_badge_warning {
+    color: @warning;
 }
 
 .mmu_entry_text {
@@ -765,7 +769,7 @@ keyboard_box {
 .mmu_tool_text {
     margin-top: 6px;
     margin-bottom: 6px;
-    font-size: 1.6em;
+    font-size: 1.4em;
 }
 
 .mmu_gate_text {

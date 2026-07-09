@@ -514,8 +514,8 @@ class Panel(ScreenPanel, MmuMixin):
 
                 current_extruder = self._printer.get_stat("toolhead", "extruder")
                 if 'configfile' not in data:
-                if current_extruder in data:
-                    self.update_extruder_temp()
+                    if current_extruder in data:
+                        self.update_extruder_temp()
 
             except KeyError:
                 # Almost certainly a version mismatch of Happy Hare on the printer

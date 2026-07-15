@@ -1576,9 +1576,11 @@ class MmuSpoolTray(Gtk.DrawingArea):
 
         viewport_w = width - margin * 2
 
+        tray_pad = slot_w * tray_pad_ratio
+
         content_w = (
             total_spools * slot_w +
-            max(0, len(groups) - 1) * group_gap +
+            max(0, len(groups) - 1) * (group_gap + 2 * tray_pad) +
             scroll_pad * 2
         )
 
@@ -1670,7 +1672,6 @@ class MmuSpoolTray(Gtk.DrawingArea):
                         espooler=item.get("espooler"),
                     )
 
-                tray_pad = slot_w * tray_pad_ratio
                 tray_x = group_start - tray_pad
                 tray_w = group_w + tray_pad * 2
 
@@ -1682,7 +1683,7 @@ class MmuSpoolTray(Gtk.DrawingArea):
 
                 lid_rects.append((tray_x, lid_top, tray_w, lid_height, spool_h))
 
-                x += group_gap
+                x += group_gap + 2 * tray_pad 
 
             # Draw glass lids after spools but before trays.
             for rect in lid_rects:
@@ -2170,12 +2171,13 @@ class MmuSpoolTray(Gtk.DrawingArea):
         group_gap = layout["group_gap"]
         margin = layout["margin"]
         scroll_pad = layout["scroll_pad"]
+        tray_pad = slot_w * layout["tray_pad_ratio"]
 
         viewport_w = width - margin * 2
 
         content_w = (
             total_spools * slot_w +
-            max(0, len(groups) - 1) * group_gap +
+            max(0, len(groups) - 1) * (group_gap + 2 * tray_pad) +  # CHANGED
             scroll_pad * 2
         )
 
@@ -2189,7 +2191,7 @@ class MmuSpoolTray(Gtk.DrawingArea):
                 ordered_items.append((item, x))
                 x += slot_w
 
-            x += group_gap
+            x += group_gap + 2 * tray_pad
 
         first_gate = ordered_items[0][0]["gate"]
         last_gate = ordered_items[-1][0]["gate"]

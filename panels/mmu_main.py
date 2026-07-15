@@ -371,12 +371,9 @@ class Panel(ScreenPanel, MmuMixin):
         pages = range(0, n_pages)
         mmu = self._printer.get_stat("mmu")
         mmu_print_state = mmu['print_state']
-        printing = mmu_print_state in ("started",  "printing")
 
         for i in range(1, n_pages + 1):
             candidate = (page + i) % n_pages
-            if candidate == 0 and printing:
-                continue
 
             if self._is_clickable_page(notebook, candidate):
                 notebook.set_current_page(candidate)
@@ -944,9 +941,7 @@ class Panel(ScreenPanel, MmuMixin):
             notebook = self.labels['notebook_corner']
             page = notebook.get_current_page()
             if page == 0 and printing:
-                # Get off manage button (which is hidden in print)
-                # Call twice to prefer one of the possible flowguard monitors
-                self._next_notebook_corner_page()
+                # Get off "manage" button and Move to one of the monitor gauges
                 self._next_notebook_corner_page()
 
             if ("paused" not in ui_state and "pause_locked" not in ui_state) or "no_message" in ui_state:

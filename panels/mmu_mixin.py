@@ -331,21 +331,29 @@ class MmuMixin:
 
 
     def get_selector_type(self):
-        # >v3.1 method...
+        selector_type = None
         mmu = self._printer.get_stat("mmu")
+
+        # >v3.1 method
         gate = mmu['gate']
         mmu_unit = self.get_mmu_unit(gate)
         if mmu_unit is not None:
-            return mmu_unit['selector_type']
+            selector_type = mmu_unit['selector_type']
 
-        # v3.0...
-        mmu = self._printer.get_stat("mmu")
-        selector_type = mmu.get('selector_type', None)
-        if selector_type:
-            return selector_type
+        # v3.0 fallback
+        if selector_type is None:
+            selector_type = mmu.get('selector_type', None)
 
         # Prior to v3.0
-        return 'LinearServoSelector'
+        if selector_type is None:
+            selector_type = 'LinearServoSelector'
+
+        # FIXME: temporary for inconsistent name change (minimal MMUs use
+        # LinearSelector but it was used for ERCF which has a servo)
+        if selector_type == 'LinearSelector':
+            selector_type = 'LinearServoSelector'
+
+        return selector_type
 
 
     def get_mmu_unit(self, gate):

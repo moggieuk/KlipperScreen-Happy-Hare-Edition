@@ -570,12 +570,22 @@ class BasePanel(ScreenPanel):
             self.update_shortcut_icon(level=0)
         self.menu_item_clicked(widget, item)
 
+    def _shortcut_icon_size(self): # Happy Hare: Added because it appears some icons are missing in some themes(?)
+        # The current image has no pixbuf if the icon is missing from the theme
+        image = self.control["shortcut"].get_image()
+        pixbuf = image.get_pixbuf() if image is not None else None
+        if pixbuf is not None:
+            return pixbuf.get_width(), pixbuf.get_height()
+        logging.error("Couldn't get pixbuf for shortcut, a custom theme may have caused this")
+        size = self._gtk.img_scale * self.abscale * 1.4
+        return size, size
+
     def update_shortcut(self, target):
         self.shortcut["panel"] = target
         self.shortcut["icon"] = self._get_shortcut_icon(target)
-        pixbuf = self.control["shortcut"].get_image().get_pixbuf()
+        width, height = self._shortcut_icon_size()
         self.control["shortcut"].set_image(
-            self._gtk.Image(self.shortcut["icon"], pixbuf.get_width(), pixbuf.get_height())
+            self._gtk.Image(self.shortcut["icon"], width, height)
         )
         self.show_shortcut(target)
 
@@ -609,7 +619,7 @@ class BasePanel(ScreenPanel):
 
         self.set_control_sensitive(available, control="shortcut")
 
-    def update_shortcut_icon(self, level=None):
+    def update_shortcut_icon(self, level=0):
         if self.shortcut["panel"] != "notifications":
             return
         if level > 0:
@@ -625,9 +635,9 @@ class BasePanel(ScreenPanel):
         else:
             icon = "notifications"
         self.shortcut["icon"] = icon
-        pixbuf = self.control["shortcut"].get_image().get_pixbuf()
+        width, height = self._shortcut_icon_size()
         self.control["shortcut"].set_image(
-            self._gtk.Image(icon, pixbuf.get_width(), pixbuf.get_height())
+            self._gtk.Image(icon, width, height)
         )
 
     def show_mmu_shortcut(self, show=True): # Happy Hare

@@ -119,7 +119,6 @@ class Panel(ScreenPanel):
         name.set_vexpand(False)
         name.set_halign(Gtk.Align.START)
         name.connect("clicked", self.send_load_mesh, profile)
-        name.connect("clicked", self.update_graph, profile)
 
         buttons = {
             "save": self._gtk.Button("complete", None, "color4", self.bts),
@@ -174,8 +173,10 @@ class Panel(ScreenPanel):
     def process_update(self, action, data):
         if action != "notify_status_update":
             return
-        if "bed_mesh" in data and "profile_name" in data["bed_mesh"]:
-            self.activate_mesh(data["bed_mesh"]["profile_name"])
+        if "bed_mesh" in data:
+            if "profile_name" in data["bed_mesh"]:
+                self.activate_mesh(data["bed_mesh"]["profile_name"])
+            self.load_meshes()
 
     def remove_create(self):
         if self.show_create is False:
@@ -203,6 +204,7 @@ class Panel(ScreenPanel):
         self.active_mesh = None
         self.update_graph()
         self.buttons["clear"].set_sensitive(False)
+        self.remove_create()
 
     def _get_position(self, profile):
         pl = list(self.profiles)
@@ -242,6 +244,7 @@ class Panel(ScreenPanel):
             self.labels["create_profile"].pack_start(box, True, True, 5)
 
         self.content.add(self.labels["create_profile"])
+        self.labels["create_profile"].show_all()
         self.labels["profile_name"].grab_focus_without_selecting()
         self.show_create = True
 

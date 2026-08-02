@@ -5,7 +5,6 @@ import gi
 
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gtk
-from jinja2 import Template
 
 from ks_includes.screen_panel import ScreenPanel
 from ks_includes.widgets.autogrid import AutoGrid
@@ -17,6 +16,7 @@ class Panel(ScreenPanel):
         self.menu_callbacks = {} # Happy Hare
         self.items = items
         self.j2_data = self._printer.get_printer_status_data()
+        self._compiled_enable = {}
         self.create_menu_items()
         self.scroll = self._gtk.ScrolledWindow()
         self.scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
@@ -178,15 +178,25 @@ class Panel(ScreenPanel):
             self.labels[key] = b
 
     def evaluate_enable(self, enable):
+        if enable == "True":
+            return True
+
+        if enable == "False":
+            return False
+
         if enable == "{{ moonraker_connected }}":
-            logging.info(f"moonraker connected {self._screen.state.connected}")
             return self._screen.state.connected
         self.j2_data["klipperscreen"] = { # Happy Hare: injected data to allow for menu button rather than side bar navigation
                 "side_mmu_shortcut": self._screen._config.get_main_config().getboolean("side_mmu_shortcut")
                 }
         try:
-            j2_temp = Template(enable, autoescape=True)
-            return j2_temp.render(self.j2_data) == "True"
+            tmpl = self._compiled_enable.get(enable)
+            if tmpl is None:
+                tmpl = self._screen.env.from_string(enable)
+                self._compiled_enable[enable] = tmpl
+
+            return tmpl.render(self.j2_data) == "True"
+
         except Exception as e:
             logging.debug(f"Error evaluating enable statement: {enable}\n{e}")
             return False

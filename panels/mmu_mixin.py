@@ -334,11 +334,20 @@ class MmuMixin:
         selector_type = None
         mmu = self._printer.get_stat("mmu")
 
-        # >v3.1 method
-        gate = mmu['gate']
-        mmu_unit = self.get_mmu_unit(gate)
+        # >v3.1 method. Use the active unit directly because an unknown gate or
+        # bypass does not uniquely identify a unit on a multi-unit machine.
+        mmu_unit = None
+        mmu_machine = self._printer.get_stat("mmu_machine")
+        unit = mmu.get("unit")
+        if mmu_machine is not None and unit is not None:
+            mmu_unit = mmu_machine.get(f"unit_{unit}")
+
+        # Compatibility fallback for versions which do not publish mmu.unit.
+        if mmu_unit is None:
+            mmu_unit = self.get_mmu_unit(mmu['gate'])
+
         if mmu_unit is not None:
-            selector_type = mmu_unit['selector_type']
+            selector_type = mmu_unit.get('selector_type')
 
         # v3.0 fallback
         if selector_type is None:

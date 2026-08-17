@@ -317,6 +317,9 @@ class Panel(ScreenPanel, MmuMixin):
         filament = mmu['filament']
         sync_drive = mmu['sync_drive']
         selector_type = self.get_selector_type()
+        selector_status = mmu.get('selector')
+        if not isinstance(selector_status, dict):
+            selector_status = mmu
 
         ui_state = []
         if enabled:
@@ -345,10 +348,10 @@ class Panel(ScreenPanel, MmuMixin):
                 self.labels['unload'].set_label("Eject")
 
             if selector_type in ['RotarySelector']:
-                grip = mmu.get('grip', None)
+                grip = selector_status.get('grip', None)
                 ui_state.append("gripped" if grip.lower() == 'gripped'  else "released")
             elif selector_type in ['LinearServoSelector']:
-                servo = mmu.get('servo', None)
+                servo = selector_status.get('servo', None)
                 servo_states = {
                     'Up': ['servo_up'],
                     'Down': ['servo_down'],

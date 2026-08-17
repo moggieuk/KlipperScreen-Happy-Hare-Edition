@@ -937,10 +937,10 @@ class KlipperScreen(Gtk.ApplicationWindow):
         message += "\n\n" + _("Retrying") + f" #{self.state.reinit_count}"
         self._init_printer(message, go_to_splash)
 
-    def state_sticky_panel(self): # Happy Hare
+    def state_sticky_panel(self, wait=True): # Happy Hare
         if "job_status" in self._cur_panels and wait:
             return
-        if not self.initialized:
+        if not self.state.initialized:
             logging.debug("Printer not initialized yet")
             self.printer.state = "not ready"
             return        

@@ -14,7 +14,7 @@
 # This file may be distributed under the terms of the GNU GPLv3 license.
 # Happy Hare MMU Software
 #
-import logging, gi, math
+import gi, math
 
 gi.require_version("Gtk", "3.0")
 

@@ -5,12 +5,12 @@
 # Copyright (C) 2023-2026  moggieuk#6538 (discord)
 #                          moggieuk@hotmail.com
 #
-import logging, gi
+import gi
 
 gi.require_version("Gtk", "3.0")
 gi.require_version("PangoCairo", "1.0")
 
-from gi.repository import Gtk, GLib, Pango, Gdk, PangoCairo
+from gi.repository import Gtk, Pango, PangoCairo
 
 from ks_includes.screen_panel import ScreenPanel
 from panels.mmu_mixin         import *
@@ -144,7 +144,6 @@ class Panel(ScreenPanel, MmuMixin):
         self.ui_ttg_map = list(mmu['ttg_map'])
         self.ui_endless_spool_groups = list(mmu['endless_spool_groups'])
 
-        gate = self.ui_ttg_map[self.ui_sel_tool] if 0 <= self.ui_sel_tool < self.num_gates else -1
         self.ui_sel_es_group = self.selected_group()
 
         self.ui_es_enabled = mmu.get('endless_spool_enabled') or mmu.get('endless_spool')
@@ -317,8 +316,8 @@ class Panel(ScreenPanel, MmuMixin):
         self._gtk.remove_dialog(dialog)
         if response_id == Gtk.ResponseType.APPLY:
             if action == "reset":
-                self._screen._ws.api.gcode_script(f"MMU_TTG_MAP RESET=1 QUIET=1")
-                self._screen._ws.api.gcode_script(f"MMU_ENDLESS_SPOOL RESET=1 QUIET=1")
+                self._screen._ws.api.gcode_script("MMU_TTG_MAP RESET=1 QUIET=1")
+                self._screen._ws.api.gcode_script("MMU_ENDLESS_SPOOL RESET=1 QUIET=1")
             else:
                 ttg_map=",".join(map(str,self.ui_ttg_map))
                 groups=",".join(map(str,self.ui_endless_spool_groups))

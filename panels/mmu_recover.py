@@ -4,11 +4,11 @@
 # Copyright (C) 2023-2026  moggieuk#6538 (discord)
 #                          moggieuk@hotmail.com
 #
-import logging, gi
+import gi
 
 gi.require_version("Gtk", "3.0")
 
-from gi.repository import Gtk, GLib, Pango
+from gi.repository import Gtk
 from ks_includes.screen_panel import ScreenPanel
 from panels.mmu_mixin import *
 
@@ -272,16 +272,16 @@ class Panel(ScreenPanel, MmuMixin):
         if self.ui_sel_tool >= 0:
             self.labels['tool'].set_label(f"T{self.ui_sel_tool}")
         elif self.ui_sel_tool == TOOL_GATE_BYPASS:
-            self.labels['tool'].set_label(f"Bypass")
+            self.labels['tool'].set_label("Bypass")
         else:
-            self.labels['tool'].set_label(f"n/a")
+            self.labels['tool'].set_label("n/a")
 
         if self.ui_sel_gate >= 0:
             self.labels['gate'].set_label(f"Gate #{self.ui_sel_gate}")
         elif self.ui_sel_gate == TOOL_GATE_BYPASS:
-            self.labels['gate'].set_label(f"Bypass")
+            self.labels['gate'].set_label("Bypass")
         else:
-            self.labels['gate'].set_label(f"n/a")
+            self.labels['gate'].set_label("n/a")
 
         if self.ui_sel_loaded == 1:
             self.labels['filament'].set_label("Filament: Loaded")
@@ -330,12 +330,12 @@ class Panel(ScreenPanel, MmuMixin):
             None,
             "This will set the MMU state to:\n\n" + summary + warning + "\n\nSure you want to continue?",
             "printer.gcode.script",
-            {'script': f"MMU_RECOVER TOOL={self.ui_sel_tool} GATE={self.ui_sel_gate} LOADED={self.ui_sel_loaded}"}
+            {'script': f"MMU_RECOVER TOOL={self.ui_sel_tool} GATE={self.ui_sel_gate} LOADED={sel_loaded}"}
         )
 
 
     def select_auto(self, widget):
-        self._screen._ws.api.gcode_script(f"MMU_RECOVER")
+        self._screen._ws.api.gcode_script("MMU_RECOVER")
 
 
     def select_reset(self, widget):

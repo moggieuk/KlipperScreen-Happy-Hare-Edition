@@ -4,11 +4,11 @@
 # Copyright (C) 2023-2026  moggieuk#6538 (discord)
 #                          moggieuk@hotmail.com
 #
-import logging, gi
+import gi
 
 gi.require_version("Gtk", "3.0")
 
-from gi.repository import Gtk, GLib, Pango, Gdk
+from gi.repository import Gtk, Gdk
 from ks_includes.screen_panel import ScreenPanel
 from panels.mmu_mixin import *
 

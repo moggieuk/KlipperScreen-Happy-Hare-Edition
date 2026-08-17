@@ -4,14 +4,13 @@
 # Copyright (C) 2023-2026  moggieuk#6538 (discord)
 #                          moggieuk@hotmail.com
 #
-import threading, time, logging, gi
+import gi
 
 gi.require_version("Gtk", "3.0")
 
 from gi.repository            import Gtk, Gdk
 
 from ks_includes.screen_panel import ScreenPanel
-from ks_includes.KlippyRest   import KlippyRest
 from panels.spoolman          import SpoolmanSpool
 from panels.mmu_mixin         import *
 
@@ -43,7 +42,7 @@ class Panel(ScreenPanel, MmuMixin):
             gate_label.get_style_context().add_class("mmu_spoolman_gate_text")
             gate_box.pack_start(gate_label, True, True, 0)
 
-            color = self.labels[f'color_{i}'] = Gtk.Label(f'⬤')
+            color = self.labels[f'color_{i}'] = Gtk.Label('⬤')
             color.get_style_context().add_class("mmu_spoolman_color_swatch")
             color.set_xalign(0.0)
             color_image = self.labels[f'color_image_{i}'] = self._gtk.Image()
@@ -113,7 +112,6 @@ class Panel(ScreenPanel, MmuMixin):
         self.gate_tool_map = self.build_gate_tool_map()
         mmu = self._printer.get_stat("mmu")
         gate_status = mmu['gate_status']
-        gate_material = mmu['gate_material']
         gate_spool_id = mmu['gate_spool_id']
         gate_color = mmu['gate_color']
         num_gates = len(gate_status)
@@ -150,10 +148,7 @@ class Panel(ScreenPanel, MmuMixin):
                 a.override_background_color(Gtk.StateType.NORMAL, background_color)
 
             material="-"
-            vendor=""
             name="-"
-            usage=""
-            remaining_length=""
             remaining_weight_str=""
             remaining_percentage_str=""
             remaining_percentage_val=0
@@ -162,19 +157,13 @@ class Panel(ScreenPanel, MmuMixin):
                 spool=self.spools[str(gate_spool_id[i])]
 
                 material=spool.filament.material if hasattr(spool.filament,"material") else "-"
-                vendor=spool.filament.vendor.name if spool.filament.vendor else "n/a"
                 name=spool.filament.name if hasattr(spool.filament,"name") else "-"
-                used_length = spool.used_length if hasattr(spool,"used_length") else 0
-                remaining_length = spool.remaining_length if hasattr(spool,"remaining_length") else 0
                 initial_weight = spool.initial_weight if hasattr(spool,"initial_weight") else spool.filament.weight if hasattr(spool.filament,"weight") else 0
                 remaining_weight = spool.remaining_weight if hasattr(spool,"remaining_weight") else 0
                 pixbuf=spool.icon
 
-                used_length_val=spool.used_length/10.0
-                remaining_length_val=remaining_length/10.0
                 remaining_percentage_val=100/(initial_weight/remaining_weight) if remaining_weight else 0
 
-                remaining_length_str=f"{remaining_length_val:.2f}cm"
                 remaining_weight_str=f"{remaining_weight:.0f}g"
                 remaining_percentage_str=f"{remaining_percentage_val:.0f}%"
 
@@ -183,7 +172,6 @@ class Panel(ScreenPanel, MmuMixin):
                 if not Gdk.RGBA.parse(color, color_hex):
                     Gdk.RGBA.parse(color, '#' + color_hex)
                 self.labels[f'color_{i}'].override_color(Gtk.StateType.NORMAL, color)
-                usage=f"{used_length/10:.2f}" 
                 self.labels[f'color_image_{i}'].set_from_pixbuf(pixbuf.scale_simple(pixbuf.get_width()*0.9, pixbuf.get_height()*0.9, 1))
 
             self.labels[f'remaining_weight_{i}'].set_label(remaining_weight_str) 
@@ -262,4 +250,3 @@ class Panel(ScreenPanel, MmuMixin):
                 e_data = data['mmu']
                 if 'ttg_map' in e_data or 'gate' in e_data or 'gate_status' in e_data in e_data or 'gate_spool_id' in e_data:
                     self.refresh()
-

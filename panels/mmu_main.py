@@ -14,8 +14,8 @@
 # This file may be distributed under the terms of the GNU GPLv3 license.
 # Happy Hare MMU Software
 #
-import logging, gi, re
-import math, html, cairo
+import logging, gi
+import math, cairo
 
 gi.require_version("Gtk", "3.0")
 
@@ -470,7 +470,6 @@ class Panel(ScreenPanel, MmuMixin):
 
                 # v4 contains everything required in 'printer.mmu'
                 if 'mmu' in data:
-                    mmu = self._printer.get_stat("mmu")
                     e_data = data['mmu']
 
                     if 'unit' in e_data:
@@ -668,9 +667,9 @@ class Panel(ScreenPanel, MmuMixin):
         mmu = self._printer.get_stat("mmu")
         filament = mmu['filament']
         if filament != "Unloaded":
-            self._screen._ws.api.gcode_script(f"MMU_UNLOAD")
+            self._screen._ws.api.gcode_script("MMU_UNLOAD")
         else:
-            self._screen._ws.api.gcode_script(f"MMU_EJECT")
+            self._screen._ws.api.gcode_script("MMU_EJECT")
 
 
     def select_picker(self, widget):
@@ -678,13 +677,13 @@ class Panel(ScreenPanel, MmuMixin):
         mmu = self._printer.get_stat("mmu")
         tool = mmu['tool']
         if tool == TOOL_GATE_BYPASS:
-            self._screen._ws.api.gcode_script(f"MMU_LOAD EXTRUDER_ONLY=1")
+            self._screen._ws.api.gcode_script("MMU_LOAD EXTRUDER_ONLY=1")
         else:
             self._screen.show_panel('mmu_picker', 'MMU Tool Picker')
 
 
     def select_pause(self, widget):
-        self._screen._ws.api.gcode_script(f"MMU_PAUSE FORCE_IN_PRINT=1")
+        self._screen._ws.api.gcode_script("MMU_PAUSE FORCE_IN_PRINT=1")
 
 
     def select_message(self, widget):
@@ -693,11 +692,11 @@ class Panel(ScreenPanel, MmuMixin):
 
 
     def select_resume(self, widget):
-        self._screen._ws.api.gcode_script(f"RESUME")
+        self._screen._ws.api.gcode_script("RESUME")
 
 
     def select_unlock(self, widget):
-        self._screen._ws.api.gcode_script(f"MMU_UNLOCK")
+        self._screen._ws.api.gcode_script("MMU_UNLOCK")
 
 
     def update_enabled(self):
@@ -761,13 +760,13 @@ class Panel(ScreenPanel, MmuMixin):
         # Adjust buttons (class display) ---------
         if tool == TOOL_GATE_BYPASS:
             self.labels['picker'].set_image(self.labels['load_bypass_img'])
-            self.labels['picker'].set_label(f"Load")
+            self.labels['picker'].set_label("Load")
             self.labels['unload'].set_image(self.labels['unload_bypass_img'])
-            self.labels['unload'].set_label(f"Unload")
+            self.labels['unload'].set_label("Unload")
 
         else:
             self.labels['picker'].set_image(self.labels['tool_picker_img'])
-            self.labels['picker'].set_label(f"Tools...")
+            self.labels['picker'].set_label("Tools...")
 
             if filament != "Unloaded":
                 self.labels['unload'].set_image(self.labels['unload_img'])
@@ -793,7 +792,6 @@ class Panel(ScreenPanel, MmuMixin):
         num_gates = len(mmu['gate_status'])
         tool = mmu['tool']
         filament = mmu['filament']
-        enabled = mmu['enabled']
         action = mmu['action']
 
         # Set sensitivity of +/- buttons
@@ -820,10 +818,10 @@ class Panel(ScreenPanel, MmuMixin):
                 else:
                     self.labels['tool'].set_sensitive(tool_sensitive)
             elif self.ui_sel_tool == TOOL_GATE_BYPASS:
-                self.labels['tool'].set_label(f"Bypass")
+                self.labels['tool'].set_label("Bypass")
                 self.labels['tool'].set_sensitive(tool_sensitive)
             else:
-                self.labels['tool'].set_label(f"n/a")
+                self.labels['tool'].set_label("n/a")
                 self.labels['tool'].set_sensitive(tool_sensitive)
         else:
             self.labels['tool'].set_label(action[:11])
@@ -855,7 +853,6 @@ class Panel(ScreenPanel, MmuMixin):
         # Encoder pos is displayed in filament position status
         self.update_movement(data['encoder_pos'])
 
-        mmu = self._printer.get_stat("mmu")
         gauge = self.labels.get('encoder_gauge')
         if gauge:
             gauge.update(data)
@@ -1018,7 +1015,6 @@ class Panel(ScreenPanel, MmuMixin):
         mmu = self._printer.get_stat("mmu")
         gate_status = mmu['gate_status']
         gate_selected = mmu['gate']
-        tool_selected = mmu['tool']
         gate_color = mmu['gate_color']
 
         unit_selected = mmu.get("unit")
@@ -2580,7 +2576,6 @@ class MmuSpoolTray(Gtk.DrawingArea):
         l = self._panel.labels
 
         # We should only get here if not printing
-        printing = (mmu['print_state'] == "printing")
         loaded = (mmu['filament'] == "Loaded")
         unloaded = (mmu['filament'] == "Unloaded")
         selected = (mmu['gate'] == gate)
@@ -2602,8 +2597,6 @@ class MmuSpoolTray(Gtk.DrawingArea):
         self._close_gate_popover()
         api = self._panel._screen._ws.api
 
-        mmu = self._printer.get_stat("mmu")
-
         if action == "select":
             if gate == TOOL_GATE_BYPASS:
                 api.gcode_script("MMU_SELECT BYPASS=1 QUIET=1")
@@ -2617,16 +2610,16 @@ class MmuSpoolTray(Gtk.DrawingArea):
 
         if action == "load":
             if gate == TOOL_GATE_BYPASS:
-                api.gcode_script(f"MMU_LOAD EXTRUDER_ONLY=1")
+                api.gcode_script("MMU_LOAD EXTRUDER_ONLY=1")
             else:
-                api.gcode_script(f"MMU_LOAD")
+                api.gcode_script("MMU_LOAD")
             return
 
         if action == "unload":
             if gate == TOOL_GATE_BYPASS:
-                api.gcode_script(f"MMU_UNLOAD EXTRUDER_ONLY=1")
+                api.gcode_script("MMU_UNLOAD EXTRUDER_ONLY=1")
             else:
-                api.gcode_script(f"MMU_UNLOAD")
+                api.gcode_script("MMU_UNLOAD")
             return
 
         if action == "eject":

@@ -4,13 +4,12 @@
 # Copyright (C) 2023-2026  moggieuk#6538 (discord)
 #                          moggieuk@hotmail.com
 #
-import logging, gi, threading, time
+import gi
 
 gi.require_version("Gtk", "3.0")
 
-from gi.repository            import Gtk, GLib, Pango, Gdk, GdkPixbuf
+from gi.repository            import Gtk, Gdk
 from ks_includes.screen_panel import ScreenPanel
-from ks_includes.KlippyRest   import KlippyRest
 from panels.mmu_mixin         import *
 
 
@@ -60,7 +59,7 @@ class Panel(ScreenPanel, MmuMixin):
             spool_id.get_style_context().add_class("mmu_spool_id_text")
             spool_id.set_xalign(0)
 
-            edit = self.labels[f'edit_{i}'] = self._gtk.Button('mmu_gear', f'Edit', 'color4')
+            edit = self.labels[f'edit_{i}'] = self._gtk.Button('mmu_gear', 'Edit', 'color4')
             edit.connect("clicked", self.select_edit, i)
 
             grid.attach(status_box, 0, i, 3, 1)
@@ -83,7 +82,7 @@ class Panel(ScreenPanel, MmuMixin):
             'material': Gtk.Label('PLA'),
             'tools': Gtk.Label("n/a"),
             'spool_id': Gtk.Label("n/a"),
-            'save': self._gtk.Button('mmu_save', f'Save', 'color1'),
+            'save': self._gtk.Button('mmu_save', 'Save', 'color1'),
             'c_picker': self._gtk.Button('mmu_color_chooser', None, 'color2', scale=self.bts * 0.8),
             'c_selector': Gtk.ComboBoxText(),
             'm_entry': Gtk.Entry(),
@@ -389,7 +388,6 @@ class Panel(ScreenPanel, MmuMixin):
         response = dialog.run()
         if response == Gtk.ResponseType.OK:
             color = dialog.get_rgba()
-            color_str = color.to_string()
             self.labels['c_selector'].set_active(-1)
             self.ui_gate_color = self.rgba_to_hex(color)
             if self.ui_gate_color is None:

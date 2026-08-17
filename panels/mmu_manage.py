@@ -4,11 +4,11 @@
 # Copyright (C) 2023-2026  moggieuk#6538 (discord)
 #                          moggieuk@hotmail.com
 #
-import logging, gi
+import gi
 
 gi.require_version("Gtk", "3.0")
 
-from gi.repository import Gtk, GLib, Pango
+from gi.repository import Gtk
 from ks_includes.screen_panel import ScreenPanel
 from panels.mmu_mixin import *
 
@@ -176,7 +176,7 @@ class Panel(ScreenPanel, MmuMixin):
                     if e_data['gate'] >= 0:
                         self.labels['load'].set_label(f"Load #{e_data['gate']}")
                     else:
-                        self.labels['load'].set_label(f"Load")
+                        self.labels['load'].set_label("Load")
                 if 'action' in e_data:
                     action = e_data['action']
                     if self.ui_action_button_name != None:
@@ -213,7 +213,7 @@ class Panel(ScreenPanel, MmuMixin):
             self.ui_action_button_name = 'gate'
             self.ui_action_button_label = self.labels[self.ui_action_button_name].get_label()
             if self.ui_sel_gate == TOOL_GATE_BYPASS:
-                self._screen._ws.api.gcode_script(f"MMU_SELECT_BYPASS")
+                self._screen._ws.api.gcode_script("MMU_SELECT_BYPASS")
             elif mmu['filament'] != "Loaded":
                 self._screen._ws.api.gcode_script(f"MMU_SELECT GATE={self.ui_sel_gate}")
             return
@@ -245,7 +245,7 @@ class Panel(ScreenPanel, MmuMixin):
     def select_load(self, widget):
         self.ui_action_button_name = 'load'
         self.ui_action_button_label = self.labels[self.ui_action_button_name].get_label()
-        self._screen._ws.api.gcode_script(f"MMU_LOAD")
+        self._screen._ws.api.gcode_script("MMU_LOAD")
 
 
     def select_unload_eject(self, widget):
@@ -254,15 +254,15 @@ class Panel(ScreenPanel, MmuMixin):
         mmu = self._printer.get_stat("mmu")
         filament = mmu['filament']
         if filament != "Unloaded":
-            self._screen._ws.api.gcode_script(f"MMU_UNLOAD")
+            self._screen._ws.api.gcode_script("MMU_UNLOAD")
         else:
-            self._screen._ws.api.gcode_script(f"MMU_EJECT")
+            self._screen._ws.api.gcode_script("MMU_EJECT")
 
 
     def select_home(self, widget):
         self.ui_action_button_name = 'home'
         self.ui_action_button_label = self.labels[self.ui_action_button_name].get_label()
-        self._screen._ws.api.gcode_script(f"MMU_HOME")
+        self._screen._ws.api.gcode_script("MMU_HOME")
 
 
     def select_motors_off(self, widget):
@@ -275,35 +275,35 @@ class Panel(ScreenPanel, MmuMixin):
 
 
     def select_servo_up(self, widget):
-        self._screen._ws.api.gcode_script(f"MMU_SERVO POS=up")
+        self._screen._ws.api.gcode_script("MMU_SERVO POS=up")
 
 
     def select_servo_move(self, widget):
-        self._screen._ws.api.gcode_script(f"MMU_SERVO POS=move")
+        self._screen._ws.api.gcode_script("MMU_SERVO POS=move")
 
 
     def select_servo_down(self, widget):
-        self._screen._ws.api.gcode_script(f"MMU_SERVO POS=down")
+        self._screen._ws.api.gcode_script("MMU_SERVO POS=down")
 
 
     def select_grip(self, widget):
-        self._screen._ws.api.gcode_script(f"MMU_GRIP")
+        self._screen._ws.api.gcode_script("MMU_GRIP")
 
 
     def select_release(self, widget):
-        self._screen._ws.api.gcode_script(f"MMU_RELEASE")
+        self._screen._ws.api.gcode_script("MMU_RELEASE")
 
 
     def select_load_extruder(self, widget):
         self.ui_action_button_name = 'load_ext'
         self.ui_action_button_label = self.labels[self.ui_action_button_name].get_label()
-        self._screen._ws.api.gcode_script(f"MMU_LOAD EXTRUDER_ONLY=1")
+        self._screen._ws.api.gcode_script("MMU_LOAD EXTRUDER_ONLY=1")
 
 
     def select_unload_extruder(self, widget):
         self.ui_action_button_name = 'unload_ext'
         self.ui_action_button_label = self.labels[self.ui_action_button_name].get_label()
-        self._screen._ws.api.gcode_script(f"MMU_UNLOAD EXTRUDER_ONLY=1")
+        self._screen._ws.api.gcode_script("MMU_UNLOAD EXTRUDER_ONLY=1")
 
 
     # Dynamically update button sensitivity based on state
@@ -311,7 +311,6 @@ class Panel(ScreenPanel, MmuMixin):
         mmu = self._printer.get_stat("mmu")
         enabled = mmu['enabled']
         is_homed = mmu['is_homed']
-        gate = mmu['gate']
         tool = mmu['tool']
         action = mmu['action']
         filament = mmu['filament']
@@ -410,13 +409,13 @@ class Panel(ScreenPanel, MmuMixin):
                 else:
                     self.labels['gate'].set_sensitive(gate_sensitive)
             elif self.ui_sel_gate == TOOL_GATE_BYPASS:
-                self.labels['gate'].set_label(f"Bypass")
+                self.labels['gate'].set_label("Bypass")
                 if mmu['gate'] == self.ui_sel_gate:
                     self.labels['gate'].set_sensitive(False)
                 else:
                     self.labels['gate'].set_sensitive(gate_sensitive)
             else:
-                self.labels['gate'].set_label(f"Unknown")
+                self.labels['gate'].set_label("Unknown")
         else:
             self.labels['gate'].set_label(action)
             self.labels['gate'].set_sensitive(False)

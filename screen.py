@@ -60,20 +60,6 @@ class AppState:
 class KlipperScreen(Gtk.ApplicationWindow):
     MAX_RETRIES = 4
 
-    # These v4 fields are published only when supported by the active MMU
-    # unit. Klipper resolves a None subscription to the fields present at
-    # subscription time, so request the unit-dependent fields explicitly.
-    MMU_UNIT_STATUS_FIELDS = (
-        "encoder",
-        "sync_feedback_state",
-        "sync_feedback_enabled",
-        "sync_feedback_bias_raw",
-        "sync_feedback_bias_modelled",
-        "sync_feedback_flow_rate",
-        "flowguard",
-        "tangle_prevention",
-    )
-
     def __init__(self, args):
         try:
             super().__init__(title="KlipperScreen")
@@ -353,15 +339,6 @@ class KlipperScreen(Gtk.ApplicationWindow):
         self._init_printer(_("Connecting to %s") % self.state.printer_name)
 
     def ws_subscribe(self):
-        # Preserve every MMU field discovered by the initial full query and add
-        # fields which may be absent until a different MMU unit is selected.
-        mmu_updates = list(self.printer.get_stat("mmu"))
-        mmu_updates.extend(
-            field
-            for field in self.MMU_UNIT_STATUS_FIELDS
-            if field not in mmu_updates
-        )
-
         requested_updates = {
             "objects": {
                 "bed_mesh": ["profile_name", "mesh_max", "mesh_min", "probed_matrix", "profiles"],
@@ -409,7 +386,7 @@ class KlipperScreen(Gtk.ApplicationWindow):
                 "exclude_object": ["current_object", "objects", "excluded_objects"],
                 "manual_probe": ["is_active"],
                 "screws_tilt_adjust": ["results", "error", "max_deviation"],
-                "mmu": mmu_updates,
+                "mmu": None,
                 "mmu_machine": None,
             }
         }

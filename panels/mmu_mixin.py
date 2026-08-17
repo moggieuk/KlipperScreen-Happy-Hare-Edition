@@ -302,11 +302,10 @@ class MmuMixin:
 
 
     def has_encoder(self):
-        # v4...
-        mmu = self._printer.get_stat("mmu")
-        encoder = mmu.get('encoder')
-        if encoder is not None:
-            return True
+        # v4 publishes None when the active unit has no encoder.
+        if self.is_happy_hare_v4():
+            mmu = self._printer.get_stat("mmu") or {}
+            return mmu.get("encoder") is not None
 
         # v3...
         encoder = self._printer.get_stat('mmu_encoder mmu_encoder', None)
@@ -317,11 +316,10 @@ class MmuMixin:
 
 
     def get_encoder_data(self):
-        # v4...
-        mmu = self._printer.get_stat("mmu")
-        encoder = mmu.get('encoder')
-        if encoder is not None:
-            return encoder
+        # v4 publishes None when the active unit has no encoder.
+        if self.is_happy_hare_v4():
+            mmu = self._printer.get_stat("mmu") or {}
+            return mmu.get("encoder") or {}
 
         # v3...
         encoder = self._printer.get_stat('mmu_encoder mmu_encoder', None)

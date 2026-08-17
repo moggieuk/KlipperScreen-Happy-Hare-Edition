@@ -332,6 +332,13 @@ class MmuMixin:
 
 
     def has_buffer(self):
+        # v4 publishes sync-feedback status only for an active unit with a
+        # configured buffer. In v3 the field is always present, so retain the
+        # sensor-based capability check for older versions.
+        if self.is_happy_hare_v4():
+            mmu = self._printer.get_stat("mmu") or {}
+            return mmu.get("sync_feedback_state") is not None
+
         return any(
             self.has_sensor(sensor)
             for sensor in (

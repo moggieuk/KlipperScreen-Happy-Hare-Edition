@@ -249,52 +249,63 @@ EMPTY_SWATCH = '◯'
 
 NOT_SET = -99
 
+HAPPY_HARE_VERSION_FALLBACK = "3.4.2"
+
 
 class MmuMixin:
 
+    def get_happy_hare_version(self):
+        """Return the reported Happy Hare version, or the known v3 fallback."""
+        version = self._printer.get_stat("mmu_machine", "happy_hare_version")
+        return version or HAPPY_HARE_VERSION_FALLBACK
+
+
+    def is_happy_hare_v4(self):
+        version = self.get_happy_hare_version()
+        major, minor, point = (int(part) for part in version.split("."))
+        return (major, minor, point) >= (4, 0, 0)
+
+
     def check_sensor(self, s):
-        # v4...
-        mmu = self._printer.get_stat("mmu")
-        sensors = mmu.get('sensors')
-        if sensors is not None:
+        if self.is_happy_hare_v4():
+            mmu = self._printer.get_stat("mmu") or {}
+            sensors = mmu.get("sensors") or {}
             return sensors.get(s)
 
-        # v3...
+        if s == SENSOR_SHARED_EXIT:
+            s = V3_SENSOR_GATE
+        elif s == SENSOR_EXIT_PREFIX:
+            s = V3_SENSOR_GEAR
         sensor = self._printer.get_stat(f"filament_switch_sensor {s}_sensor")
         if sensor:
-            if sensor['enabled']:
-                return sensor['filament_detected']
+            if sensor["enabled"]:
+                return sensor["filament_detected"]
 
         return None
 
 
     def has_sensor(self, s):
-        # v4...
-        mmu = self._printer.get_stat("mmu")
-        sensors = mmu.get('sensors')
-        if sensors is not None:
-            if sensors.get(s) is not None:
-                return True
-            return False
+        if self.is_happy_hare_v4():
+            mmu = self._printer.get_stat("mmu") or {}
+            sensors = mmu.get("sensors") or {}
+            return sensors.get(s) is not None
 
-        # v3...
         if s == SENSOR_SHARED_EXIT:
             s = V3_SENSOR_GATE
-        elif s == SENSOR_EXIT:
+        elif s == SENSOR_EXIT_PREFIX:
             s = V3_SENSOR_GEAR
         sensor = self._printer.get_stat(f"filament_switch_sensor {s}_sensor")
         if sensor:
-            return sensor['enabled']
+            return sensor["enabled"]
 
         return False
 
 
     def has_encoder(self):
-        # v4...
-        mmu = self._printer.get_stat("mmu")
-        encoder = mmu.get('encoder')
-        if encoder is not None:
-            return True
+        # v4 publishes None when the active unit has no encoder.
+        if self.is_happy_hare_v4():
+            mmu = self._printer.get_stat("mmu") or {}
+            return mmu.get("encoder") is not None
 
         # v3...
         encoder = self._printer.get_stat('mmu_encoder mmu_encoder', None)
@@ -305,11 +316,10 @@ class MmuMixin:
 
 
     def get_encoder_data(self):
-        # v4...
-        mmu = self._printer.get_stat("mmu")
-        encoder = mmu.get('encoder')
-        if encoder is not None:
-            return encoder
+        # v4 publishes None when the active unit has no encoder.
+        if self.is_happy_hare_v4():
+            mmu = self._printer.get_stat("mmu") or {}
+            return mmu.get("encoder") or {}
 
         # v3...
         encoder = self._printer.get_stat('mmu_encoder mmu_encoder', None)
@@ -320,6 +330,13 @@ class MmuMixin:
 
 
     def has_buffer(self):
+        # v4 publishes sync-feedback status only for an active unit with a
+        # configured buffer. In v3 the field is always present, so retain the
+        # sensor-based capability check for older versions.
+        if self.is_happy_hare_v4():
+            mmu = self._printer.get_stat("mmu") or {}
+            return mmu.get("sync_feedback_state") is not None
+
         return any(
             self.has_sensor(sensor)
             for sensor in (

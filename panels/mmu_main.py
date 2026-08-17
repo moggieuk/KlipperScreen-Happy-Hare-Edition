@@ -1121,11 +1121,11 @@ class Panel(ScreenPanel, MmuMixin):
 
     def get_filament_text(self, markup=False, bold=False):
         mmu = self._printer.get_stat("mmu")
-        tool = mmu["tool"]
         pos = mmu["filament_pos"]
         direction = mmu["filament_direction"]
         gate = mmu["gate"]
         gate_color = mmu["gate_color"]
+        gate_status = mmu["gate_status"][gate] if gate >= 0 else GATE_UNKNOWN
 
         # Old filament color in extruder if information is available
         if mmu.get("filament_remaining"):
@@ -1158,14 +1158,17 @@ class Panel(ScreenPanel, MmuMixin):
         else:
             home, line, arrow = "┫", "━", "▶"
 
+        # Placeholder for a literal filament tip that must survive the pass that
+        # suppresses a second tip when a home marker is present elsewhere.
+        tip_override = "\x00"
+
         # Helpers --------
 
         def past(target_pos):
+            # A genuinely empty gate has nothing to show as already passed.
+            if pos <= FILAMENT_POS_UNLOADED and gate_empty():
+                return space
             return arrow if pos >= target_pos else space
-
-        def sensor_label(sensor, label=""):
-            marker = trig_sensor if self.check_sensor(sensor) else empty_sensor
-            return marker + label
 
         def homed_segment(target_pos, label):
             if pos > target_pos:
@@ -1185,20 +1188,157 @@ class Panel(ScreenPanel, MmuMixin):
 
         def optional_sensor(sensor, target_pos, width=3):
             if self.has_sensor(sensor):
-                return homed_segment(target_pos, sensor_label(sensor))
+                marker = trig_sensor if self.check_sensor(sensor) else empty_sensor
+                return homed_segment(target_pos, marker)
             return pad(target_pos, width)
 
-        def gate_segment():
-            # Forward-parked exit sensor: filament is UNLOADED but still sits at/past the
-            # gate sensor (positive gate_parking_distance), so render it as homed there
-            # rather than as not-yet-reached
-            if pos == FILAMENT_POS_UNLOADED and self.check_sensor(gate_homing_endstop):
-                return home + sensor_label(gate_homing_endstop) + space
-            return optional_sensor(gate_homing_endstop, FILAMENT_POS_HOMED_GATE)
+        # Physical order of the gate-area endstops, gate-ward to extruder-ward.
+        gate_sensor_order = (
+            SENSOR_EXIT_PREFIX,
+            SENSOR_SHARED_EXIT,
+            SENSOR_ENCODER,
+            SENSOR_EXTRUDER_ENTRY,
+        )
+        per_gate_sensors = (SENSOR_EXIT_PREFIX, SENSOR_SHARED_EXIT)
+
+        def furthest_triggered_gate_sensor_index():
+            index = -1
+            for sensor in per_gate_sensors:
+                if self.has_sensor(sensor) and self.check_sensor(sensor):
+                    index = max(index, gate_sensor_order.index(sensor))
+            return index
+
+        def parked_forward_cap():
+            if self.check_sensor(SENSOR_ENTRY_PREFIX) is False:
+                return -1
+            for index, sensor in enumerate(gate_sensor_order):
+                if self.has_sensor(sensor):
+                    return index - 1
+            return len(gate_sensor_order) - 1
+
+        def gate_empty():
+            # Real per-gate sensor evidence overrides a possibly stale gate map.
+            if gate_status != GATE_EMPTY:
+                return False
+            if self.check_sensor(SENSOR_ENTRY_PREFIX) is True:
+                return False
+            if self.check_sensor(SENSOR_EXIT_PREFIX) is True:
+                return False
+            return True
+
+        def passed_gate_sensor(sensor):
+            if pos in (FILAMENT_POS_UNLOADED, FILAMENT_POS_UNKNOWN):
+                if furthest_triggered_gate_sensor_index() > gate_sensor_order.index(sensor):
+                    return True
+                if pos != FILAMENT_POS_UNLOADED:
+                    return False
+                return (
+                    not gate_empty()
+                    and parked_forward_cap() >= gate_sensor_order.index(sensor)
+                )
+            if pos > FILAMENT_POS_HOMED_GATE:
+                return True
+            if pos == FILAMENT_POS_HOMED_GATE:
+                try:
+                    return (
+                        gate_sensor_order.index(gate_homing_endstop)
+                        > gate_sensor_order.index(sensor)
+                    )
+                except ValueError:
+                    return True
+            return False
+
+        def reached_gate_sensor(sensor):
+            if pos in (FILAMENT_POS_UNLOADED, FILAMENT_POS_UNKNOWN):
+                if self.has_sensor(sensor) and self.check_sensor(sensor):
+                    return True
+                if furthest_triggered_gate_sensor_index() >= gate_sensor_order.index(sensor):
+                    return True
+                if pos != FILAMENT_POS_UNLOADED:
+                    return False
+                return (
+                    not gate_empty()
+                    and parked_forward_cap() >= gate_sensor_order.index(sensor)
+                )
+            if pos > FILAMENT_POS_HOMED_GATE:
+                return True
+            if pos == FILAMENT_POS_HOMED_GATE:
+                try:
+                    return (
+                        gate_sensor_order.index(gate_homing_endstop)
+                        >= gate_sensor_order.index(sensor)
+                    )
+                except ValueError:
+                    return True
+            return False
+
+        def homed_here(sensor):
+            return pos == FILAMENT_POS_HOMED_GATE and gate_homing_endstop == sensor
+
+        def with_home(fill, sensor):
+            if homed_here(sensor) and fill:
+                return fill[:-1] + home
+            return fill
+
+        def gate_presence_marker():
+            if pos <= FILAMENT_POS_UNLOADED and gate_empty():
+                return space
+            return arrow
+
+        def entry_marker():
+            if self.has_sensor(SENSOR_ENTRY_PREFIX):
+                return (
+                    trig_sensor
+                    if self.check_sensor(SENSOR_ENTRY_PREFIX)
+                    else empty_sensor
+                )
+            return gate_presence_marker()
+
+        def gate_sensor_marker(sensor):
+            if self.has_sensor(sensor):
+                return trig_sensor if self.check_sensor(sensor) else empty_sensor
+            return arrow if passed_gate_sensor(sensor) else space
+
+        def gate_sensor_gap(sensor, width=2):
+            if passed_gate_sensor(sensor):
+                return arrow * width
+            if (
+                pos in (FILAMENT_POS_UNLOADED, FILAMENT_POS_UNKNOWN)
+                and reached_gate_sensor(sensor)
+            ):
+                left = width - width // 2
+                right = width // 2
+                return arrow * left + space * right
+            return space * width
+
+        def entry_exit_gap(width=2):
+            if pos <= FILAMENT_POS_UNLOADED and gate_empty():
+                return space * width
+            if (
+                pos in (FILAMENT_POS_UNLOADED, FILAMENT_POS_UNKNOWN)
+                and not reached_gate_sensor(SENSOR_EXIT_PREFIX)
+            ):
+                if self.check_sensor(SENSOR_ENTRY_PREFIX) is not True:
+                    return space * width
+                left = width - width // 2
+                right = width // 2
+                return arrow * left + space * right
+            return arrow * width
+
+        def gate_area_segment():
+            return (
+                gate_presence_marker()
+                + entry_marker()
+                + with_home(entry_exit_gap(), SENSOR_EXIT_PREFIX)
+                + gate_sensor_marker(SENSOR_EXIT_PREFIX)
+                + with_home(gate_sensor_gap(SENSOR_EXIT_PREFIX), SENSOR_SHARED_EXIT)
+                + gate_sensor_marker(SENSOR_SHARED_EXIT)
+                + with_home(gate_sensor_gap(SENSOR_SHARED_EXIT), SENSOR_ENCODER)
+            )
 
         def nozzle_segment():
             if pos >= FILAMENT_POS_LOADED:
-                return arrow + home + "Nz" + arrow * 2
+                return arrow + home + "Nz" + tip_override
             if residual_filament_color:
                 return residual_line + gate_mark + "Nz"
             return space + gate_mark + "Nz"
@@ -1232,16 +1372,7 @@ class Panel(ScreenPanel, MmuMixin):
 
         # Impl --------
 
-        tool_text = ""
-        if not self.show_spool_tray:
-            if tool >= 0:
-                tool_text = f"T{tool} "[:3]
-            elif tool == TOOL_GATE_BYPASS:
-                tool_text = "BYPASS "
-            else:
-                tool_text = "T? "
-
-        bowden_length = max(1, 12 - len(tool_text))
+        bowden_length = 16
         bowden_half = bowden_length // 2
 
         encoder_ref_pos = (
@@ -1249,20 +1380,25 @@ class Panel(ScreenPanel, MmuMixin):
             if gate_homing_endstop == SENSOR_ENCODER
             else FILAMENT_POS_IN_BOWDEN
         )
+        encoder_char = (
+            "ê"
+            if pos >= encoder_ref_pos or homed_here(SENSOR_ENCODER)
+            else "e"
+        )
+        encoder_overshoots = self.has_encoder() and homed_here(SENSOR_ENCODER)
 
         parts = [
-            tool_text,
-            past(FILAMENT_POS_UNLOADED) * 2,
-
-            gate_segment(),
+            gate_area_segment(),
 
             (
-                "En" + past(encoder_ref_pos) * 2
+                encoder_char
+                + (tip_override if encoder_overshoots else past(encoder_ref_pos))
+                + past(encoder_ref_pos)
                 if self.has_encoder()
-                else past(encoder_ref_pos) * 4
+                else past(encoder_ref_pos) * 3
             ),
-        
-            past(FILAMENT_POS_IN_BOWDEN) * bowden_half,
+
+            past(FILAMENT_POS_IN_BOWDEN) * max(0, bowden_half - 2),
 
             (
                 buffer_segment()
@@ -1270,7 +1406,7 @@ class Panel(ScreenPanel, MmuMixin):
                 else pad(FILAMENT_POS_IN_BOWDEN, 7)
             ),
 
-            past(FILAMENT_POS_END_BOWDEN) * bowden_half,
+            past(FILAMENT_POS_END_BOWDEN) * max(0, bowden_half - 2),
 
             optional_sensor(SENSOR_EXTRUDER_ENTRY, FILAMENT_POS_HOMED_ENTRY),
 
@@ -1283,10 +1419,12 @@ class Panel(ScreenPanel, MmuMixin):
             nozzle_segment(),
         ]
 
+        is_empty = pos == FILAMENT_POS_UNLOADED and gate_status == GATE_EMPTY
+
         if pos == FILAMENT_POS_LOADED:
             parts.append(" LOADED")
         elif pos == FILAMENT_POS_UNLOADED:
-            parts.append(" UNLOADED")
+            parts.append(" EMPTY" if is_empty else " UNLOADED")
         elif pos == FILAMENT_POS_UNKNOWN:
             parts.append(" UNKNOWN")
         elif direction == DIRECTION_LOAD:
@@ -1301,8 +1439,10 @@ class Panel(ScreenPanel, MmuMixin):
 
         visual = visual.replace(arrow, line)
 
-        if last_arrow != -1 and (last_home == -1 or not bold):
+        if last_arrow != -1 and last_home == -1:
             visual = visual[:last_arrow] + arrow + visual[last_arrow + 1:]
+
+        visual = visual.replace(tip_override, line if bold else arrow)
 
         # Post process filament color
         if markup and gate >= 0:

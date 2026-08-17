@@ -13,7 +13,7 @@ gi.require_version("PangoCairo", "1.0")
 from gi.repository import Gtk, Pango, PangoCairo
 
 from ks_includes.screen_panel import ScreenPanel
-from panels.mmu_mixin         import *
+from panels.mmu_mixin import MmuMixin
 
 
 class Panel(ScreenPanel, MmuMixin):
@@ -38,29 +38,29 @@ class Panel(ScreenPanel, MmuMixin):
             'endless_spool': Gtk.CheckButton("EndlessSpool Enabled"),
         }
 
-        l = self.labels
-        l['t_decrease'].connect("clicked", self.select_tool_gate, 'tool', -1)
-        l['t_increase'].connect("clicked", self.select_tool_gate, 'tool', 1)
-        l['g_decrease'].connect("clicked", self.select_tool_gate, 'gate', -1)
-        l['g_increase'].connect("clicked", self.select_tool_gate, 'gate', 1)
-        l['save'].connect("clicked", self.select_reset_save, "save")
-        l['reset'].connect("clicked", self.select_reset_save, "reset")
-        l['endless_spool'].connect("notify::active", self.select_es_toggle)
-        l['tool'].get_style_context().add_class("mmu_tool_text")
-        l['gate'].get_style_context().add_class("mmu_gate_text")
-        l['t_decrease'].set_vexpand(False)
-        l['t_increase'].set_vexpand(False)
-        l['g_decrease'].set_vexpand(False)
-        l['g_increase'].set_vexpand(False)
-        l['save'].set_vexpand(False)
-        l['save'].set_hexpand(False)
-        l['reset'].set_halign(Gtk.Align.CENTER)
-        l['reset'].set_vexpand(False)
-        l['reset'].get_style_context().add_class("mmu_es_gate")
-        l['reset'].get_style_context().add_class("mmu_es_gate_reset")
-        l['es_group'].set_xalign(0)
-        l['es_group'].get_style_context().add_class("mmu_endless_spool_toggle")
-        l['endless_spool'].get_style_context().add_class("mmu_endless_spool_toggle")
+        lbl = self.labels
+        lbl['t_decrease'].connect("clicked", self.select_tool_gate, 'tool', -1)
+        lbl['t_increase'].connect("clicked", self.select_tool_gate, 'tool', 1)
+        lbl['g_decrease'].connect("clicked", self.select_tool_gate, 'gate', -1)
+        lbl['g_increase'].connect("clicked", self.select_tool_gate, 'gate', 1)
+        lbl['save'].connect("clicked", self.select_reset_save, "save")
+        lbl['reset'].connect("clicked", self.select_reset_save, "reset")
+        lbl['endless_spool'].connect("notify::active", self.select_es_toggle)
+        lbl['tool'].get_style_context().add_class("mmu_tool_text")
+        lbl['gate'].get_style_context().add_class("mmu_gate_text")
+        lbl['t_decrease'].set_vexpand(False)
+        lbl['t_increase'].set_vexpand(False)
+        lbl['g_decrease'].set_vexpand(False)
+        lbl['g_increase'].set_vexpand(False)
+        lbl['save'].set_vexpand(False)
+        lbl['save'].set_hexpand(False)
+        lbl['reset'].set_halign(Gtk.Align.CENTER)
+        lbl['reset'].set_vexpand(False)
+        lbl['reset'].get_style_context().add_class("mmu_es_gate")
+        lbl['reset'].get_style_context().add_class("mmu_es_gate_reset")
+        lbl['es_group'].set_xalign(0)
+        lbl['es_group'].get_style_context().add_class("mmu_endless_spool_toggle")
+        lbl['endless_spool'].get_style_context().add_class("mmu_endless_spool_toggle")
 
         self.ttg_map_widget = TtgMapWidget()
         self.ttg_map_widget.set_hexpand(True)
@@ -73,7 +73,7 @@ class Panel(ScreenPanel, MmuMixin):
         es_flowbox.set_vexpand(False)
         es_flowbox.set_margin_bottom(8)
         for i in range(self.num_gates):
-            g = l[f'es_gate{i}'] = self._gtk.Button(label=str(i))
+            g = lbl[f'es_gate{i}'] = self._gtk.Button(label=str(i))
             g.set_hexpand(False)
             g.connect("clicked", self.select_es_gate, int(i))
             g.get_style_context().add_class("mmu_es_gate")
@@ -81,8 +81,8 @@ class Panel(ScreenPanel, MmuMixin):
 
         inner = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
         inner.set_margin_top(8)
-        inner.pack_start(l['endless_spool'], False, False, 0)
-        inner.pack_start(l['es_group'], False, False, 0)
+        inner.pack_start(lbl['endless_spool'], False, False, 0)
+        inner.pack_start(lbl['es_group'], False, False, 0)
         es_grp_box = Gtk.Box()
         es_grp_box.set_halign(Gtk.Align.CENTER)
         es_grp_box.pack_start(inner, False, False, 0)
@@ -90,13 +90,13 @@ class Panel(ScreenPanel, MmuMixin):
         mapgrid = Gtk.Grid()
         mapgrid.set_column_homogeneous(True)
         mapgrid.set_vexpand(True)
-        mapgrid.attach(l['t_decrease'],      0,  1,  3, 2)
-        mapgrid.attach(l['tool'],            0,  3,  3, 1)
-        mapgrid.attach(l['t_increase'],      0,  4,  3, 2)
+        mapgrid.attach(lbl['t_decrease'],      0,  1,  3, 2)
+        mapgrid.attach(lbl['tool'],            0,  3,  3, 1)
+        mapgrid.attach(lbl['t_increase'],      0,  4,  3, 2)
         mapgrid.attach(self.ttg_map_widget,  3,  0, 10, 7)
-        mapgrid.attach(l['g_decrease'],     13,  1,  3, 2)
-        mapgrid.attach(l['gate'],           13,  3,  3, 1)
-        mapgrid.attach(l['g_increase'],     13,  4,  3, 2)
+        mapgrid.attach(lbl['g_decrease'],     13,  1,  3, 2)
+        mapgrid.attach(lbl['gate'],           13,  3,  3, 1)
+        mapgrid.attach(lbl['g_increase'],     13,  4,  3, 2)
 
         grid = Gtk.Grid()
         grid.set_column_homogeneous(False)
@@ -108,9 +108,9 @@ class Panel(ScreenPanel, MmuMixin):
 
         grid.attach(mapgrid,                 0,  0, 16, 1)
         grid.attach(es_grp_box,              2,  1, 12, 1)
-        grid.attach(l['reset'],             14,  1,  2, 1)
+        grid.attach(lbl['reset'],             14,  1,  2, 1)
         grid.attach(es_flowbox,              0,  2, 14, 2)
-        grid.attach(l['save'],              14,  2,  2, 2)
+        grid.attach(lbl['save'],              14,  2,  2, 2)
         grid.attach(bottom_pad,              0,  4, 16, 1)
 
         self.content.add(grid)

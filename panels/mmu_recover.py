@@ -9,8 +9,15 @@ import gi
 gi.require_version("Gtk", "3.0")
 
 from gi.repository import Gtk
+
 from ks_includes.screen_panel import ScreenPanel
-from panels.mmu_mixin import *
+from panels.mmu_mixin import (
+    GATE_EMPTY,
+    NOT_SET,
+    TOOL_GATE_BYPASS,
+    TOOL_GATE_UNKNOWN,
+    MmuMixin,
+)
 
 
 class Panel(ScreenPanel, MmuMixin):
@@ -143,7 +150,7 @@ class Panel(ScreenPanel, MmuMixin):
         for label in self.btn_states['all']:
             sensitive = True
             for state in ui_state:
-                if not label in self.btn_states[state]:
+                if label not in self.btn_states[state]:
                     sensitive = False
                     break
             if sensitive:
@@ -208,7 +215,7 @@ class Panel(ScreenPanel, MmuMixin):
                 self.ui_sel_gate = TOOL_GATE_BYPASS
             elif self.ui_sel_tool >= 0:
                 suggested_gate, possible_gates = self.get_possible_gates(self.ui_sel_tool)
-                if self.ui_sel_gate == TOOL_GATE_UNKNOWN or self.ui_sel_gate == TOOL_GATE_BYPASS or not self.ui_sel_gate in possible_gates:
+                if self.ui_sel_gate == TOOL_GATE_UNKNOWN or self.ui_sel_gate == TOOL_GATE_BYPASS or self.ui_sel_gate not in possible_gates:
                     self.ui_sel_gate = suggested_gate
 
         elif toolgate == "gate":

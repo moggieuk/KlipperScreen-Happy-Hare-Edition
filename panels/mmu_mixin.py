@@ -13,10 +13,9 @@
 # This file may be distributed under the terms of the GNU GPLv3 license.
 #
 
-from gi.repository   import Gdk, GLib
+from gi.repository import Gdk, GLib
 
 from panels.spoolman import SpoolmanSpool
-
 
 TOOL_GATE_UNKNOWN = -1
 TOOL_GATE_BYPASS = -2
@@ -383,7 +382,8 @@ class MmuMixin:
 
     def get_mmu_unit(self, gate):
         mmu_machine = self._printer.get_stat("mmu_machine")
-        if mmu_machine is None: return None
+        if mmu_machine is None:
+            return None
 
         if gate == TOOL_GATE_UNKNOWN:
             return mmu_machine['unit_0']

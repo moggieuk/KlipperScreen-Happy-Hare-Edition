@@ -9,8 +9,9 @@ import gi
 gi.require_version("Gtk", "3.0")
 
 from gi.repository import Gtk
+
 from ks_includes.screen_panel import ScreenPanel
-from panels.mmu_mixin import *
+from panels.mmu_mixin import NOT_SET, TOOL_GATE_BYPASS, TOOL_GATE_UNKNOWN, MmuMixin
 
 
 class Panel(ScreenPanel, MmuMixin):
@@ -162,7 +163,7 @@ class Panel(ScreenPanel, MmuMixin):
     def activate(self):
         self.configure_selector_controls()
         self.init_gate_values()
-        if self.ui_action_button_name != None:
+        if self.ui_action_button_name is not None:
             self.labels[self.ui_action_button_name].set_label(self.ui_action_button_label)
 
 
@@ -179,7 +180,7 @@ class Panel(ScreenPanel, MmuMixin):
                         self.labels['load'].set_label("Load")
                 if 'action' in e_data:
                     action = e_data['action']
-                    if self.ui_action_button_name != None:
+                    if self.ui_action_button_name is not None:
                         if action == "Idle" or action == "Unknown":
                             self.labels[self.ui_action_button_name].set_label(self.ui_action_button_label) # Restore original button label
                             self.ui_action_button_name = None
@@ -369,7 +370,7 @@ class Panel(ScreenPanel, MmuMixin):
         for label in self.btn_states['all']:
             sensitive = True
             for state in ui_state:
-                if not label in self.btn_states[state]:
+                if label not in self.btn_states[state]:
                     sensitive = False
                     break
             if sensitive:

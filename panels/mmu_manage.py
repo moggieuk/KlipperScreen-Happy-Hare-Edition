@@ -93,52 +93,14 @@ class Panel(ScreenPanel, MmuMixin):
         self.labels['g_decrease'].set_hexpand(False)
         self.labels['g_decrease'].get_style_context().add_class("mmu_sel_decrease")
 
-        selector_type = self.get_selector_type()
-        grid = Gtk.Grid()
-        grid.set_column_homogeneous(True)
-        grid.set_row_homogeneous(True)
-
-        if selector_type in ['RotarySelector', 'LinearSelector', 'LinearServoSelector']:
-            grid.attach(self.labels['g_decrease'], 0, 0, 1, 1)
-            grid.attach(self.labels['gate'],       1, 0, 1, 1)
-            grid.attach(self.labels['g_increase'], 2, 0, 1, 1)
-
-            if selector_type == 'RotarySelector':
-                grid.attach(self.labels['grip'],       4, 0, 1, 1)
-                grid.attach(self.labels['release'],    5, 0, 1, 1)
-
-            elif selector_type == 'LinearServoSelector':
-                grid.attach(self.labels['servo_up'],   3, 0, 1, 1)
-                grid.attach(self.labels['servo_move'], 4, 0, 1, 1)
-                grid.attach(self.labels['servo_down'], 5, 0, 1, 1)
-
-            grid.attach(self.labels['recover'],    0, 1, 2, 1)
-            grid.attach(self.labels['checkgate'],  2, 1, 2, 1)
-            grid.attach(self.labels['home'],       4, 1, 1, 1)
-            grid.attach(self.labels['motors_off'], 5, 1, 1, 1)
-            grid.attach(self.labels['load'],       0, 2, 1, 1)
-            grid.attach(self.labels['unload'],     1, 2, 1, 1)
-
-            if selector_type == 'LinearServoSelector':
-                grid.attach(self.labels['sync'],       2, 2, 1, 1)
-                grid.attach(self.labels['unsync'],     3, 2, 1, 1)
-
-            grid.attach(self.labels['load_ext'],   4, 2, 1, 1)
-            grid.attach(self.labels['unload_ext'], 5, 2, 1, 1)
-        else:
-            grid.attach(self.labels['g_decrease'], 0, 0, 1, 1)
-            grid.attach(self.labels['gate'],       1, 0, 2, 1)
-            grid.attach(self.labels['g_increase'], 3, 0, 1, 1)
-            grid.attach(self.labels['motors_off'], 5, 0, 1, 1)
-            grid.attach(self.labels['recover'],    0, 1, 2, 1)
-            grid.attach(self.labels['checkgate'],  2, 1, 2, 1)
-            grid.attach(self.labels['load'],       0, 2, 2, 1)
-            grid.attach(self.labels['unload'],     2, 2, 2, 1)
-            grid.attach(self.labels['load_ext'],   4, 2, 1, 1)
-            grid.attach(self.labels['unload_ext'], 5, 2, 1, 1)
+        self.selector_type = None
+        self.grid = Gtk.Grid()
+        self.grid.set_column_homogeneous(True)
+        self.grid.set_row_homogeneous(True)
+        self.configure_selector_controls()
 
         scroll = self._gtk.ScrolledWindow()
-        scroll.add(grid)
+        scroll.add(self.grid)
         self.content.add(scroll)
 
         self.ui_sel_gate = NOT_SET
@@ -146,7 +108,59 @@ class Panel(ScreenPanel, MmuMixin):
         self.ui_action_button_label = ""
 
 
+    def configure_selector_controls(self):
+        selector_type = self.get_selector_type()
+        if selector_type == self.selector_type:
+            return
+
+        self.selector_type = selector_type
+        for child in self.grid.get_children():
+            self.grid.remove(child)
+
+        if selector_type in ['RotarySelector', 'LinearSelector', 'LinearServoSelector']:
+            self.grid.attach(self.labels['g_decrease'], 0, 0, 1, 1)
+            self.grid.attach(self.labels['gate'],       1, 0, 1, 1)
+            self.grid.attach(self.labels['g_increase'], 2, 0, 1, 1)
+
+            if selector_type == 'RotarySelector':
+                self.grid.attach(self.labels['grip'],       4, 0, 1, 1)
+                self.grid.attach(self.labels['release'],    5, 0, 1, 1)
+
+            elif selector_type == 'LinearServoSelector':
+                self.grid.attach(self.labels['servo_up'],   3, 0, 1, 1)
+                self.grid.attach(self.labels['servo_move'], 4, 0, 1, 1)
+                self.grid.attach(self.labels['servo_down'], 5, 0, 1, 1)
+
+            self.grid.attach(self.labels['recover'],    0, 1, 2, 1)
+            self.grid.attach(self.labels['checkgate'],  2, 1, 2, 1)
+            self.grid.attach(self.labels['home'],       4, 1, 1, 1)
+            self.grid.attach(self.labels['motors_off'], 5, 1, 1, 1)
+            self.grid.attach(self.labels['load'],       0, 2, 1, 1)
+            self.grid.attach(self.labels['unload'],     1, 2, 1, 1)
+
+            if selector_type == 'LinearServoSelector':
+                self.grid.attach(self.labels['sync'],       2, 2, 1, 1)
+                self.grid.attach(self.labels['unsync'],     3, 2, 1, 1)
+
+            self.grid.attach(self.labels['load_ext'],   4, 2, 1, 1)
+            self.grid.attach(self.labels['unload_ext'], 5, 2, 1, 1)
+        else:
+            self.grid.attach(self.labels['g_decrease'], 0, 0, 1, 1)
+            self.grid.attach(self.labels['gate'],       1, 0, 2, 1)
+            self.grid.attach(self.labels['g_increase'], 3, 0, 1, 1)
+            self.grid.attach(self.labels['motors_off'], 5, 0, 1, 1)
+            self.grid.attach(self.labels['recover'],    0, 1, 2, 1)
+            self.grid.attach(self.labels['checkgate'],  2, 1, 2, 1)
+            self.grid.attach(self.labels['load'],       0, 2, 2, 1)
+            self.grid.attach(self.labels['unload'],     2, 2, 2, 1)
+            self.grid.attach(self.labels['load_ext'],   4, 2, 1, 1)
+            self.grid.attach(self.labels['unload_ext'], 5, 2, 1, 1)
+
+        self.grid.show_all()
+
+
     def activate(self):
+        self.configure_selector_controls()
         self.init_gate_values()
         if self.ui_action_button_name != None:
             self.labels[self.ui_action_button_name].set_label(self.ui_action_button_label)
@@ -156,6 +170,7 @@ class Panel(ScreenPanel, MmuMixin):
         if action == "notify_status_update":
             if 'mmu' in data:
                 e_data = data['mmu']
+                self.configure_selector_controls()
                 if 'gate' in e_data:
                     self.ui_sel_gate = e_data['gate']
                     if e_data['gate'] >= 0:
@@ -302,6 +317,9 @@ class Panel(ScreenPanel, MmuMixin):
         filament = mmu['filament']
         sync_drive = mmu['sync_drive']
         selector_type = self.get_selector_type()
+        selector_status = mmu.get('selector')
+        if not isinstance(selector_status, dict):
+            selector_status = mmu
 
         ui_state = []
         if enabled:
@@ -330,10 +348,10 @@ class Panel(ScreenPanel, MmuMixin):
                 self.labels['unload'].set_label("Eject")
 
             if selector_type in ['RotarySelector']:
-                grip = mmu.get('grip', None)
+                grip = selector_status.get('grip', None)
                 ui_state.append("gripped" if grip.lower() == 'gripped'  else "released")
             elif selector_type in ['LinearServoSelector']:
-                servo = mmu.get('servo', None)
+                servo = selector_status.get('servo', None)
                 servo_states = {
                     'Up': ['servo_up'],
                     'Down': ['servo_down'],
@@ -407,4 +425,3 @@ class Panel(ScreenPanel, MmuMixin):
             self.labels['checkgate'].set_sensitive(False)
         elif gate_sensitive:
             self.labels['checkgate'].set_sensitive(True)
-

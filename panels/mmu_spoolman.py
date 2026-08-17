@@ -8,11 +8,21 @@ import gi
 
 gi.require_version("Gtk", "3.0")
 
-from gi.repository            import Gtk, Gdk
+from gi.repository import Gdk, Gtk
 
 from ks_includes.screen_panel import ScreenPanel
-from panels.spoolman          import SpoolmanSpool
-from panels.mmu_mixin         import *
+from panels.mmu_mixin import (
+    COLOR_DARK_GREY,
+    COLOR_GREEN,
+    COLOR_LIGHT_GREY,
+    COLOR_ORANGE,
+    COLOR_RED,
+    GATE_AVAILABLE,
+    GATE_AVAILABLE_FROM_BUFFER,
+    GATE_EMPTY,
+    MmuMixin,
+)
+from panels.spoolman import SpoolmanSpool
 
 
 class Panel(ScreenPanel, MmuMixin):
@@ -221,7 +231,7 @@ class Panel(ScreenPanel, MmuMixin):
 
 
     def get_color_details(self, gate_color):
-        if gate_color == None:
+        if gate_color is None:
             gate_color = ''
         color = Gdk.RGBA()
         if not Gdk.RGBA.parse(color, gate_color):

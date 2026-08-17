@@ -8,9 +8,21 @@ import gi
 
 gi.require_version("Gtk", "3.0")
 
-from gi.repository import Gtk, Gdk
+from gi.repository import Gdk, Gtk
+
 from ks_includes.screen_panel import ScreenPanel
-from panels.mmu_mixin import *
+from panels.mmu_mixin import (
+    COLOR_GREEN,
+    COLOR_LIGHT_GREY,
+    COLOR_RED,
+    COLOR_SWATCH,
+    EMPTY_SWATCH,
+    GATE_AVAILABLE,
+    GATE_AVAILABLE_FROM_BUFFER,
+    GATE_EMPTY,
+    TOOL_GATE_BYPASS,
+    MmuMixin,
+)
 
 
 class Panel(ScreenPanel, MmuMixin):
@@ -172,4 +184,3 @@ class Panel(ScreenPanel, MmuMixin):
         else:
             self._screen._ws.api.gcode_script(f"MMU_CHANGE_TOOL TOOL={selected_tool}")
             self._screen._menu_go_back()
-

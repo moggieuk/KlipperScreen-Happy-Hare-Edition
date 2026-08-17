@@ -8,9 +8,21 @@ import gi
 
 gi.require_version("Gtk", "3.0")
 
-from gi.repository            import Gtk, Gdk
+from gi.repository import Gdk, Gtk
+
 from ks_includes.screen_panel import ScreenPanel
-from panels.mmu_mixin         import *
+from panels.mmu_mixin import (
+    COLOR_GREEN,
+    COLOR_LIGHT_GREY,
+    COLOR_RED,
+    COLOR_SWATCH,
+    EMPTY_SWATCH,
+    GATE_AVAILABLE,
+    GATE_AVAILABLE_FROM_BUFFER,
+    GATE_EMPTY,
+    W3C_COLORS,
+    MmuMixin,
+)
 
 
 class Panel(ScreenPanel, MmuMixin):

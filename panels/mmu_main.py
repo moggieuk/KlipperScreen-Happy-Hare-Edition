@@ -140,6 +140,8 @@ class Panel(ScreenPanel, MmuMixin):
         notebook_corner = Gtk.Notebook()
         l['notebook_corner'] = notebook_corner
         notebook_corner.set_show_tabs(False)
+        self._notebook_corner_page_available = []
+        self._notebook_corner_pages = {}
         page = 0
 
         notebook_overlay = Gtk.Overlay()
@@ -168,27 +170,28 @@ class Panel(ScreenPanel, MmuMixin):
         manage_frame.set_label_align(0.6, 0)
         manage_frame.add(manage_grid)
         notebook_corner.insert_page(self._clickable_page(manage_frame), None, page)
+        self._notebook_corner_pages['manage'] = page
         page += 1
 
         # In print Encoder gauge
-        if self.has_encoder():
-            l['encoder_gauge'] = encoder_gauge = EncoderDialGauge()
-            l['encoder_frame'] = encoder_frame = Gtk.Frame()
-            encoder_frame.set_label("Encoder")
-            encoder_frame.set_label_align(0.5, 0)
-            encoder_frame.add(encoder_gauge)
-            notebook_corner.insert_page(self._clickable_page(encoder_frame), None, page)
-            page += 1
+        l['encoder_gauge'] = encoder_gauge = EncoderDialGauge()
+        l['encoder_frame'] = encoder_frame = Gtk.Frame()
+        encoder_frame.set_label("Encoder")
+        encoder_frame.set_label_align(0.5, 0)
+        encoder_frame.add(encoder_gauge)
+        notebook_corner.insert_page(self._clickable_page(encoder_frame), None, page)
+        self._notebook_corner_pages['encoder'] = page
+        page += 1
 
         # In print sync-feedback flowguard gauge
-        if self.has_buffer():
-            l['flowguard_gauge'] = flowguard_gauge = FlowGuardDialGauge()
-            l['flowguard_frame'] = flowguard_frame = Gtk.Frame()
-            flowguard_frame.set_label("FlowGuard")
-            flowguard_frame.set_label_align(0.5, 0)
-            flowguard_frame.add(flowguard_gauge)
-            notebook_corner.insert_page(self._clickable_page(flowguard_frame), None, page)
-            page += 1
+        l['flowguard_gauge'] = flowguard_gauge = FlowGuardDialGauge()
+        l['flowguard_frame'] = flowguard_frame = Gtk.Frame()
+        flowguard_frame.set_label("FlowGuard")
+        flowguard_frame.set_label_align(0.5, 0)
+        flowguard_frame.add(flowguard_gauge)
+        notebook_corner.insert_page(self._clickable_page(flowguard_frame), None, page)
+        self._notebook_corner_pages['flowguard'] = page
+        page += 1
 
         # Selected spool details
         l['spool_details'] = spool_details = MmuSpoolDetails(self._printer, self)
@@ -197,10 +200,12 @@ class Panel(ScreenPanel, MmuMixin):
         spool_details_frame.set_label_align(0.5, 0)
         spool_details_frame.add(spool_details)
         notebook_corner.insert_page(self._clickable_page(spool_details_frame), None, page)
+        self._notebook_corner_pages['spool_details'] = page
         page += 1
 
+        self._notebook_corner_page_available = [True] * page
         notebook_corner.set_current_page(0)
-        next_label.set_text(self._notebook_page_indicator(0, page))
+        next_label.set_markup(self._notebook_page_indicator(0, page))
 
 
         # Pause button "layers" ------------------------------------
@@ -336,6 +341,7 @@ class Panel(ScreenPanel, MmuMixin):
         self.config_update()
         self.update_status()
         self.update_filament_status()
+        self._update_notebook_corner_pages()
 
         if self.show_spool_tray:
             mmu = self._printer.get_stat("mmu")
@@ -365,34 +371,70 @@ class Panel(ScreenPanel, MmuMixin):
 
     def _next_notebook_corner_page(self, widget=None, event=None):
         notebook = self.labels["notebook_corner"]
-        next_label = self.labels["notebook_corner_next"]
         page = notebook.get_current_page()
         n_pages = notebook.get_n_pages()
-        pages = range(0, n_pages)
-        mmu = self._printer.get_stat("mmu")
-        mmu_print_state = mmu['print_state']
 
         for i in range(1, n_pages + 1):
             candidate = (page + i) % n_pages
 
             if self._is_clickable_page(notebook, candidate):
                 notebook.set_current_page(candidate)
-                next_label.set_text(self._notebook_page_indicator(candidate, n_pages))
+                self._update_notebook_corner_indicator()
                 break
 
         return True
 
 
     def _notebook_page_indicator(self, page, n_pages):
-        return "".join(
-            "●" if i == page else "○"
-            for i in range(n_pages)
+        indicator = []
+        for i in range(n_pages):
+            if not self._notebook_corner_page_available[i]:
+                indicator.append("<span foreground='#666666'>○</span>")
+            else:
+                indicator.append("●" if i == page else "○")
+        return "".join(indicator)
+
+
+    def _update_notebook_corner_indicator(self):
+        notebook = self.labels["notebook_corner"]
+        self.labels["notebook_corner_next"].set_markup(
+            self._notebook_page_indicator(
+                notebook.get_current_page(),
+                notebook.get_n_pages(),
+            )
         )
+
+
+    def _update_notebook_corner_pages(self):
+        notebook = self.labels["notebook_corner"]
+        mmu = self._printer.get_stat("mmu")
+        printing = mmu.get("print_state") in ("started", "printing")
+
+        availability = {
+            "manage": not printing,
+            "encoder": self.has_encoder(),
+            "flowguard": self.has_buffer(),
+            "spool_details": True,
+        }
+
+        for name, page in self._notebook_corner_pages.items():
+            available = availability[name]
+            self._notebook_corner_page_available[page] = available
+            notebook.get_nth_page(page).set_sensitive(available)
+
+        current_page = notebook.get_current_page()
+        if not self._notebook_corner_page_available[current_page]:
+            self._next_notebook_corner_page()
+        else:
+            self._update_notebook_corner_indicator()
 
 
     def _is_clickable_page(self, notebook, page_num):
         child = notebook.get_nth_page(page_num)
-        return isinstance(child, Gtk.EventBox)
+        return (
+            isinstance(child, Gtk.EventBox)
+            and self._notebook_corner_page_available[page_num]
+        )
 
 
     def _clickable_page(self, child):
@@ -430,6 +472,9 @@ class Panel(ScreenPanel, MmuMixin):
                 if 'mmu' in data:
                     mmu = self._printer.get_stat("mmu")
                     e_data = data['mmu']
+
+                    if 'unit' in e_data:
+                        self._update_notebook_corner_pages()
 
                     # v4 encoder
                     if self.has_encoder() and 'encoder' in e_data:
@@ -912,6 +957,7 @@ class Panel(ScreenPanel, MmuMixin):
         action = mmu['action']
         filament = mmu['filament']
         ui_state = []
+        self._update_notebook_corner_pages()
         if enabled:
             if mmu_print_state in ("pause_locked", "paused"):
                 ui_state.append(mmu_print_state)
@@ -937,13 +983,6 @@ class Panel(ScreenPanel, MmuMixin):
             if not self._screen.have_last_popup_message():
                 ui_state.append("no_message")
 
-            # Adjust "notebook corner" if necessary
-            notebook = self.labels['notebook_corner']
-            page = notebook.get_current_page()
-            if page == 0 and printing:
-                # Get off "manage" button and Move to one of the monitor gauges
-                self._next_notebook_corner_page()
-
             if ("paused" not in ui_state and "pause_locked" not in ui_state) or "no_message" in ui_state:
                 self.labels['pause_layer'].set_current_page(0) # Pause button
             else:
@@ -953,7 +992,10 @@ class Panel(ScreenPanel, MmuMixin):
                 ui_state.append("busy")
         else:
             ui_state.append("disabled")
-            self.labels['notebook_corner'].set_current_page(0) # Manage recovery button
+            if not printing:
+                manage_page = self._notebook_corner_pages['manage']
+                self.labels['notebook_corner'].set_current_page(manage_page)
+                self._update_notebook_corner_indicator()
             self.labels['t_increase'].set_sensitive(False)
             self.labels['t_decrease'].set_sensitive(False)
 

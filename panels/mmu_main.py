@@ -1121,7 +1121,6 @@ class Panel(ScreenPanel, MmuMixin):
 
     def get_filament_text(self, markup=False, bold=False):
         mmu = self._printer.get_stat("mmu")
-        tool = mmu["tool"]
         pos = mmu["filament_pos"]
         direction = mmu["filament_direction"]
         gate = mmu["gate"]
@@ -1373,14 +1372,7 @@ class Panel(ScreenPanel, MmuMixin):
 
         # Impl --------
 
-        if tool >= 0:
-            tool_text = f"[T{tool}] "
-        elif tool == TOOL_GATE_BYPASS:
-            tool_text = "[BYPASS] "
-        else:
-            tool_text = "[T?] "
-
-        bowden_length = max(1, 16 - len(tool_text))
+        bowden_length = 16
         bowden_half = bowden_length // 2
 
         encoder_ref_pos = (
@@ -1396,8 +1388,6 @@ class Panel(ScreenPanel, MmuMixin):
         encoder_overshoots = self.has_encoder() and homed_here(SENSOR_ENCODER)
 
         parts = [
-            tool_text,
-
             gate_area_segment(),
 
             (

@@ -1364,6 +1364,12 @@ class Panel(ScreenPanel, MmuMixin):
             return arrow * width
 
         def gate_area_segment():
+            encoder_approach = with_home(
+                gate_sensor_gap(SENSOR_SHARED_EXIT), SENSOR_ENCODER
+            )
+            if pos == FILAMENT_POS_UNLOADED and self.has_encoder():
+                encoder_approach = encoder_approach[:-1] + space
+
             return (
                 gate_presence_marker()
                 + entry_marker()
@@ -1371,7 +1377,7 @@ class Panel(ScreenPanel, MmuMixin):
                 + gate_sensor_marker(SENSOR_EXIT_PREFIX)
                 + with_home(gate_sensor_gap(SENSOR_EXIT_PREFIX), SENSOR_SHARED_EXIT)
                 + gate_sensor_marker(SENSOR_SHARED_EXIT)
-                + with_home(gate_sensor_gap(SENSOR_SHARED_EXIT), SENSOR_ENCODER)
+                + encoder_approach
             )
 
         def nozzle_segment():

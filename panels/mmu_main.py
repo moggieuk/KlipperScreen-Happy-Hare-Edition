@@ -1441,7 +1441,7 @@ class Panel(ScreenPanel, MmuMixin):
 
         # Impl --------
 
-        bowden_length = 16
+        bowden_length = 12
         bowden_half = bowden_length // 2
 
         encoder_ref_pos = (

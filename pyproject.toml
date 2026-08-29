@@ -18,14 +18,15 @@ extend-exclude = [
 ]
 
 [tool.ruff.lint]
-# E: pycodestyle, /F: Pyflakes, I: isort (import sorting)
-select = ["E", "F", "I"]
-ignore = [
-    "E402", # Module level import not at top of file (needed for gi)
+# E: pycodestyle, F: Pyflakes, I: isort (import sorting)
+select = [
+    "E9",
+    "F",
+    "I",
+    "E401", # Multiple imports on one line
+    "E713", # Prefer `not in`
+    "E741", # Ambiguous variable names
 ]
-
-[tool.ruff.lint.per-file-ignores]
-"panels/mmu_*.py" = ["E501"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["ks_includes", "panels"]

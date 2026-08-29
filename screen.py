@@ -11,14 +11,14 @@ import subprocess
 import sys
 import traceback  # noqa
 from dataclasses import dataclass
+from datetime import datetime
+from importlib import import_module
+from signal import SIGTERM
 
 import gi
 
 gi.require_version("Gdk", "3.0")
 gi.require_version("Gtk", "3.0")
-from datetime import datetime
-from importlib import import_module
-from signal import SIGTERM
 
 from gi.repository import Gdk, GLib, Gtk, Pango
 from jinja2 import Environment

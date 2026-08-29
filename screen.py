@@ -27,7 +27,6 @@ from ks_includes import functions
 from ks_includes.config import KlipperScreenConfig
 from ks_includes.files import KlippyFiles
 from ks_includes.KlippyGtk import KlippyGtk
-from ks_includes.KlippyRest import KlippyRest
 from ks_includes.KlippyUDS import KlippyUDS
 from ks_includes.KlippyWebsocket import KlippyWebsocket
 from ks_includes.notification_handler import NotificationHandler
@@ -75,7 +74,6 @@ class KlipperScreen(Gtk.ApplicationWindow):
         self.files = None
         self.printer = None
         self.printers = None
-        self.restApi = None
         self._ws = None
 
         self.keyboard = None
@@ -290,13 +288,18 @@ class KlipperScreen(Gtk.ApplicationWindow):
         is_uds = moonraker_host.startswith(("/", "~"))
         rest_host = "localhost" if is_uds else moonraker_host
 
-        self.restApi = KlippyRest(
-            rest_host,
-            self.printers[ind][name]["moonraker_port"],
-            self.printers[ind][name]["moonraker_api_key"],
-            self.printers[ind][name]["moonraker_path"],
-            self.printers[ind][name]["moonraker_ssl"],
+        moonraker_port = self.printers[ind][name]["moonraker_port"]
+        moonraker_path = self.printers[ind][name]["moonraker_path"]
+        moonraker_ssl = self.printers[ind][name]["moonraker_ssl"]
+        if moonraker_ssl is None:
+            moonraker_ssl = int(moonraker_port) in {443, 7130}
+
+        self.moonraker_endpoint = (
+            f"{'https' if moonraker_ssl else 'http'}://{rest_host}:{moonraker_port}"
         )
+        if moonraker_path:
+            self.moonraker_endpoint += f"/{moonraker_path}"
+        self.moonraker_api_key = self.printers[ind][name]["moonraker_api_key"]
         self._notification_handler = NotificationHandler(self)
         self.state.printer_is_local = is_uds or moonraker_host in ("localhost", "127.0.0.1")
 
@@ -543,6 +546,7 @@ class KlipperScreen(Gtk.ApplicationWindow):
             halign=Gtk.Align.CENTER,
             width_request=int(self.width * 0.9),
         )
+        popup.set_modal(False)
         popup.get_style_context().add_class("message_popup_popover")
         if monospace: # Happy Hare added
             popup.get_style_context().add_class("mmu_unicode_mono")
@@ -1112,7 +1116,7 @@ class KlipperScreen(Gtk.ApplicationWindow):
         zoffset = float(offset[2]) if offset else 0
         if zoffset != 0:
             sign = "+" if zoffset > 0 else "-"
-            msg = f"Apply {sign}{abs(zoffset)} offset?"
+            msg = f"Apply {sign}{abs(zoffset):.3f} offset?"
             zlabel = Gtk.Label(label=msg, hexpand=True, vexpand=True, wrap=True)
             zlabel.set_line_wrap_mode(Pango.WrapMode.WORD_CHAR)
             grid.attach(zlabel, 0, 1, 2, 1)

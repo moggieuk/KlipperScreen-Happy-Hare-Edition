@@ -107,6 +107,15 @@ class Printer:
                     self.config[obj] = {}
                     self.data[obj] = {"temperature": 0}
                     self.tempdevcount += 1
+            elif obj.startswith(("filament_switch_sensor ", "filament_motion_sensor ")):
+                name = obj.split(" ", 1)[1]
+                if name.startswith("_"):
+                    continue
+                if obj not in self.config:
+                    logging.info(f"Registering dynamic sensor: {obj}")
+                    self.config[obj] = {}
+                    self.data[obj] = {"enabled": True, "filament_detected": False}
+                    self.sensors = None
 
     def log_counts(self, printer_info):
         logging.info(f"Klipper version: {printer_info['software_version']}")

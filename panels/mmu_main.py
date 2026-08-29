@@ -1430,7 +1430,7 @@ class Panel(ScreenPanel, MmuMixin):
             if sf_state == "neutral":
                 if self.has_sensor(SENSOR_PROPORTIONAL) and sf_value is not None:
                     self._last_sync_feedback_bias_rounded = round(sf_value, 1)
-                    return f"[{f'{sf_value:.1f}'.center(5)}]"
+                    return f"[{f'{sf_value: .1f}'.ljust(5)}]"
                 sf_char = "N"
 
             if c_sensor:
@@ -1441,7 +1441,7 @@ class Panel(ScreenPanel, MmuMixin):
 
         # Impl --------
 
-        bowden_length = 12
+        bowden_length = 14
         bowden_half = bowden_length // 2
 
         encoder_ref_pos = (

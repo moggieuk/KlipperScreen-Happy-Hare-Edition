@@ -204,7 +204,11 @@ class Panel(ScreenPanel, MmuMixin):
         manage_grid.attach(lbl['manage'], 1, 0, 6, 1)
         manage_grid.attach(Gtk.Label(), 0, 1, 6, 1)
         lbl['manage_frame'] = manage_frame = Gtk.Frame()
-        manage_frame.set_label("Unit0")
+        lbl['manage_title'] = manage_title = Gtk.Label(label="Unit0")
+        manage_title.set_ellipsize(Pango.EllipsizeMode.END)
+        manage_title.set_max_width_chars(14)
+        manage_title.set_single_line_mode(True)
+        manage_frame.set_label_widget(manage_title)
         manage_frame.set_label_align(0.6, 0)
         manage_frame.add(manage_grid)
         notebook_corner.insert_page(self._clickable_page(manage_frame), None, page)
@@ -954,7 +958,7 @@ class Panel(ScreenPanel, MmuMixin):
                 else:
                     self.labels[name].set_label(text[i])
 
-            self.labels['manage_frame'].set_label(current_unit_name)
+            self.labels['manage_title'].set_label(current_unit_name)
         else:
             self.labels['spool_tray'].refresh()
 
@@ -966,7 +970,7 @@ class Panel(ScreenPanel, MmuMixin):
             if unit:
                 current_unit_name = unit.get("display_name") or unit.get("name")
                 current_unit_name = current_unit_name[:1].upper() + current_unit_name[1:]
-                self.labels['manage_frame'].set_label(current_unit_name)
+                self.labels['manage_title'].set_label(current_unit_name)
 
 
     # Dynamically update button sensitivity based on state

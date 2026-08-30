@@ -1,7 +1,7 @@
 import logging
+import re  # Happy Hare
 
 import gi
-import re # Happy Hare
 
 gi.require_version("Gtk", "3.0")
 from gi.repository import GLib

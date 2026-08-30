@@ -27,6 +27,7 @@ from gi.repository import Gtk
 # ENCODER DIAL GUAGE
 # -------------------------------------------------------------------------------------------
 
+
 class EncoderDialGauge(Gtk.DrawingArea):
     def __init__(self):
         super().__init__()
@@ -41,9 +42,9 @@ class EncoderDialGauge(Gtk.DrawingArea):
         # Colors
         self.green = (0.25, 0.60, 0.32)
         self.amber = (0.78, 0.55, 0.16)
-        self.red   = (0.70, 0.20, 0.20)
+        self.red = (0.70, 0.20, 0.20)
         self.white = (0.95, 0.95, 0.95)
-        self.grey  = (0.45, 0.45, 0.45)
+        self.grey = (0.45, 0.45, 0.45)
 
         # Geometry / styling
         self.arc_width = 10
@@ -65,7 +66,6 @@ class EncoderDialGauge(Gtk.DrawingArea):
 
         self.connect("draw", self._draw)
 
-
     def update(self, data):
         new_max = max(1.0, float(data.get("detection_length", 10.0)))
         new_min = float(data.get("min_headroom", 0.0))
@@ -75,12 +75,12 @@ class EncoderDialGauge(Gtk.DrawingArea):
         new_flowrate = float(data.get("flow_rate", 0.0))
 
         changed = (
-            abs(self.max_value - new_max) > 0.01 or
-            abs(self.min_headroom - new_min) > 0.01 or
-            abs(self.desired_headroom - new_desired) > 0.01 or
-            abs(self.value - new_value) > 0.05 or
-            self.enabled != new_enabled or
-            self.flowrate != new_flowrate
+            abs(self.max_value - new_max) > 0.01
+            or abs(self.min_headroom - new_min) > 0.01
+            or abs(self.desired_headroom - new_desired) > 0.01
+            or abs(self.value - new_value) > 0.05
+            or self.enabled != new_enabled
+            or self.flowrate != new_flowrate
         )
 
         if not changed:
@@ -95,10 +95,8 @@ class EncoderDialGauge(Gtk.DrawingArea):
 
         self.queue_draw()
 
-
     def _clamp(self, value, low, high):
         return max(low, min(high, value))
-
 
     def _angle(self, value):
         # left = max_value, right = 0, across the top
@@ -106,7 +104,6 @@ class EncoderDialGauge(Gtk.DrawingArea):
         fraction = value / self.max_value
         degrees = self.arc_start_deg + self.arc_sweep_deg * fraction
         return math.radians(degrees)
-
 
     def _color_for_headroom(self, value):
         warning = self.desired_headroom
@@ -118,7 +115,6 @@ class EncoderDialGauge(Gtk.DrawingArea):
             return self.amber
         return self.green
 
-
     def _point_on_arc(self, cx, cy, radius, value):
         a = self._angle(value)
         return (
@@ -126,12 +122,10 @@ class EncoderDialGauge(Gtk.DrawingArea):
             cy + radius * math.sin(a),
         )
 
-
     def _draw_arc(self, cr, cx, cy, r, start, end, color):
         cr.set_source_rgb(*color)
         cr.arc(cx, cy, r, self._angle(start), self._angle(end))
         cr.stroke()
-
 
     def _draw_marker(self, cr, cx, cy, r, value):
         x1, y1 = self._point_on_arc(cx, cy, r + self.marker_inner_offset, value)
@@ -144,12 +138,10 @@ class EncoderDialGauge(Gtk.DrawingArea):
         cr.line_to(x2, y2)
         cr.stroke()
 
-
     def _draw_text_centered(self, cr, text, x, y):
         ext = cr.text_extents(text)
         cr.move_to(x - ext.width / 2, y)
         cr.show_text(text)
-
 
     def _draw(self, widget, cr):
         w = self.get_allocated_width()
@@ -157,7 +149,7 @@ class EncoderDialGauge(Gtk.DrawingArea):
 
         # Shape of arc (circle center and radius)
         cx = w * 0.5
-        cy = h * 0.62 # 62% down
+        cy = h * 0.62  # 62% down
         r = min(w * 0.40, h * 0.50)
 
         warning = self.desired_headroom
@@ -239,15 +231,17 @@ class EncoderDialGauge(Gtk.DrawingArea):
         else:
             cr.set_source_rgb(*self.grey)
             bottom_text = "Flowrate: --%"
-        self._draw_text_centered(cr, bottom_text, cx, cy - cr.text_extents(bottom_text).y_bearing + 36)
+        self._draw_text_centered(
+            cr, bottom_text, cx, cy - cr.text_extents(bottom_text).y_bearing + 36
+        )
 
         return False
-
 
 
 # -------------------------------------------------------------------------------------------
 # FLOWGUARD TANGLE / CLOG METER
 # -------------------------------------------------------------------------------------------
+
 
 class FlowGuardDialGauge(Gtk.DrawingArea):
     def __init__(self):
@@ -264,9 +258,9 @@ class FlowGuardDialGauge(Gtk.DrawingArea):
         # Colors
         self.green = (0.25, 0.60, 0.32)
         self.amber = (0.78, 0.55, 0.16)
-        self.red   = (0.70, 0.20, 0.20)
+        self.red = (0.70, 0.20, 0.20)
         self.white = (0.95, 0.95, 0.95)
-        self.grey  = (0.45, 0.45, 0.45)
+        self.grey = (0.45, 0.45, 0.45)
 
         # Geometry / styling
         self.arc_width = 10
@@ -288,7 +282,6 @@ class FlowGuardDialGauge(Gtk.DrawingArea):
 
         self.connect("draw", self._draw)
 
-
     def update(self, flowguard_status, flowrate=None):
         new_level = float(flowguard_status.get("level", 0.0))
         new_max_clog = float(flowguard_status.get("max_clog", 0.0))
@@ -299,13 +292,13 @@ class FlowGuardDialGauge(Gtk.DrawingArea):
         new_flowrate = None if flowrate is None else float(flowrate)
 
         changed = (
-            abs(self.level - new_level) > 0.01 or
-            abs(self.max_clog - new_max_clog) > 0.01 or
-            abs(self.max_tangle - new_max_tangle) > 0.01 or
-            self.active != new_active or
-            self.enabled != new_enabled or
-            self.trigger != new_trigger or
-            self.flowrate != new_flowrate
+            abs(self.level - new_level) > 0.01
+            or abs(self.max_clog - new_max_clog) > 0.01
+            or abs(self.max_tangle - new_max_tangle) > 0.01
+            or self.active != new_active
+            or self.enabled != new_enabled
+            or self.trigger != new_trigger
+            or self.flowrate != new_flowrate
         )
 
         if not changed:
@@ -321,16 +314,13 @@ class FlowGuardDialGauge(Gtk.DrawingArea):
 
         self.queue_draw()
 
-
     def _clamp(self, value):
         return max(-1.0, min(1.0, value))
-
 
     def _angle(self, value):
         fraction = (self._clamp(value) + 1.0) / 2.0
         degrees = self.arc_start_deg + self.arc_sweep_deg * fraction
         return math.radians(degrees)
-
 
     def _color_for_value(self, value):
         abs_value = abs(value)
@@ -341,7 +331,6 @@ class FlowGuardDialGauge(Gtk.DrawingArea):
             return self.amber
         return self.green
 
-
     def _point_on_arc(self, cx, cy, radius, value):
         a = self._angle(value)
         return (
@@ -349,12 +338,10 @@ class FlowGuardDialGauge(Gtk.DrawingArea):
             cy + radius * math.sin(a),
         )
 
-
     def _draw_arc(self, cr, cx, cy, r, start, end, color):
         cr.set_source_rgb(*color)
         cr.arc(cx, cy, r, self._angle(start), self._angle(end))
         cr.stroke()
-
 
     def _draw_marker(self, cr, cx, cy, r, value):
         x1, y1 = self._point_on_arc(cx, cy, r + 7, value)
@@ -367,12 +354,10 @@ class FlowGuardDialGauge(Gtk.DrawingArea):
         cr.line_to(x2, y2)
         cr.stroke()
 
-
     def _draw_text_centered(self, cr, text, x, y):
         ext = cr.text_extents(text)
         cr.move_to(x - ext.width / 2, y)
         cr.show_text(text)
-
 
     def _draw(self, widget, cr):
         w = self.get_allocated_width()
@@ -385,11 +370,11 @@ class FlowGuardDialGauge(Gtk.DrawingArea):
         cr.set_line_width(self.arc_width)
         cr.set_line_cap(cairo.LINE_CAP_ROUND)
 
-        self._draw_arc(cr, cx, cy, r, -0.5,  0.5, self.green)
+        self._draw_arc(cr, cx, cy, r, -0.5, 0.5, self.green)
         self._draw_arc(cr, cx, cy, r, -0.9, -0.5, self.amber)
         self._draw_arc(cr, cx, cy, r, -1.0, -0.9, self.red)
-        self._draw_arc(cr, cx, cy, r,  0.5,  0.9, self.amber)
-        self._draw_arc(cr, cx, cy, r,  0.9,  1.0, self.red)
+        self._draw_arc(cr, cx, cy, r, 0.5, 0.9, self.amber)
+        self._draw_arc(cr, cx, cy, r, 0.9, 1.0, self.red)
 
         cr.set_source_rgb(*self.white)
         cr.select_font_face("Sans", cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_NORMAL)
@@ -453,6 +438,8 @@ class FlowGuardDialGauge(Gtk.DrawingArea):
         else:
             cr.set_source_rgb(*self.grey)
             bottom_text = "Flowrate: --%"
-        self._draw_text_centered(cr, bottom_text, cx, cy - cr.text_extents(bottom_text).y_bearing + 36)
+        self._draw_text_centered(
+            cr, bottom_text, cx, cy - cr.text_extents(bottom_text).y_bearing + 36
+        )
 
         return False

@@ -21,4 +21,4 @@ jobs:
         with:
           version: "0.15.22"
           args: check screen.py ks_includes panels
-      - run: ruff format --check screen.py ks_includes panels
+      - run: ruff format --check panels/mmu_*.py

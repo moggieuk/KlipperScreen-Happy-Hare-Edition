@@ -64,7 +64,6 @@ from panels.mmu_mixin import (
 
 
 class Panel(ScreenPanel, MmuMixin):
-
     def __init__(self, screen, title):
         super().__init__(screen, title)
 
@@ -72,7 +71,7 @@ class Panel(ScreenPanel, MmuMixin):
         self.spools = {}
 
         # We need to keep track of just a little bit of UI state
-        self.ui_runout_mark = 0.
+        self.ui_runout_mark = 0.0
         self.min_tool = TOOL_GATE_BYPASS
         self._last_sync_feedback_bias_rounded = -9.9
 
@@ -82,49 +81,178 @@ class Panel(ScreenPanel, MmuMixin):
         self.ui_sel_tool = NOT_SET
         self.init_tool_value()
 
-        self.config_update() # Get preferences
+        self.config_update()  # Get preferences
 
         # btn_states: The "gaps" are what functionality the state takes away. Multiple states are combined
         self.btn_states = {
-            'all':             ['check_gates', 'tool', 'unload', 'picker', 'pause', 'message', 'extrude', 'unlock', 'resume', 'manage', 'more'],
-            'printing':        [                                           'pause',                                                     'more'],
-            'pause_locked':    ['check_gates', 'tool', 'unload', 'picker',          'message',            'unlock', 'resume', 'manage', 'more'],
-            'paused':          ['check_gates', 'tool', 'unload', 'picker',          'message', 'extrude',           'resume', 'manage', 'more'],
-            'idle':            ['check_gates', 'tool', 'unload', 'picker', 'pause', 'message', 'extrude',                     'manage', 'more'],
-            'bypass_loaded':   [                       'unload',           'pause', 'message', 'extrude', 'unlock', 'resume', 'manage', 'more'],
-            'bypass_unloaded': ['check_gates', 'tool',           'picker', 'pause', 'message', 'extrude', 'unlock', 'resume', 'manage', 'more'],
-            'bypass_unknown':  ['check_gates', 'tool', 'unload', 'picker', 'pause', 'message', 'extrude', 'unlock', 'resume', 'manage', 'more'],
-            'tool_loaded':     ['check_gates', 'tool', 'unload', 'picker', 'pause', 'message', 'extrude', 'unlock', 'resume', 'manage', 'more'],
-            'tool_unloaded':   ['check_gates', 'tool', 'unload', 'picker', 'pause', 'message', 'extrude', 'unlock', 'resume', 'manage', 'more'],
-            'tool_unknown':    ['check_gates', 'tool', 'unload', 'picker', 'pause', 'message', 'extrude', 'unlock', 'resume', 'manage', 'more'],
-            'no_message':      ['check_gates', 'tool', 'unload', 'picker', 'pause',            'extrude', 'unlock', 'resume', 'manage', 'more'],
-            'busy':            [                                                                                              'manage', 'more'],
-            'disabled':        [                                                                                                              ],
+            "all": [
+                "check_gates",
+                "tool",
+                "unload",
+                "picker",
+                "pause",
+                "message",
+                "extrude",
+                "unlock",
+                "resume",
+                "manage",
+                "more",
+            ],
+            "printing": ["pause", "more"],
+            "pause_locked": [
+                "check_gates",
+                "tool",
+                "unload",
+                "picker",
+                "message",
+                "unlock",
+                "resume",
+                "manage",
+                "more",
+            ],
+            "paused": [
+                "check_gates",
+                "tool",
+                "unload",
+                "picker",
+                "message",
+                "extrude",
+                "resume",
+                "manage",
+                "more",
+            ],
+            "idle": [
+                "check_gates",
+                "tool",
+                "unload",
+                "picker",
+                "pause",
+                "message",
+                "extrude",
+                "manage",
+                "more",
+            ],
+            "bypass_loaded": [
+                "unload",
+                "pause",
+                "message",
+                "extrude",
+                "unlock",
+                "resume",
+                "manage",
+                "more",
+            ],
+            "bypass_unloaded": [
+                "check_gates",
+                "tool",
+                "picker",
+                "pause",
+                "message",
+                "extrude",
+                "unlock",
+                "resume",
+                "manage",
+                "more",
+            ],
+            "bypass_unknown": [
+                "check_gates",
+                "tool",
+                "unload",
+                "picker",
+                "pause",
+                "message",
+                "extrude",
+                "unlock",
+                "resume",
+                "manage",
+                "more",
+            ],
+            "tool_loaded": [
+                "check_gates",
+                "tool",
+                "unload",
+                "picker",
+                "pause",
+                "message",
+                "extrude",
+                "unlock",
+                "resume",
+                "manage",
+                "more",
+            ],
+            "tool_unloaded": [
+                "check_gates",
+                "tool",
+                "unload",
+                "picker",
+                "pause",
+                "message",
+                "extrude",
+                "unlock",
+                "resume",
+                "manage",
+                "more",
+            ],
+            "tool_unknown": [
+                "check_gates",
+                "tool",
+                "unload",
+                "picker",
+                "pause",
+                "message",
+                "extrude",
+                "unlock",
+                "resume",
+                "manage",
+                "more",
+            ],
+            "no_message": [
+                "check_gates",
+                "tool",
+                "unload",
+                "picker",
+                "pause",
+                "extrude",
+                "unlock",
+                "resume",
+                "manage",
+                "more",
+            ],
+            "busy": ["manage", "more"],
+            "disabled": [],
         }
 
         self.labels = lbl = {
-            'check_gates': self._gtk.Button('mmu_checkgates', "Gates", 'color1'),
-            'manage': self._gtk.Button('mmu_manage', "Manage...",'color2'),
-            't_decrease': self._gtk.Button('decrease', None, scale=self.bts * 1.2),
-            'tool': self._gtk.Button('mmu_extruder', 'Load T0', 'color2'),
-            't_increase': self._gtk.Button('increase', None, scale=self.bts * 1.2),
-            'picker': self._gtk.Button('mmu_tool_picker', 'Tools...', 'color3'),
-            'unload': self._gtk.Button('mmu_unload', 'Unload', 'color4'), # Doubles as eject button
-            'pause': self._gtk.Button('pause', 'MMU Pause', 'color1'),
-            'message': self._gtk.Button('warning', 'Last Error', 'color1'),
-            'unlock': self._gtk.Button('heat-up', 'Unlock', 'color2'),
-            'resume': self._gtk.Button('resume', 'Resume', 'color3'),
-            'extrude': self._gtk.Button('extrude', 'Extrude...', 'color4'),
-            'more': self._gtk.Button('mmu_more', 'More...', 'color1'),
-            'tool_icon': self._gtk.Image('mmu_extruder', self._gtk.img_width * 0.7, self._gtk.img_height * 0.7),
-            'tool_icon_overlay': Gtk.Overlay(),
-            'tool_label': Gtk.Label('T?'),
-            'filament': Gtk.Label('Filament: Unknown'),
-            'select_bypass_img': self._gtk.Image('mmu_select_bypass'), # Alternative for tool
-            'load_bypass_img': self._gtk.Image('mmu_load_bypass'),     # Alternative for picker
-            'unload_bypass_img': self._gtk.Image('mmu_unload_bypass'), # Alternative for unload/eject
-            'eject_img': self._gtk.Image('mmu_eject'),                 # Alternative for unload button to fully eject
-            'sync_drive_img': self._gtk.Image('mmu_synced_extruder', self._gtk.img_width * 0.7, self._gtk.img_height * 0.7), # Alternative for tool_icon
+            "check_gates": self._gtk.Button("mmu_checkgates", "Gates", "color1"),
+            "manage": self._gtk.Button("mmu_manage", "Manage...", "color2"),
+            "t_decrease": self._gtk.Button("decrease", None, scale=self.bts * 1.2),
+            "tool": self._gtk.Button("mmu_extruder", "Load T0", "color2"),
+            "t_increase": self._gtk.Button("increase", None, scale=self.bts * 1.2),
+            "picker": self._gtk.Button("mmu_tool_picker", "Tools...", "color3"),
+            "unload": self._gtk.Button("mmu_unload", "Unload", "color4"),  # Doubles as eject button
+            "pause": self._gtk.Button("pause", "MMU Pause", "color1"),
+            "message": self._gtk.Button("warning", "Last Error", "color1"),
+            "unlock": self._gtk.Button("heat-up", "Unlock", "color2"),
+            "resume": self._gtk.Button("resume", "Resume", "color3"),
+            "extrude": self._gtk.Button("extrude", "Extrude...", "color4"),
+            "more": self._gtk.Button("mmu_more", "More...", "color1"),
+            "tool_icon": self._gtk.Image(
+                "mmu_extruder", self._gtk.img_width * 0.7, self._gtk.img_height * 0.7
+            ),
+            "tool_icon_overlay": Gtk.Overlay(),
+            "tool_label": Gtk.Label("T?"),
+            "filament": Gtk.Label("Filament: Unknown"),
+            "select_bypass_img": self._gtk.Image("mmu_select_bypass"),  # Alternative for tool
+            "load_bypass_img": self._gtk.Image("mmu_load_bypass"),  # Alternative for picker
+            "unload_bypass_img": self._gtk.Image(
+                "mmu_unload_bypass"
+            ),  # Alternative for unload/eject
+            "eject_img": self._gtk.Image(
+                "mmu_eject"
+            ),  # Alternative for unload button to fully eject
+            "sync_drive_img": self._gtk.Image(
+                "mmu_synced_extruder", self._gtk.img_width * 0.7, self._gtk.img_height * 0.7
+            ),  # Alternative for tool_icon
         }
 
         # Overlay for extruder temperature
@@ -133,60 +261,64 @@ class Panel(ScreenPanel, MmuMixin):
         image_box.set_margin_right(8)
         image_box.set_margin_bottom(12)
         image_box.add(lbl["tool_icon"])
-        lbl['tool_icon_overlay'].add(image_box)
+        lbl["tool_icon_overlay"].add(image_box)
 
-        lbl['tool_badge'] = tb = Gtk.Label(label="-°C")
+        lbl["tool_badge"] = tb = Gtk.Label(label="-°C")
         tb.set_halign(Gtk.Align.END)
         tb.set_valign(Gtk.Align.END)
         tb.set_margin_end(1)
         tb.set_margin_bottom(1)
         tb.get_style_context().add_class("mmu_tool_badge")
-        lbl['tool_icon_overlay'].add_overlay(tb)
+        lbl["tool_icon_overlay"].add_overlay(tb)
 
-        lbl['unload_img'] = lbl['unload'].get_image()
-        lbl['tool_img'] = lbl['tool'].get_image()
-        lbl['tool_picker_img'] = lbl['picker'].get_image()
-        lbl['tool_icon_pixbuf'] = lbl['tool_icon'].get_pixbuf()
-        lbl['sync_drive_pixbuf'] = lbl['sync_drive_img'].get_pixbuf()
+        lbl["unload_img"] = lbl["unload"].get_image()
+        lbl["tool_img"] = lbl["tool"].get_image()
+        lbl["tool_picker_img"] = lbl["picker"].get_image()
+        lbl["tool_icon_pixbuf"] = lbl["tool_icon"].get_pixbuf()
+        lbl["sync_drive_pixbuf"] = lbl["sync_drive_img"].get_pixbuf()
 
-        lbl['check_gates'].connect("clicked", self.select_check_gates)
-        lbl['manage'].connect("clicked", self.menu_item_clicked, {"panel": "mmu_manage", "name": "MMU Manage"})
-        lbl['manage'].set_vexpand(False)
-        lbl['t_decrease'].connect("clicked", self.select_tool, -1)
-        lbl['tool'].connect("clicked", self.select_tool, 0)
-        lbl['t_increase'].connect("clicked", self.select_tool, 1)
-        lbl['picker'].connect("clicked", self.select_picker)
-        lbl['unload'].connect("clicked", self.select_unload_eject)
-        lbl['pause'].connect("clicked", self.select_pause)
-        lbl['message'].connect("clicked", self.select_message)
-        lbl['unlock'].connect("clicked", self.select_unlock)
-        lbl['resume'].connect("clicked", self.select_resume)
-        lbl['extrude'].connect("clicked", self.menu_item_clicked, {"panel": "extrude", "name": "Extrude"})
-        lbl['more'].connect("clicked", self._screen._go_to_submenu, "mmu")
+        lbl["check_gates"].connect("clicked", self.select_check_gates)
+        lbl["manage"].connect(
+            "clicked", self.menu_item_clicked, {"panel": "mmu_manage", "name": "MMU Manage"}
+        )
+        lbl["manage"].set_vexpand(False)
+        lbl["t_decrease"].connect("clicked", self.select_tool, -1)
+        lbl["tool"].connect("clicked", self.select_tool, 0)
+        lbl["t_increase"].connect("clicked", self.select_tool, 1)
+        lbl["picker"].connect("clicked", self.select_picker)
+        lbl["unload"].connect("clicked", self.select_unload_eject)
+        lbl["pause"].connect("clicked", self.select_pause)
+        lbl["message"].connect("clicked", self.select_message)
+        lbl["unlock"].connect("clicked", self.select_unlock)
+        lbl["resume"].connect("clicked", self.select_resume)
+        lbl["extrude"].connect(
+            "clicked", self.menu_item_clicked, {"panel": "extrude", "name": "Extrude"}
+        )
+        lbl["more"].connect("clicked", self._screen._go_to_submenu, "mmu")
 
-        lbl['t_increase'].set_hexpand(False)
-        lbl['t_increase'].get_style_context().add_class("mmu_sel_increase")
-        lbl['t_decrease'].set_hexpand(False)
-        lbl['t_decrease'].get_style_context().add_class("mmu_sel_decrease")
+        lbl["t_increase"].set_hexpand(False)
+        lbl["t_increase"].get_style_context().add_class("mmu_sel_increase")
+        lbl["t_decrease"].set_hexpand(False)
+        lbl["t_decrease"].get_style_context().add_class("mmu_sel_decrease")
 
-        lbl['tool_label'].get_style_context().add_class("mmu_tool_text")
-        lbl['tool_label'].set_xalign(0)
-        lbl['filament'].set_xalign(0)
+        lbl["tool_label"].get_style_context().add_class("mmu_tool_text")
+        lbl["tool_label"].set_xalign(0)
+        lbl["filament"].set_xalign(0)
 
         # Notebook corner "layers" ---------------------------------
 
         notebook_corner = Gtk.Notebook()
-        lbl['notebook_corner'] = notebook_corner
+        lbl["notebook_corner"] = notebook_corner
         notebook_corner.set_show_tabs(False)
         self._notebook_corner_page_available = []
         self._notebook_corner_pages = {}
         page = 0
 
         notebook_overlay = Gtk.Overlay()
-        lbl['notebook_overlay'] = notebook_overlay
+        lbl["notebook_overlay"] = notebook_overlay
         notebook_overlay.add(notebook_corner)
         next_label = Gtk.Label(label=">>>")
-        lbl['notebook_corner_next'] = next_label
+        lbl["notebook_corner_next"] = next_label
         next_label.set_size_request(24, 24)
         next_label.set_halign(Gtk.Align.END)
         next_label.set_valign(Gtk.Align.END)
@@ -201,10 +333,10 @@ class Panel(ScreenPanel, MmuMixin):
         manage_grid.set_vexpand(True)
         manage_grid.set_column_homogeneous(True)
         manage_grid.set_row_homogeneous(False)
-        manage_grid.attach(lbl['manage'], 1, 0, 6, 1)
+        manage_grid.attach(lbl["manage"], 1, 0, 6, 1)
         manage_grid.attach(Gtk.Label(), 0, 1, 6, 1)
-        lbl['manage_frame'] = manage_frame = Gtk.Frame()
-        lbl['manage_title'] = manage_title = Gtk.Label(label="Unit0")
+        lbl["manage_frame"] = manage_frame = Gtk.Frame()
+        lbl["manage_title"] = manage_title = Gtk.Label(label="Unit0")
         manage_title.set_ellipsize(Pango.EllipsizeMode.END)
         manage_title.set_max_width_chars(14)
         manage_title.set_single_line_mode(True)
@@ -212,69 +344,65 @@ class Panel(ScreenPanel, MmuMixin):
         manage_frame.set_label_align(0.6, 0)
         manage_frame.add(manage_grid)
         notebook_corner.insert_page(self._clickable_page(manage_frame), None, page)
-        self._notebook_corner_pages['manage'] = page
+        self._notebook_corner_pages["manage"] = page
         page += 1
 
         # In print Encoder gauge
-        lbl['encoder_gauge'] = encoder_gauge = EncoderDialGauge()
-        lbl['encoder_frame'] = encoder_frame = Gtk.Frame()
+        lbl["encoder_gauge"] = encoder_gauge = EncoderDialGauge()
+        lbl["encoder_frame"] = encoder_frame = Gtk.Frame()
         encoder_frame.set_label("Encoder")
         encoder_frame.set_label_align(0.5, 0)
         encoder_frame.add(encoder_gauge)
         notebook_corner.insert_page(self._clickable_page(encoder_frame), None, page)
-        self._notebook_corner_pages['encoder'] = page
+        self._notebook_corner_pages["encoder"] = page
         page += 1
 
         # In print sync-feedback flowguard gauge
-        lbl['flowguard_gauge'] = flowguard_gauge = FlowGuardDialGauge()
-        lbl['flowguard_frame'] = flowguard_frame = Gtk.Frame()
+        lbl["flowguard_gauge"] = flowguard_gauge = FlowGuardDialGauge()
+        lbl["flowguard_frame"] = flowguard_frame = Gtk.Frame()
         flowguard_frame.set_label("FlowGuard")
         flowguard_frame.set_label_align(0.5, 0)
         flowguard_frame.add(flowguard_gauge)
         notebook_corner.insert_page(self._clickable_page(flowguard_frame), None, page)
-        self._notebook_corner_pages['flowguard'] = page
+        self._notebook_corner_pages["flowguard"] = page
         page += 1
 
         # Selected spool details
-        lbl['spool_details'] = spool_details = MmuSpoolDetails(self._printer, self)
-        lbl['spool_details_frame'] = spool_details_frame = Gtk.Frame()
+        lbl["spool_details"] = spool_details = MmuSpoolDetails(self._printer, self)
+        lbl["spool_details_frame"] = spool_details_frame = Gtk.Frame()
         spool_details_frame.set_label("Spool Details")
         spool_details_frame.set_label_align(0.5, 0)
         spool_details_frame.add(spool_details)
         notebook_corner.insert_page(self._clickable_page(spool_details_frame), None, page)
-        self._notebook_corner_pages['spool_details'] = page
+        self._notebook_corner_pages["spool_details"] = page
         page += 1
 
         self._notebook_corner_page_available = [True] * page
         notebook_corner.set_current_page(0)
         next_label.set_markup(self._notebook_page_indicator(0, page))
 
-
         # Pause button "layers" ------------------------------------
         pause_layer = Gtk.Notebook()
-        lbl['pause_layer'] = pause_layer
+        lbl["pause_layer"] = pause_layer
         pause_layer.set_show_tabs(False)
-        pause_layer.insert_page(self.labels['pause'], None, 0)
-        pause_layer.insert_page(self.labels['message'], None, 1)
-
+        pause_layer.insert_page(self.labels["pause"], None, 0)
+        pause_layer.insert_page(self.labels["message"], None, 1)
 
         # Assemble "classic" view --------------------------------------
 
         if not self.show_spool_tray:
-
             # Top line status ------------------------------------------
             top_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
-            top_box.pack_start(lbl['tool_icon_overlay'], False, True, 0)
-            top_box.pack_start(lbl['tool_label'], True, True, 0)
-            top_box.pack_start(lbl['filament'], True, True, 0)
-
+            top_box.pack_start(lbl["tool_icon_overlay"], False, True, 0)
+            top_box.pack_start(lbl["tool_label"], True, True, 0)
+            top_box.pack_start(lbl["filament"], True, True, 0)
 
             # Main textual status area ---------------------------------
 
             status_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
             # TextView has problems in this use case so use 5 separate labels...
             for i in range(5):
-                name = (f'status{i+1}')
+                name = f"status{i + 1}"
                 label = Gtk.Label()
                 lbl[name] = label
                 label.get_style_context().add_class("mmu_unicode_mono")
@@ -283,9 +411,8 @@ class Panel(ScreenPanel, MmuMixin):
                     label.get_style_context().add_class("mmu_status")
                     status_box.pack_start(label, False, True, 0)
                 else:
-                    lbl['filament_pos'] = label # Alias for status5
+                    lbl["filament_pos"] = label  # Alias for status5
                     label.get_style_context().add_class("mmu_status_filament")
-
 
             # Assemble upper section of panel ---------------------------
 
@@ -293,30 +420,32 @@ class Panel(ScreenPanel, MmuMixin):
             top_grid.set_vexpand(False)
             top_grid.set_column_homogeneous(True)
 
-            top_grid.attach(top_box,               0, 0,  9, 1)
-            top_grid.attach(lbl['notebook_overlay'], 9, 0,  3, 3)
-            top_grid.attach(status_box,            0, 1, 10, 1) # Should be 9, not 10 (but this prevents accidental screen expansion)
-            top_grid.attach(lbl['filament_pos'],     0, 2, 12, 1) # Allows filament line line to extend
+            top_grid.attach(top_box, 0, 0, 9, 1)
+            top_grid.attach(lbl["notebook_overlay"], 9, 0, 3, 3)
+            top_grid.attach(
+                status_box, 0, 1, 10, 1
+            )  # Should be 9, not 10 (but this prevents accidental screen expansion)
+            top_grid.attach(lbl["filament_pos"], 0, 2, 12, 1)  # Allows filament line line to extend
 
             # Assemble the two primary button rows ------------
             tool_grid = Gtk.Grid()
             tool_grid.set_column_homogeneous(False)
-            tool_grid.attach(lbl['t_decrease'],      0, 0, 1, 1)
-            tool_grid.attach(lbl['tool'],            1, 0, 1, 1)
-            tool_grid.attach(lbl['t_increase'],      2, 0, 1, 1)
+            tool_grid.attach(lbl["t_decrease"], 0, 0, 1, 1)
+            tool_grid.attach(lbl["tool"], 1, 0, 1, 1)
+            tool_grid.attach(lbl["t_increase"], 2, 0, 1, 1)
 
             main_grid = Gtk.Grid()
             main_grid.set_vexpand(True)
             main_grid.set_column_homogeneous(True)
-            main_grid.attach(tool_grid,            0, 0, 6, 1)
-            main_grid.attach(lbl['picker'],          6, 0, 2, 1)
-            main_grid.attach(lbl['unload'],          8, 0, 2, 1)
-            main_grid.attach(lbl['check_gates'],    10, 0, 2, 1)
-            main_grid.attach(lbl['pause_layer'],     0, 1, 3, 1)
-            main_grid.attach(lbl['unlock'],          3, 1, 2, 1)
-            main_grid.attach(lbl['resume'],          5, 1, 2, 1)
-            main_grid.attach(lbl['extrude'],         7, 1, 2, 1)
-            main_grid.attach(lbl['more'],            9, 1, 3, 1)
+            main_grid.attach(tool_grid, 0, 0, 6, 1)
+            main_grid.attach(lbl["picker"], 6, 0, 2, 1)
+            main_grid.attach(lbl["unload"], 8, 0, 2, 1)
+            main_grid.attach(lbl["check_gates"], 10, 0, 2, 1)
+            main_grid.attach(lbl["pause_layer"], 0, 1, 3, 1)
+            main_grid.attach(lbl["unlock"], 3, 1, 2, 1)
+            main_grid.attach(lbl["resume"], 5, 1, 2, 1)
+            main_grid.attach(lbl["extrude"], 7, 1, 2, 1)
+            main_grid.attach(lbl["more"], 9, 1, 3, 1)
 
             box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
             box.pack_start(top_grid, False, True, 0)
@@ -326,58 +455,56 @@ class Panel(ScreenPanel, MmuMixin):
             scroll.add(box)
             self.content.add(scroll)
 
-
         # Assemble new "visual" view -----------------------------------
 
         else:
             # Popup action buttons --------
-            lbl['menu_select']  = self._gtk.Button('mmu_select_gate', 'Select',      'color1')
-            lbl['menu_check']   = self._gtk.Button('mmu_checkgates',  'Check Gates', 'color1')
-            lbl['menu_preload'] = self._gtk.Button('mmu_reset',       'Preload',     'color2')
-            lbl['menu_load']    = self._gtk.Button('mmu_load',        'Load',        'color2')
-            lbl['menu_unload']  = self._gtk.Button('mmu_unload',      'Unload',      'color3')
-            lbl['menu_eject']   = self._gtk.Button('mmu_eject',       'Eject',       'color3')
+            lbl["menu_select"] = self._gtk.Button("mmu_select_gate", "Select", "color1")
+            lbl["menu_check"] = self._gtk.Button("mmu_checkgates", "Check Gates", "color1")
+            lbl["menu_preload"] = self._gtk.Button("mmu_reset", "Preload", "color2")
+            lbl["menu_load"] = self._gtk.Button("mmu_load", "Load", "color2")
+            lbl["menu_unload"] = self._gtk.Button("mmu_unload", "Unload", "color3")
+            lbl["menu_eject"] = self._gtk.Button("mmu_eject", "Eject", "color3")
 
             # Spool visualization --------
-            lbl['spool_tray'] = MmuSpoolTray(self._printer, self)
-            spool_frame = lbl['spool_frame'] = Gtk.Frame()
+            lbl["spool_tray"] = MmuSpoolTray(self._printer, self)
+            spool_frame = lbl["spool_frame"] = Gtk.Frame()
             spool_frame.set_label("Filament: Unknown")
             spool_frame.set_label_align(0.5, 0)
-            spool_frame.add(lbl['spool_tray'])
+            spool_frame.add(lbl["spool_tray"])
 
-            lbl['filament_pos'] = label = Gtk.Label()
+            lbl["filament_pos"] = label = Gtk.Label()
             label.get_style_context().add_class("mmu_unicode_mono")
             label.get_style_context().add_class("mmu_status_filament")
             label.set_xalign(0)
 
             fil_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
-            fil_row.pack_start(lbl['tool_label'], False, False, 0)
-            lbl['filament_pos'].set_hexpand(True)
-            lbl['filament_pos'].set_halign(Gtk.Align.FILL)
-            lbl['filament_pos'].set_xalign(0.0)        # Left-justify the text
-            fil_row.pack_start(lbl['filament_pos'], True, True, 0)
-            lbl['tool_icon_overlay'].set_margin_end(2) # Right padding
-            fil_row.pack_end(lbl['tool_icon_overlay'], False, False, 0)
+            fil_row.pack_start(lbl["tool_label"], False, False, 0)
+            lbl["filament_pos"].set_hexpand(True)
+            lbl["filament_pos"].set_halign(Gtk.Align.FILL)
+            lbl["filament_pos"].set_xalign(0.0)  # Left-justify the text
+            fil_row.pack_start(lbl["filament_pos"], True, True, 0)
+            lbl["tool_icon_overlay"].set_margin_end(2)  # Right padding
+            fil_row.pack_end(lbl["tool_icon_overlay"], False, False, 0)
 
             main_grid = Gtk.Grid()
             main_grid.set_vexpand(True)
             main_grid.set_column_homogeneous(True)
 
-            main_grid.attach(lbl['spool_frame'],      0,  0,  9,  5)
-            main_grid.attach(lbl['notebook_overlay'], 9,  0,  3,  5)
-            main_grid.attach(fil_row,               0,  5,  12, 1)
-            main_grid.attach(lbl['pause_layer'],      0,  6,  3,  2)
-            main_grid.attach(lbl['unlock'],           3,  6,  2,  2)
-            main_grid.attach(lbl['resume'],           5,  6,  2,  2)
-            main_grid.attach(lbl['extrude'],          7,  6,  2,  2)
-            main_grid.attach(lbl['more'],             9,  6,  3,  2)
+            main_grid.attach(lbl["spool_frame"], 0, 0, 9, 5)
+            main_grid.attach(lbl["notebook_overlay"], 9, 0, 3, 5)
+            main_grid.attach(fil_row, 0, 5, 12, 1)
+            main_grid.attach(lbl["pause_layer"], 0, 6, 3, 2)
+            main_grid.attach(lbl["unlock"], 3, 6, 2, 2)
+            main_grid.attach(lbl["resume"], 5, 6, 2, 2)
+            main_grid.attach(lbl["extrude"], 7, 6, 2, 2)
+            main_grid.attach(lbl["more"], 9, 6, 3, 2)
 
             # Precautionary - make area scrollable
             scroll = self._gtk.ScrolledWindow()
             scroll.add(main_grid)
 
             self.content.add(scroll)
-
 
     def activate(self):
         self.config_update()
@@ -387,29 +514,27 @@ class Panel(ScreenPanel, MmuMixin):
 
         if self.show_spool_tray:
             mmu = self._printer.get_stat("mmu")
-            gate = mmu['gate']
+            gate = mmu["gate"]
             if gate != TOOL_GATE_UNKNOWN:
-                self.labels['spool_tray'].scroll_gate_into_view(gate, center=True)
+                self.labels["spool_tray"].scroll_gate_into_view(gate, center=True)
 
         self.spoolman_start_polling(callback=self.process_spoolman_update, interval=60)
 
-
     def deactivate(self):
         self.spoolman_stop_polling()
-
 
     def post_attach(self):
         # Gtk Notebook will only change layer after show_all() hence this extra callback to fix state
         self.update_active_buttons()
 
-
     def config_update(self):
         self.markup_status = self._config.get_main_config().getboolean("mmu_color_gates", True)
-        self.markup_filament = self._config.get_main_config().getboolean("mmu_color_filament", False)
+        self.markup_filament = self._config.get_main_config().getboolean(
+            "mmu_color_filament", False
+        )
         self.bold_filament = self._config.get_main_config().getboolean("mmu_bold_filament", False)
         self.bold_filament = self._config.get_main_config().getboolean("mmu_bold_filament", False)
         self.show_spool_tray = self._config.get_main_config().getboolean("mmu_spool_tray", True)
-
 
     def _next_notebook_corner_page(self, widget=None, event=None):
         notebook = self.labels["notebook_corner"]
@@ -426,7 +551,6 @@ class Panel(ScreenPanel, MmuMixin):
 
         return True
 
-
     def _notebook_page_indicator(self, page, n_pages):
         indicator = []
         for i in range(n_pages):
@@ -436,7 +560,6 @@ class Panel(ScreenPanel, MmuMixin):
                 indicator.append("●" if i == page else "○")
         return "".join(indicator)
 
-
     def _update_notebook_corner_indicator(self):
         notebook = self.labels["notebook_corner"]
         self.labels["notebook_corner_next"].set_markup(
@@ -445,7 +568,6 @@ class Panel(ScreenPanel, MmuMixin):
                 notebook.get_n_pages(),
             )
         )
-
 
     def _update_notebook_corner_pages(self):
         notebook = self.labels["notebook_corner"]
@@ -470,14 +592,9 @@ class Panel(ScreenPanel, MmuMixin):
         else:
             self._update_notebook_corner_indicator()
 
-
     def _is_clickable_page(self, notebook, page_num):
         child = notebook.get_nth_page(page_num)
-        return (
-            isinstance(child, Gtk.EventBox)
-            and self._notebook_corner_page_available[page_num]
-        )
-
+        return isinstance(child, Gtk.EventBox) and self._notebook_corner_page_available[page_num]
 
     def _clickable_page(self, child):
         event_box = Gtk.EventBox()
@@ -485,56 +602,59 @@ class Panel(ScreenPanel, MmuMixin):
         event_box.connect("button-press-event", self._next_notebook_corner_page)
         return event_box
 
-
     def process_update(self, action, data):
         if action == "notify_status_update" and data is not None:
-
             filament_status_updated = False
 
             try:
                 # v3 encoder
-                if self.has_encoder() and 'mmu_encoder mmu_encoder' in data: # There is only one mmu_encoder on v3
-                    ee_data = data['mmu_encoder mmu_encoder']
+                if (
+                    self.has_encoder() and "mmu_encoder mmu_encoder" in data
+                ):  # There is only one mmu_encoder on v3
+                    ee_data = data["mmu_encoder mmu_encoder"]
                     self.update_encoder()
 
                 # v4 contains everything required in 'printer.mmu'
-                if 'mmu' in data:
-                    e_data = data['mmu']
+                if "mmu" in data:
+                    e_data = data["mmu"]
 
-                    if 'unit' in e_data:
+                    if "unit" in e_data:
                         self._update_notebook_corner_pages()
 
                     # v4 encoder
-                    if self.has_encoder() and 'encoder' in e_data:
+                    if self.has_encoder() and "encoder" in e_data:
                         self.update_encoder()
 
                     # v4 buffer
-                    if (
-                        not filament_status_updated
-                        and self.has_buffer()
-                    ):
-                        if 'sync_feedback_state' in e_data:
+                    if not filament_status_updated and self.has_buffer():
+                        if "sync_feedback_state" in e_data:
                             self.update_filament_status()
                             filament_status_updated = True
-                        elif 'sync_feedback_bias_modelled' in e_data and self._should_update_proportional():
+                        elif (
+                            "sync_feedback_bias_modelled" in e_data
+                            and self._should_update_proportional()
+                        ):
                             self.update_filament_status()
                             filament_status_updated = True
 
                     # Flowguard
-                    if (
-                        self.has_buffer()
-                        and any(
-                            key in e_data
-                            for key in ('sync_feedback_flow_rate', 'flowguard')
-                        )
+                    if self.has_buffer() and any(
+                        key in e_data for key in ("sync_feedback_flow_rate", "flowguard")
                     ):
                         self.update_flowguard()
 
                     # Selected spool/filament details
-                    if (
-                        any(
-                            key in e_data
-                            for key in ('gate', 'gate_color', 'gate_filament_name', 'gate_material', 'gate_speed_override', 'gate_spool_id', 'gate_temperature', "endless_spool_groups")
+                    if any(
+                        key in e_data
+                        for key in (
+                            "gate",
+                            "gate_color",
+                            "gate_filament_name",
+                            "gate_material",
+                            "gate_speed_override",
+                            "gate_spool_id",
+                            "gate_temperature",
+                            "endless_spool_groups",
                         )
                     ):
                         self.update_spool_details()
@@ -542,48 +662,55 @@ class Panel(ScreenPanel, MmuMixin):
                     # Tool, gate or maps
                     if any(
                         key in e_data
-                        for key in ('tool', 'gate', 'ttg_map', 'gate_status', 'gate_color', 'espooler')
+                        for key in (
+                            "tool",
+                            "gate",
+                            "ttg_map",
+                            "gate_status",
+                            "gate_color",
+                            "espooler",
+                        )
                     ):
                         self.update_status()
 
                         # The spool tray may need to be scrolled so new gate is visible
-                        if self.show_spool_tray and 'gate' in e_data:
-                            self.labels['spool_tray'].scroll_gate_into_view(e_data['gate'])
+                        if self.show_spool_tray and "gate" in e_data:
+                            self.labels["spool_tray"].scroll_gate_into_view(e_data["gate"])
 
-                    if (
-                        not filament_status_updated
-                        or any(
-                            key in e_data
-                            for key in ('tool', 'filament_pos', 'filament_direction', 'sensors', 'filament_remaining_color', 'filament_remaining')
+                    if not filament_status_updated or any(
+                        key in e_data
+                        for key in (
+                            "tool",
+                            "filament_pos",
+                            "filament_direction",
+                            "sensors",
+                            "filament_remaining_color",
+                            "filament_remaining",
                         )
                     ):
                         self.update_filament_status()
                         filament_status_updated = True
 
                     if any(
-                        key in e_data
-                        for key in ('tool', 'next_tool', 'sync_drive', 'filament')
+                        key in e_data for key in ("tool", "next_tool", "sync_drive", "filament")
                     ):
                         self.update_tool()
 
-                    if 'enabled' in e_data:
+                    if "enabled" in e_data:
                         self.update_enabled()
 
-                    if any(
-                        key in e_data
-                        for key in ('action', 'print_state', 'filament')
-                    ):
+                    if any(key in e_data for key in ("action", "print_state", "filament")):
                         ee_data = self.get_encoder_data()
                         if ee_data:
-                            self.update_movement(encoder_position=ee_data['encoder_pos'])
+                            self.update_movement(encoder_position=ee_data["encoder_pos"])
                         else:
                             self.update_movement()
 
-                    if 'print_state' in e_data:
+                    if "print_state" in e_data:
                         self.update_active_buttons()
 
                 current_extruder = self._printer.get_stat("toolhead", "extruder")
-                if 'configfile' not in data:
+                if "configfile" not in data:
                     if current_extruder in data:
                         self.update_extruder_temp()
 
@@ -597,22 +724,18 @@ class Panel(ScreenPanel, MmuMixin):
                 self._screen.show_popup_message(msg, 3, save=True)
                 logging.exception("MMU: KeyError")
 
-
     def process_spoolman_update(self):
         self.update_status()
 
-
     def init_tool_value(self):
         mmu = self._printer.get_stat("mmu")
-        if self.ui_sel_tool == NOT_SET and mmu['tool'] != TOOL_GATE_UNKNOWN:
-            self.ui_sel_tool = mmu['tool']
+        if self.ui_sel_tool == NOT_SET and mmu["tool"] != TOOL_GATE_UNKNOWN:
+            self.ui_sel_tool = mmu["tool"]
         else:
             self.ui_sel_tool = 0
 
-
     def _mm_format(self, w, v):
         return f"{-v:.1f}mm"
-
 
     # Prevent unecessary updates
     def _should_update_proportional(self):
@@ -620,15 +743,13 @@ class Panel(ScreenPanel, MmuMixin):
         value = mmu.get("sync_feedback_bias_modelled")
         return round(value, 1) != self._last_sync_feedback_bias_rounded
 
-
     def select_check_gates(self, widget):
         self._screen._confirm_send_action(
             None,
             "Check filament availabily in all MMU gates?\n\nAre you sure you want to continue?",
             "printer.gcode.script",
-            {'script': "MMU_CHECK_GATE ALL=1 QUIET=1"}
+            {"script": "MMU_CHECK_GATE ALL=1 QUIET=1"},
         )
-
 
     def _schedule_gate_select(self):
         if self._select_gate_timer is not None:
@@ -639,12 +760,11 @@ class Panel(ScreenPanel, MmuMixin):
             self.select_pending_gate,
         )
 
-
     def select_pending_gate(self):
         self._select_gate_timer = None
 
         mmu = self._printer.get_stat("mmu")
-        if mmu['filament'] == "Unloaded":
+        if mmu["filament"] == "Unloaded":
             if self.ui_sel_tool == TOOL_GATE_BYPASS:
                 self._screen._ws.api.gcode_script("MMU_SELECT_BYPASS")
             elif self.ui_sel_tool >= 0:
@@ -655,11 +775,10 @@ class Panel(ScreenPanel, MmuMixin):
 
         return False
 
-
     def select_tool(self, widget, param=0):
         mmu = self._printer.get_stat("mmu")
-        num_gates = len(mmu['gate_status'])
-        tool = mmu['tool']
+        num_gates = len(mmu["gate_status"])
+        tool = mmu["tool"]
 
         if param < 0 and self.ui_sel_tool > self.min_tool:
             self.ui_sel_tool -= 1
@@ -686,53 +805,48 @@ class Panel(ScreenPanel, MmuMixin):
 
             if self.ui_sel_tool == TOOL_GATE_BYPASS:
                 self._screen._ws.api.gcode_script("MMU_SELECT_BYPASS")
-            elif self.ui_sel_tool != tool or mmu['filament'] != "Loaded":
-                self._screen._ws.api.gcode_script(f"MMU_CHANGE_TOOL TOOL={self.ui_sel_tool} QUIET=1")
+            elif self.ui_sel_tool != tool or mmu["filament"] != "Loaded":
+                self._screen._ws.api.gcode_script(
+                    f"MMU_CHANGE_TOOL TOOL={self.ui_sel_tool} QUIET=1"
+                )
 
         self.update_tool_buttons()
 
-
     def select_unload_eject(self, widget):
         mmu = self._printer.get_stat("mmu")
-        filament = mmu['filament']
+        filament = mmu["filament"]
         if filament != "Unloaded":
             self._screen._ws.api.gcode_script("MMU_UNLOAD")
         else:
             self._screen._ws.api.gcode_script("MMU_EJECT")
 
-
     def select_picker(self, widget):
         # This is a multipurpose button to select subpanel or load bypass
         mmu = self._printer.get_stat("mmu")
-        tool = mmu['tool']
+        tool = mmu["tool"]
         if tool == TOOL_GATE_BYPASS:
             self._screen._ws.api.gcode_script("MMU_LOAD EXTRUDER_ONLY=1")
         else:
-            self._screen.show_panel('mmu_picker', 'MMU Tool Picker')
-
+            self._screen.show_panel("mmu_picker", "MMU Tool Picker")
 
     def select_pause(self, widget):
         self._screen._ws.api.gcode_script("MMU_PAUSE FORCE_IN_PRINT=1")
 
-
     def select_message(self, widget):
-        last_toolchange = self._printer.get_stat('mmu', 'last_toolchange')
+        last_toolchange = self._printer.get_stat("mmu", "last_toolchange")
         self._screen.show_last_popup_message(f"Last Toolchange: {last_toolchange}")
-
 
     def select_resume(self, widget):
         self._screen._ws.api.gcode_script("RESUME")
 
-
     def select_unlock(self, widget):
         self._screen._ws.api.gcode_script("MMU_UNLOCK")
 
-
     def update_enabled(self):
-        enabled = self._printer.get_stat('mmu', 'enabled')
+        enabled = self._printer.get_stat("mmu", "enabled")
         if not self.show_spool_tray:
             for i in range(5):
-                name = (f'status{i+1}')
+                name = f"status{i + 1}"
                 if enabled:
                     self.labels[name].get_style_context().remove_class("mmu_disabled_text")
                 else:
@@ -740,19 +854,18 @@ class Panel(ScreenPanel, MmuMixin):
         else:
             self.labels["spool_frame"].set_sensitive(enabled)
 
-
     def update_tool(self):
         mmu = self._printer.get_stat("mmu")
-        tool = mmu['tool']
-        next_tool = mmu['next_tool']
-        last_tool = mmu['last_tool']
-        sync_drive = mmu['sync_drive']
-        filament = mmu['filament']
+        tool = mmu["tool"]
+        next_tool = mmu["next_tool"]
+        last_tool = mmu["last_tool"]
+        sync_drive = mmu["sync_drive"]
+        filament = mmu["filament"]
 
         # Tool text ----------
         if next_tool != TOOL_GATE_UNKNOWN:
             # Change in progress
-            self.labels["tool_label"].get_style_context().remove_class("mmu_tool_text") # Smaller
+            self.labels["tool_label"].get_style_context().remove_class("mmu_tool_text")  # Smaller
 
             if last_tool >= 0 and last_tool != next_tool:
                 text = f"T{last_tool}"
@@ -767,7 +880,7 @@ class Panel(ScreenPanel, MmuMixin):
                 text += f">T{next_tool}"
 
         else:
-            self.labels['tool_label'].get_style_context().add_class("mmu_tool_text") # Larger
+            self.labels["tool_label"].get_style_context().add_class("mmu_tool_text")  # Larger
 
             if tool >= 0:
                 text = f"T{tool}"
@@ -782,127 +895,121 @@ class Panel(ScreenPanel, MmuMixin):
 
         # Extruder sync drive status --------
         if sync_drive:
-            self.labels['tool_icon'].set_from_pixbuf(self.labels['sync_drive_pixbuf'])
+            self.labels["tool_icon"].set_from_pixbuf(self.labels["sync_drive_pixbuf"])
         else:
-            self.labels['tool_icon'].set_from_pixbuf(self.labels['tool_icon_pixbuf'])
+            self.labels["tool_icon"].set_from_pixbuf(self.labels["tool_icon_pixbuf"])
 
         # Adjust buttons (class display) ---------
         if tool == TOOL_GATE_BYPASS:
-            self.labels['picker'].set_image(self.labels['load_bypass_img'])
-            self.labels['picker'].set_label("Load")
-            self.labels['unload'].set_image(self.labels['unload_bypass_img'])
-            self.labels['unload'].set_label("Unload")
+            self.labels["picker"].set_image(self.labels["load_bypass_img"])
+            self.labels["picker"].set_label("Load")
+            self.labels["unload"].set_image(self.labels["unload_bypass_img"])
+            self.labels["unload"].set_label("Unload")
 
         else:
-            self.labels['picker'].set_image(self.labels['tool_picker_img'])
-            self.labels['picker'].set_label("Tools...")
+            self.labels["picker"].set_image(self.labels["tool_picker_img"])
+            self.labels["picker"].set_label("Tools...")
 
             if filament != "Unloaded":
-                self.labels['unload'].set_image(self.labels['unload_img'])
-                self.labels['unload'].set_label("Unload")
+                self.labels["unload"].set_image(self.labels["unload_img"])
+                self.labels["unload"].set_label("Unload")
             else:
-                self.labels['unload'].set_image(self.labels['eject_img'])
-                self.labels['unload'].set_label("Eject")
-
+                self.labels["unload"].set_image(self.labels["eject_img"])
+                self.labels["unload"].set_label("Eject")
 
     def update_extruder_temp(self):
         current_extruder = self._printer.get_stat("toolhead", "extruder")
         temp = float(self._printer.get_stat(current_extruder, "temperature"))
         can_extrude = bool(self._printer.get_stat(current_extruder, "can_extrude"))
-        self.labels['tool_badge'].set_label(f"{temp:.0f}°C")
+        self.labels["tool_badge"].set_label(f"{temp:.0f}°C")
         if not can_extrude:
-            self.labels['tool_badge'].get_style_context().add_class("mmu_tool_badge_warning")
+            self.labels["tool_badge"].get_style_context().add_class("mmu_tool_badge_warning")
         else:
-            self.labels['tool_badge'].get_style_context().remove_class("mmu_tool_badge_warning")
-
+            self.labels["tool_badge"].get_style_context().remove_class("mmu_tool_badge_warning")
 
     def update_tool_buttons(self, tool_sensitive=True):
         mmu = self._printer.get_stat("mmu")
-        num_gates = len(mmu['gate_status'])
-        tool = mmu['tool']
-        filament = mmu['filament']
-        action = mmu['action']
+        num_gates = len(mmu["gate_status"])
+        tool = mmu["tool"]
+        filament = mmu["filament"]
+        action = mmu["action"]
 
         # Set sensitivity of +/- buttons
         if (tool == TOOL_GATE_BYPASS and filament == "Loaded") or not tool_sensitive:
-            self.labels['t_decrease'].set_sensitive(False)
-            self.labels['t_increase'].set_sensitive(False)
+            self.labels["t_decrease"].set_sensitive(False)
+            self.labels["t_increase"].set_sensitive(False)
         else:
             if self.ui_sel_tool == self.min_tool:
-                self.labels['t_decrease'].set_sensitive(False)
+                self.labels["t_decrease"].set_sensitive(False)
             else:
-                self.labels['t_decrease'].set_sensitive(True)
+                self.labels["t_decrease"].set_sensitive(True)
 
-            if self.ui_sel_tool == num_gates -1:
-                self.labels['t_increase'].set_sensitive(False)
+            if self.ui_sel_tool == num_gates - 1:
+                self.labels["t_increase"].set_sensitive(False)
             else:
-                self.labels['t_increase'].set_sensitive(True)
+                self.labels["t_increase"].set_sensitive(True)
 
         # Set load button image and text (classic view)
         if action == "Idle":
             if self.ui_sel_tool >= 0:
-                self.labels['tool'].set_label(f"T{self.ui_sel_tool}")
-                if mmu['tool'] == self.ui_sel_tool and filament == "Loaded":
-                    self.labels['tool'].set_sensitive(False)
+                self.labels["tool"].set_label(f"T{self.ui_sel_tool}")
+                if mmu["tool"] == self.ui_sel_tool and filament == "Loaded":
+                    self.labels["tool"].set_sensitive(False)
                 else:
-                    self.labels['tool'].set_sensitive(tool_sensitive)
+                    self.labels["tool"].set_sensitive(tool_sensitive)
             elif self.ui_sel_tool == TOOL_GATE_BYPASS:
-                self.labels['tool'].set_label("Bypass")
-                self.labels['tool'].set_sensitive(tool_sensitive)
+                self.labels["tool"].set_label("Bypass")
+                self.labels["tool"].set_sensitive(tool_sensitive)
             else:
-                self.labels['tool'].set_label("n/a")
-                self.labels['tool'].set_sensitive(tool_sensitive)
+                self.labels["tool"].set_label("n/a")
+                self.labels["tool"].set_sensitive(tool_sensitive)
         else:
-            self.labels['tool'].set_label(action[:11])
-            self.labels['tool'].set_sensitive(False)
+            self.labels["tool"].set_label(action[:11])
+            self.labels["tool"].set_sensitive(False)
 
         if self.ui_sel_tool == TOOL_GATE_BYPASS:
-            self.labels['tool'].set_image(self.labels['select_bypass_img'])
+            self.labels["tool"].set_image(self.labels["select_bypass_img"])
         else:
-            self.labels['tool'].set_image(self.labels['tool_img'])
-
+            self.labels["tool"].set_image(self.labels["tool_img"])
 
     def update_flowguard(self):
         mmu = self._printer.get_stat("mmu")
-        data = mmu['flowguard']
+        data = mmu["flowguard"]
         flowrate = mmu["sync_feedback_flow_rate"]
 
-        gauge = self.labels.get('flowguard_gauge')
+        gauge = self.labels.get("flowguard_gauge")
         if gauge:
             gauge.update(data, flowrate)
 
         # Update frame heading
-        enabled = data['enabled']
-        self.labels['flowguard_frame'].set_sensitive(enabled)
-
+        enabled = data["enabled"]
+        self.labels["flowguard_frame"].set_sensitive(enabled)
 
     def update_encoder(self):
         data = self.get_encoder_data()
 
         # Encoder pos is displayed in filament position status
-        self.update_movement(data['encoder_pos'])
+        self.update_movement(data["encoder_pos"])
 
-        gauge = self.labels.get('encoder_gauge')
+        gauge = self.labels.get("encoder_gauge")
         if gauge:
             gauge.update(data)
 
         # Update frame heading
-        detection_mode = data['detection_mode']
-        enabled = data['enabled']
+        detection_mode = data["detection_mode"]
+        enabled = data["enabled"]
         if detection_mode == 2:
             mode_str = "Encoder (Auto)"
         elif detection_mode == 1:
             mode_str = "Encoder (Manual)"
         else:
             mode_str = "Encoder (Off)"
-        self.labels['encoder_frame'].set_label(f'{mode_str}')
-        self.labels['encoder_frame'].set_sensitive(detection_mode and enabled)
-
+        self.labels["encoder_frame"].set_label(f"{mode_str}")
+        self.labels["encoder_frame"].set_sensitive(detection_mode and enabled)
 
     def update_spool_details(self):
         mmu = self._printer.get_stat("mmu")
-        self.labels['spool_details'].set_gate(mmu['gate'])
-
+        self.labels["spool_details"].set_gate(mmu["gate"])
 
     def update_movement(self, encoder_position=None):
         # Supports classic and visual layouts
@@ -913,11 +1020,7 @@ class Panel(ScreenPanel, MmuMixin):
 
         filament_position = mmu["filament_position"]
         filament_text = f"{filament_position:.1f}mm"
-        encoder_text = (
-            f" (e:{int(encoder_position)}mm)"
-            if encoder_position is not None
-            else ""
-        )
+        encoder_text = f" (e:{int(encoder_position)}mm)" if encoder_position is not None else ""
 
         if print_state in {"complete", "error", "cancelled", "started"}:
             label = print_state.capitalize()
@@ -937,30 +1040,32 @@ class Panel(ScreenPanel, MmuMixin):
         else:
             self.labels["filament"].set_label(label)
 
-
     def update_filament_status(self):
         # Supports classic and visual layouts
         if self.markup_filament:
-            self.labels['filament_pos'].set_markup(self.get_filament_text(markup=True, bold=self.bold_filament))
+            self.labels["filament_pos"].set_markup(
+                self.get_filament_text(markup=True, bold=self.bold_filament)
+            )
         else:
-            self.labels['filament_pos'].set_label(self.get_filament_text(bold=self.bold_filament))
-
+            self.labels["filament_pos"].set_label(self.get_filament_text(bold=self.bold_filament))
 
     def update_status(self, show_gate=None):
         # Supports classic and visual layouts
 
         if not self.show_spool_tray:
-            text, current_unit_name, multi_tool = self.get_status_text(show_gate=show_gate, markup=self.markup_status)
+            text, current_unit_name, multi_tool = self.get_status_text(
+                show_gate=show_gate, markup=self.markup_status
+            )
             for i in range(4):
-                name = (f'status{i+1}')
+                name = f"status{i + 1}"
                 if self.markup_status:
                     self.labels[name].set_markup(text[i])
                 else:
                     self.labels[name].set_label(text[i])
 
-            self.labels['manage_title'].set_label(current_unit_name)
+            self.labels["manage_title"].set_label(current_unit_name)
         else:
-            self.labels['spool_tray'].refresh()
+            self.labels["spool_tray"].refresh()
 
             # Update unit name
             mmu = self._printer.get_stat("mmu")
@@ -970,24 +1075,23 @@ class Panel(ScreenPanel, MmuMixin):
             if unit:
                 current_unit_name = unit.get("display_name") or unit.get("name")
                 current_unit_name = current_unit_name[:1].upper() + current_unit_name[1:]
-                self.labels['manage_title'].set_label(current_unit_name)
-
+                self.labels["manage_title"].set_label(current_unit_name)
 
     # Dynamically update button sensitivity based on state
     def update_active_buttons(self):
         mmu = self._printer.get_stat("mmu")
-        mmu_print_state = mmu['print_state']
-        printing = mmu_print_state in ("started",  "printing")
-        enabled = mmu['enabled']
-        tool = mmu['tool']
-        action = mmu['action']
-        filament = mmu['filament']
+        mmu_print_state = mmu["print_state"]
+        printing = mmu_print_state in ("started", "printing")
+        enabled = mmu["enabled"]
+        tool = mmu["tool"]
+        action = mmu["action"]
+        filament = mmu["filament"]
         ui_state = []
         self._update_notebook_corner_pages()
         if enabled:
             if mmu_print_state in ("pause_locked", "paused"):
                 ui_state.append(mmu_print_state)
-            elif mmu_print_state in ("started",  "printing"):
+            elif mmu_print_state in ("started", "printing"):
                 ui_state.append("printing")
                 self._screen.clear_last_popup_message()
             else:
@@ -1009,23 +1113,25 @@ class Panel(ScreenPanel, MmuMixin):
             if not self._screen.have_last_popup_message():
                 ui_state.append("no_message")
 
-            if ("paused" not in ui_state and "pause_locked" not in ui_state) or "no_message" in ui_state:
-                self.labels['pause_layer'].set_current_page(0) # Pause button
+            if (
+                "paused" not in ui_state and "pause_locked" not in ui_state
+            ) or "no_message" in ui_state:
+                self.labels["pause_layer"].set_current_page(0)  # Pause button
             else:
-                self.labels['pause_layer'].set_current_page(1) # Recall last error
+                self.labels["pause_layer"].set_current_page(1)  # Recall last error
 
             if action != "Idle" and action != "Unknown":
                 ui_state.append("busy")
         else:
             ui_state.append("disabled")
             if not printing:
-                manage_page = self._notebook_corner_pages['manage']
-                self.labels['notebook_corner'].set_current_page(manage_page)
+                manage_page = self._notebook_corner_pages["manage"]
+                self.labels["notebook_corner"].set_current_page(manage_page)
                 self._update_notebook_corner_indicator()
-            self.labels['t_increase'].set_sensitive(False)
-            self.labels['t_decrease'].set_sensitive(False)
+            self.labels["t_increase"].set_sensitive(False)
+            self.labels["t_decrease"].set_sensitive(False)
 
-        for label in self.btn_states['all']:
+        for label in self.btn_states["all"]:
             sensitive = True
             for state in ui_state:
                 if label not in self.btn_states[state]:
@@ -1039,15 +1145,14 @@ class Panel(ScreenPanel, MmuMixin):
                 tool_sensitive = sensitive
         self.update_tool_buttons(tool_sensitive)
 
-
     def get_status_text(self, show_gate=None, markup=False):
         mmu = self._printer.get_stat("mmu")
-        gate_status = mmu['gate_status']
-        gate_selected = mmu['gate']
-        gate_color = mmu['gate_color']
+        gate_status = mmu["gate_status"]
+        gate_selected = mmu["gate"]
+        gate_color = mmu["gate_color"]
 
         unit_selected = mmu.get("unit")
-        display_limit = 13 # Max number of gate "columns" to display (includes bypass and gaps)
+        display_limit = 13  # Max number of gate "columns" to display (includes bypass and gaps)
 
         if unit_selected is not None:
             mmu_machine = self._printer.get_stat("mmu_machine")
@@ -1057,15 +1162,13 @@ class Panel(ScreenPanel, MmuMixin):
 
             for unit_index in range(mmu_machine["num_units"]):
                 if gate_indices:
-                    gate_indices.append(None) # Unit separator
+                    gate_indices.append(None)  # Unit separator
 
                 unit = mmu_machine[f"unit_{unit_index}"]
                 first_gate = unit["first_gate"]
                 num_gates = unit["num_gates"]
 
-                gate_indices.extend(
-                    range(first_gate, first_gate + num_gates)
-                )
+                gate_indices.extend(range(first_gate, first_gate + num_gates))
 
                 if unit.get("has_bypass", False):
                     gate_indices.append(TOOL_GATE_BYPASS)
@@ -1102,7 +1205,7 @@ class Panel(ScreenPanel, MmuMixin):
             else:
                 display_offset = max(0, selected_idx - display_limit // 2)
                 display_offset = min(display_offset, len(gate_indices) - display_limit)
-                display_gate_indices = gate_indices[display_offset:display_offset + display_limit]
+                display_gate_indices = gate_indices[display_offset : display_offset + display_limit]
         else:
             display_gate_indices = gate_indices
 
@@ -1141,7 +1244,9 @@ class Panel(ScreenPanel, MmuMixin):
             else:
                 # Regular gate
                 color = MmuUtils.get_rgb_color(gate_color[g])
-                filament_icon = ("█") if not markup or color == "" else (f"<span color='{color}'>█</span>")
+                filament_icon = (
+                    ("█") if not markup or color == "" else (f"<span color='{color}'>█</span>")
+                )
                 msg_gates += ("│#%d " % g)[:4]
 
                 if gate_status[g] in (GATE_AVAILABLE, GATE_AVAILABLE_FROM_BUFFER):
@@ -1167,7 +1272,11 @@ class Panel(ScreenPanel, MmuMixin):
                     if gate_status[g] == GATE_EMPTY
                     else "?"
                 )
-                msg_selct += ("╡ %s " % icon) if not (at_unit_start or gate_selected == prev_g) else ("│ %s " % icon)
+                msg_selct += (
+                    ("╡ %s " % icon)
+                    if not (at_unit_start or gate_selected == prev_g)
+                    else ("│ %s " % icon)
+                )
             else:
                 msg_selct += (
                     "╞═══"
@@ -1184,7 +1293,6 @@ class Panel(ScreenPanel, MmuMixin):
             msg_selct += "│" if gate_selected == g else "╛" if at_unit_end else "╧"
 
         return [msg_gates, msg_tools, msg_avail, msg_selct], current_unit_name, multi_tool
-
 
     def get_filament_text(self, markup=False, bold=False):
         mmu = self._printer.get_stat("mmu")
@@ -1203,7 +1311,7 @@ class Panel(ScreenPanel, MmuMixin):
         unit = self.get_mmu_unit(gate)
         cs = None
         if unit is not None:
-            unit_name = unit['name']
+            unit_name = unit["name"]
             cs = self._printer.get_config_section(f"mmu_unit_parameters {unit_name}")
         if not cs:
             # V3...
@@ -1299,17 +1407,13 @@ class Panel(ScreenPanel, MmuMixin):
                     return True
                 if pos != FILAMENT_POS_UNLOADED:
                     return False
-                return (
-                    not gate_empty()
-                    and parked_forward_cap() >= gate_sensor_order.index(sensor)
-                )
+                return not gate_empty() and parked_forward_cap() >= gate_sensor_order.index(sensor)
             if pos > FILAMENT_POS_HOMED_GATE:
                 return True
             if pos == FILAMENT_POS_HOMED_GATE:
                 try:
-                    return (
-                        gate_sensor_order.index(gate_homing_endstop)
-                        > gate_sensor_order.index(sensor)
+                    return gate_sensor_order.index(gate_homing_endstop) > gate_sensor_order.index(
+                        sensor
                     )
                 except ValueError:
                     return True
@@ -1323,17 +1427,13 @@ class Panel(ScreenPanel, MmuMixin):
                     return True
                 if pos != FILAMENT_POS_UNLOADED:
                     return False
-                return (
-                    not gate_empty()
-                    and parked_forward_cap() >= gate_sensor_order.index(sensor)
-                )
+                return not gate_empty() and parked_forward_cap() >= gate_sensor_order.index(sensor)
             if pos > FILAMENT_POS_HOMED_GATE:
                 return True
             if pos == FILAMENT_POS_HOMED_GATE:
                 try:
-                    return (
-                        gate_sensor_order.index(gate_homing_endstop)
-                        >= gate_sensor_order.index(sensor)
+                    return gate_sensor_order.index(gate_homing_endstop) >= gate_sensor_order.index(
+                        sensor
                     )
                 except ValueError:
                     return True
@@ -1354,11 +1454,7 @@ class Panel(ScreenPanel, MmuMixin):
 
         def entry_marker():
             if self.has_sensor(SENSOR_ENTRY_PREFIX):
-                return (
-                    trig_sensor
-                    if self.check_sensor(SENSOR_ENTRY_PREFIX)
-                    else empty_sensor
-                )
+                return trig_sensor if self.check_sensor(SENSOR_ENTRY_PREFIX) else empty_sensor
             return gate_presence_marker()
 
         def gate_sensor_marker(sensor):
@@ -1369,10 +1465,7 @@ class Panel(ScreenPanel, MmuMixin):
         def gate_sensor_gap(sensor, width=2):
             if passed_gate_sensor(sensor):
                 return arrow * width
-            if (
-                pos in (FILAMENT_POS_UNLOADED, FILAMENT_POS_UNKNOWN)
-                and reached_gate_sensor(sensor)
-            ):
+            if pos in (FILAMENT_POS_UNLOADED, FILAMENT_POS_UNKNOWN) and reached_gate_sensor(sensor):
                 left = width - width // 2
                 right = width // 2
                 return arrow * left + space * right
@@ -1381,9 +1474,8 @@ class Panel(ScreenPanel, MmuMixin):
         def entry_exit_gap(width=2):
             if pos <= FILAMENT_POS_UNLOADED and gate_empty():
                 return space * width
-            if (
-                pos in (FILAMENT_POS_UNLOADED, FILAMENT_POS_UNKNOWN)
-                and not reached_gate_sensor(SENSOR_EXIT_PREFIX)
+            if pos in (FILAMENT_POS_UNLOADED, FILAMENT_POS_UNKNOWN) and not reached_gate_sensor(
+                SENSOR_EXIT_PREFIX
             ):
                 if self.check_sensor(SENSOR_ENTRY_PREFIX) is not True:
                     return space * width
@@ -1393,9 +1485,7 @@ class Panel(ScreenPanel, MmuMixin):
             return arrow * width
 
         def gate_area_segment():
-            encoder_approach = with_home(
-                gate_sensor_gap(SENSOR_SHARED_EXIT), SENSOR_ENCODER
-            )
+            encoder_approach = with_home(gate_sensor_gap(SENSOR_SHARED_EXIT), SENSOR_ENCODER)
             if pos == FILAMENT_POS_UNLOADED and self.has_encoder():
                 encoder_approach = encoder_approach[:-1] + space
 
@@ -1453,16 +1543,11 @@ class Panel(ScreenPanel, MmuMixin):
             if gate_homing_endstop == SENSOR_ENCODER
             else FILAMENT_POS_IN_BOWDEN
         )
-        encoder_char = (
-            "ê"
-            if pos >= encoder_ref_pos or homed_here(SENSOR_ENCODER)
-            else "e"
-        )
+        encoder_char = "ê" if pos >= encoder_ref_pos or homed_here(SENSOR_ENCODER) else "e"
         encoder_overshoots = self.has_encoder() and homed_here(SENSOR_ENCODER)
 
         parts = [
             gate_area_segment(),
-
             (
                 encoder_char
                 + (tip_override if encoder_overshoots else past(encoder_ref_pos))
@@ -1470,24 +1555,13 @@ class Panel(ScreenPanel, MmuMixin):
                 if self.has_encoder()
                 else past(encoder_ref_pos) * 3
             ),
-
             past(FILAMENT_POS_IN_BOWDEN) * max(0, bowden_half - 2),
-
-            (
-                buffer_segment()
-                if self.has_buffer()
-                else pad(FILAMENT_POS_IN_BOWDEN, 7)
-            ),
-
+            (buffer_segment() if self.has_buffer() else pad(FILAMENT_POS_IN_BOWDEN, 7)),
             past(FILAMENT_POS_END_BOWDEN) * max(0, bowden_half - 2),
-
             optional_sensor(SENSOR_EXTRUDER_ENTRY, FILAMENT_POS_HOMED_ENTRY),
-
             homed_segment(FILAMENT_POS_HOMED_EXTRUDER, "Ex"),
             past(FILAMENT_POS_EXTRUDER_ENTRY),
-
             optional_sensor(SENSOR_TOOLHEAD, FILAMENT_POS_HOMED_TS),
-
             past(FILAMENT_POS_IN_EXTRUDER),
             nozzle_segment(),
         ]
@@ -1513,7 +1587,7 @@ class Panel(ScreenPanel, MmuMixin):
         visual = visual.replace(arrow, line)
 
         if last_arrow != -1 and last_home == -1:
-            visual = visual[:last_arrow] + arrow + visual[last_arrow + 1:]
+            visual = visual[:last_arrow] + arrow + visual[last_arrow + 1 :]
 
         visual = visual.replace(tip_override, line if bold else arrow)
 
@@ -1534,7 +1608,6 @@ class Panel(ScreenPanel, MmuMixin):
             # Get rid of special residual filament character
             visual = visual.replace(residual_line, line)
         return visual
-
 
     def _add_color_markup(self, text, color, *chars):
         chars = set(chars)
@@ -1560,13 +1633,12 @@ class Panel(ScreenPanel, MmuMixin):
         return "".join(result)
 
 
-
 # -------------------------------------------------------------------------------------------
 # MMU SPOOL TRAY WIDGET
 # -------------------------------------------------------------------------------------------
 
-class MmuSpoolTray(Gtk.DrawingArea):
 
+class MmuSpoolTray(Gtk.DrawingArea):
     def __init__(self, printer, panel):
         super().__init__()
         self._printer = printer
@@ -1587,7 +1659,6 @@ class MmuSpoolTray(Gtk.DrawingArea):
         self._popover = None
         self._popover_timeout_id = None
 
-
         # Drag scrolling
         self._scroll_x = 0
         self._drag_active = False
@@ -1596,10 +1667,10 @@ class MmuSpoolTray(Gtk.DrawingArea):
         self._drag_start_scroll_x = 0
 
         self.add_events(
-            Gdk.EventMask.BUTTON_PRESS_MASK |
-            Gdk.EventMask.BUTTON_RELEASE_MASK |
-            Gdk.EventMask.POINTER_MOTION_MASK |
-            Gdk.EventMask.SCROLL_MASK
+            Gdk.EventMask.BUTTON_PRESS_MASK
+            | Gdk.EventMask.BUTTON_RELEASE_MASK
+            | Gdk.EventMask.POINTER_MOTION_MASK
+            | Gdk.EventMask.SCROLL_MASK
         )
         self.connect("button-press-event", self._on_button_press)
         self.connect("button-release-event", self._on_button_release)
@@ -1640,34 +1711,31 @@ class MmuSpoolTray(Gtk.DrawingArea):
         button_grid.set_column_homogeneous(True)
 
         lbl = self._panel.labels
-        button_grid.attach(lbl['menu_select'],   0, 0, 1, 1)
-        button_grid.attach(lbl['menu_check'],    1, 0, 1, 1)
-        button_grid.attach(lbl['menu_preload'],  2, 0, 1, 1)
-        button_grid.attach(lbl['menu_load'],     0, 1, 1, 1)
-        button_grid.attach(lbl['menu_unload'],   1, 1, 1, 1)
-        button_grid.attach(lbl['menu_eject'],    2, 1, 1, 1)
+        button_grid.attach(lbl["menu_select"], 0, 0, 1, 1)
+        button_grid.attach(lbl["menu_check"], 1, 0, 1, 1)
+        button_grid.attach(lbl["menu_preload"], 2, 0, 1, 1)
+        button_grid.attach(lbl["menu_load"], 0, 1, 1, 1)
+        button_grid.attach(lbl["menu_unload"], 1, 1, 1, 1)
+        button_grid.attach(lbl["menu_eject"], 2, 1, 1, 1)
 
         self._popover_gate = None
-        lbl['menu_select'].connect( "clicked", self._on_gate_menu_clicked, "select")
-        lbl['menu_preload'].connect("clicked", self._on_gate_menu_clicked, "preload")
-        lbl['menu_load'].connect("clicked",    self._on_gate_menu_clicked, "load")
-        lbl['menu_unload'].connect("clicked",  self._on_gate_menu_clicked, "unload")
-        lbl['menu_eject'].connect("clicked",   self._on_gate_menu_clicked, "eject")
-        lbl['menu_check'].connect("clicked",   self._on_gate_menu_clicked, "check")
+        lbl["menu_select"].connect("clicked", self._on_gate_menu_clicked, "select")
+        lbl["menu_preload"].connect("clicked", self._on_gate_menu_clicked, "preload")
+        lbl["menu_load"].connect("clicked", self._on_gate_menu_clicked, "load")
+        lbl["menu_unload"].connect("clicked", self._on_gate_menu_clicked, "unload")
+        lbl["menu_eject"].connect("clicked", self._on_gate_menu_clicked, "eject")
+        lbl["menu_check"].connect("clicked", self._on_gate_menu_clicked, "check")
 
         box.pack_start(button_grid, False, False, 0)
         self._popover.add(box)
         self._button_handlers = {}
 
-
     def do_get_preferred_height(self):
-        return (72, 128) # minimum, natural
-
+        return (72, 128)  # minimum, natural
 
     def refresh(self):
         self._items = self._build_items()
         self.queue_draw()
-
 
     def _build_items(self):
         mmu = self._printer.get_stat("mmu")
@@ -1734,7 +1802,6 @@ class MmuSpoolTray(Gtk.DrawingArea):
 
         return groups
 
-
     def _gate_item(self, gate, tool, status, color, selected_gate, percent, espooler):
         return {
             "gate": gate,
@@ -1747,7 +1814,6 @@ class MmuSpoolTray(Gtk.DrawingArea):
             "espooler": espooler,
         }
 
-
     def _bypass_item(self, selected_gate):
         return {
             "gate": TOOL_GATE_BYPASS,
@@ -1759,7 +1825,6 @@ class MmuSpoolTray(Gtk.DrawingArea):
             "percent": None,
             "espooler": None,
         }
-
 
     def _draw(self, widget, cr):
         alloc = self.get_allocation()
@@ -1794,9 +1859,9 @@ class MmuSpoolTray(Gtk.DrawingArea):
         tray_pad = slot_w * tray_pad_ratio
 
         content_w = (
-            total_spools * slot_w +
-            max(0, len(groups) - 1) * (group_gap + 2 * tray_pad) +
-            scroll_pad * 2
+            total_spools * slot_w
+            + max(0, len(groups) - 1) * (group_gap + 2 * tray_pad)
+            + scroll_pad * 2
         )
 
         max_scroll_x = max(0, content_w - viewport_w)
@@ -1898,7 +1963,7 @@ class MmuSpoolTray(Gtk.DrawingArea):
 
                 lid_rects.append((tray_x, lid_top, tray_w, lid_height, spool_h))
 
-                x += group_gap + 2 * tray_pad 
+                x += group_gap + 2 * tray_pad
 
             # Draw glass lids after spools but before trays.
             for rect in lid_rects:
@@ -1945,9 +2010,9 @@ class MmuSpoolTray(Gtk.DrawingArea):
         # The widget should not change size, but this protects against size changes
         # by creating a new ImageSurface for fading only when necessary
         if (
-            self._viewport_surface is None or
-            self._viewport_surface.get_width() != width or
-            self._viewport_surface.get_height() != height
+            self._viewport_surface is None
+            or self._viewport_surface.get_width() != width
+            or self._viewport_surface.get_height() != height
         ):
             self._viewport_surface = cairo.ImageSurface(cairo.FORMAT_ARGB32, width, height)
 
@@ -1993,7 +2058,9 @@ class MmuSpoolTray(Gtk.DrawingArea):
             grad.add_color_stop_rgba(1.00, 0, 0, 0, right_fade_a)
 
             viewport_cr.save()
-            viewport_cr.rectangle(width - fade_w, top_margin, fade_w, height - top_margin - bottom_margin)
+            viewport_cr.rectangle(
+                width - fade_w, top_margin, fade_w, height - top_margin - bottom_margin
+            )
             viewport_cr.clip()
             viewport_cr.set_operator(cairo.OPERATOR_DEST_OUT)
             viewport_cr.set_source(grad)
@@ -2011,13 +2078,13 @@ class MmuSpoolTray(Gtk.DrawingArea):
 
         return False
 
-
-
     # ---------------------------------------------------------------------------
     # Draw colored spool with annotions
     # ---------------------------------------------------------------------------
 
-    def _draw_spool(self, cr, cx, cy, w, h, color, empty=False, selected=False, percent=None, espooler=None):
+    def _draw_spool(
+        self, cr, cx, cy, w, h, color, empty=False, selected=False, percent=None, espooler=None
+    ):
         key = (round(w), round(h), color, empty, percent)
         surface = self._spool_cache.get(key)
 
@@ -2038,7 +2105,7 @@ class MmuSpoolTray(Gtk.DrawingArea):
         cr.set_source_surface(surface, cx - w / 2 - 7, cy - h / 2 - 7)
         cr.paint()
 
-        if espooler in ['rewind', 'assist']:
+        if espooler in ["rewind", "assist"]:
             self._draw_espooler_overlay(cr, cx, cy, w, h, espooler)
 
         if selected:
@@ -2046,10 +2113,10 @@ class MmuSpoolTray(Gtk.DrawingArea):
             grad = cairo.RadialGradient(
                 cx,
                 cy + h * 0.40,
-                h * 0.02,      # inner radius
+                h * 0.02,  # inner radius
                 cx,
                 cy + h * 0.28,
-                h * 0.30,      # outer radius
+                h * 0.30,  # outer radius
             )
             grad.add_color_stop_rgba(0.00, 1.00, 1.00, 1.00, 0.90)  # pure white
             grad.add_color_stop_rgba(0.18, 1.00, 0.98, 0.88, 0.70)  # warm white
@@ -2063,28 +2130,27 @@ class MmuSpoolTray(Gtk.DrawingArea):
             cr.paint()
             cr.restore()
 
-
     def _render_spool(self, cr, w, h, color, empty, percent):
-        rgb_color = MmuUtils.get_rgb_color(color)    # #rrggbbaa form
-        fr, fg, fb, fa = MmuUtils.parse_color(color) # rgba tuple form
+        rgb_color = MmuUtils.get_rgb_color(color)  # #rrggbbaa form
+        fr, fg, fb, fa = MmuUtils.parse_color(color)  # rgba tuple form
         filament_pct = 100
         if percent is not None:
             filament_pct = max(0, min(100, percent))
 
         # Cardboard colors
-        cardboard      = (0.70, 0.52, 0.30)
-        cardboard_dark = (0.38, 0.25, 0.12) # Recess on cardboard joins
+        cardboard = (0.70, 0.52, 0.30)
+        cardboard_dark = (0.38, 0.25, 0.12)  # Recess on cardboard joins
         cardboard_edge = (0.20, 0.13, 0.06)
 
         spool_cx = w / 2
 
-        body_w = w * 0.38 # width of filament
+        body_w = w * 0.38  # width of filament
         body_x = spool_cx - body_w / 2
 
         left_x = body_x
         right_x = body_x + body_w
 
-        outer_w = w * 0.16 # Orientation of spools to viewer
+        outer_w = w * 0.16  # Orientation of spools to viewer
         outer_h = h * 0.88
 
         # Use the outer oval aspect ratio for all smaller ovals
@@ -2103,17 +2169,23 @@ class MmuSpoolTray(Gtk.DrawingArea):
         # 100% = slightly smaller than cardboard flange
         max_filament_h = outer_h * 0.8
         inner_h = tube_h + (max_filament_h - tube_h) * (filament_pct / 100)
-        inner_w = inner_h * oval_ratio * 0.75 # * 0.75 provides more cardboard view for full filament in low resolution
+        inner_w = (
+            inner_h * oval_ratio * 0.75
+        )  # * 0.75 provides more cardboard view for full filament in low resolution
 
         # Filament bulk rectangle matches the oval height.
         filament_h = inner_h
         filament_y = h / 2 - filament_h / 2
 
         # 1. Right cardboard oval (with edge)
-        self._draw_oval(cr, right_x, h / 2, outer_w, outer_h, cardboard, cardboard_edge, stroke_width=2)
+        self._draw_oval(
+            cr, right_x, h / 2, outer_w, outer_h, cardboard, cardboard_edge, stroke_width=2
+        )
 
         # 2. Right core rounded tube end
-        self._draw_oval(cr, right_x, h / 2, tube_w, tube_h, cardboard, cardboard_dark, stroke_width=2)
+        self._draw_oval(
+            cr, right_x, h / 2, tube_w, tube_h, cardboard, cardboard_dark, stroke_width=2
+        )
 
         # 3. Core body (rectangle)
         cr.set_source_rgb(*cardboard)
@@ -2122,7 +2194,16 @@ class MmuSpoolTray(Gtk.DrawingArea):
 
         if not empty:
             # 4. Filament oval on right face
-            self._draw_oval(cr, right_x, h / 2, inner_w, inner_h, (fr, fg, fb, fa), cardboard_dark, stroke_width=3)
+            self._draw_oval(
+                cr,
+                right_x,
+                h / 2,
+                inner_w,
+                inner_h,
+                (fr, fg, fb, fa),
+                cardboard_dark,
+                stroke_width=3,
+            )
 
             # 5. Filament body (rectangle)
             cr.set_source_rgba(fr, fg, fb, fa)
@@ -2153,7 +2234,6 @@ class MmuSpoolTray(Gtk.DrawingArea):
             )
             cr.show_text(label)
             cr.restore()
-
 
     # ---------------------------------------------------------------------------
     # Draw espooler movement arrows
@@ -2196,7 +2276,6 @@ class MmuSpoolTray(Gtk.DrawingArea):
 
         cr.restore()
 
-
     def _espool_arrow_path(self, cr):
         cr.move_to(89.561, 35.5)
         cr.line_to(60.333, 15.734)
@@ -2216,7 +2295,6 @@ class MmuSpoolTray(Gtk.DrawingArea):
         cr.curve_to(89.835, 36.971, 90.000, 36.661, 90.000, 36.329)
         cr.curve_to(90.000, 35.997, 89.835, 35.686, 89.561, 35.500)
         cr.close_path()
-
 
     # ---------------------------------------------------------------------------
     # Draw gate status / filament availability and number
@@ -2264,7 +2342,7 @@ class MmuSpoolTray(Gtk.DrawingArea):
             cr.set_font_size(tool_font_size)
             xb, yb, tw, th, xa, ya = cr.text_extents(tool_label)
 
-            badge_gap = spool_h * 0.045 # Space between tool text and badge
+            badge_gap = spool_h * 0.045  # Space between tool text and badge
             tool_y = badge_y - th - badge_gap
             cr.set_source_rgba(fg.red, fg.green, fg.blue, fg.alpha)
             cr.move_to(cx - tw / 2 - xb, tool_y - yb)
@@ -2300,8 +2378,6 @@ class MmuSpoolTray(Gtk.DrawingArea):
         )
         cr.show_text(badge_label)
 
-
-
     # ---------------------------------------------------------------------------
     # Draw spool tray clipping lower part of spool
     # ---------------------------------------------------------------------------
@@ -2312,7 +2388,12 @@ class MmuSpoolTray(Gtk.DrawingArea):
         tray_grad.add_color_stop_rgb(1.0, 0.06, 0.07, 0.08)  # very dark bottom
 
         self._draw_rounded_rect(
-            cr, x, y, w, h, 7,
+            cr,
+            x,
+            y,
+            w,
+            h,
+            7,
             fill_rgb=tray_grad,
             stroke_rgb=(0.18, 0.19, 0.20),
             stroke_width=1.0,
@@ -2336,7 +2417,6 @@ class MmuSpoolTray(Gtk.DrawingArea):
         cr.stroke()
         cr.restore()
 
-
     def _draw_unit_lid(self, cr, x, y, w, h, spool_h):
         radius = spool_h * 0.10
 
@@ -2347,7 +2427,12 @@ class MmuSpoolTray(Gtk.DrawingArea):
         glass_grad.add_color_stop_rgba(1.00, 0.20, 0.24, 0.28, 0.05)
 
         self._draw_rounded_rect(
-            cr, x, y, w, h, radius,
+            cr,
+            x,
+            y,
+            w,
+            h,
+            radius,
             fill_rgb=glass_grad,
             stroke_rgb=(1.0, 1.0, 1.0, 0.14),
             stroke_width=max(1.0, spool_h * 0.012),
@@ -2365,7 +2450,6 @@ class MmuSpoolTray(Gtk.DrawingArea):
         cr.set_source(highlight_grad)
         cr.paint()
         cr.restore()
-
 
     def scroll_gate_into_view(self, gate, center=False):
         if self._items is None:
@@ -2391,9 +2475,9 @@ class MmuSpoolTray(Gtk.DrawingArea):
         viewport_w = width - margin * 2
 
         content_w = (
-            total_spools * slot_w +
-            max(0, len(groups) - 1) * (group_gap + 2 * tray_pad) +  # CHANGED
-            scroll_pad * 2
+            total_spools * slot_w
+            + max(0, len(groups) - 1) * (group_gap + 2 * tray_pad)  # CHANGED
+            + scroll_pad * 2
         )
 
         max_scroll_x = max(0, content_w - viewport_w)
@@ -2430,10 +2514,7 @@ class MmuSpoolTray(Gtk.DrawingArea):
                 visible_left = margin + self._scroll_x
                 visible_right = visible_left + viewport_w
 
-                fully_visible = (
-                    slot_x >= visible_left and
-                    slot_right <= visible_right
-                )
+                fully_visible = slot_x >= visible_left and slot_right <= visible_right
 
                 if fully_visible and not center:
                     return
@@ -2459,11 +2540,9 @@ class MmuSpoolTray(Gtk.DrawingArea):
             self._scroll_x = new_scroll_x
             self.queue_draw()
 
-
     def _invalidate_render_cache(self):
         self._render_cache = None
         self._render_cache_key = None
-
 
     # ---------------------------------------------------------------------------
     # Scrolling and Pop-up action handling
@@ -2477,7 +2556,6 @@ class MmuSpoolTray(Gtk.DrawingArea):
                 return gate
         return None
 
-
     def _on_button_press(self, widget, event):
         if event.button != 1:
             return False
@@ -2487,7 +2565,6 @@ class MmuSpoolTray(Gtk.DrawingArea):
         self._drag_start_y = event.y
         self._drag_start_scroll_x = self._scroll_x
         return True
-
 
     def _on_motion(self, widget, event):
         if not self._drag_active:
@@ -2507,7 +2584,6 @@ class MmuSpoolTray(Gtk.DrawingArea):
 
         return True
 
-
     def _on_button_release(self, widget, event):
         if not self._drag_active:
             return False
@@ -2525,7 +2601,6 @@ class MmuSpoolTray(Gtk.DrawingArea):
 
         return True
 
-
     def _on_scroll(self, widget, event):
         step = self.get_allocation().height * 0.45
 
@@ -2542,7 +2617,6 @@ class MmuSpoolTray(Gtk.DrawingArea):
 
         self.queue_draw()
         return True
-
 
     def _show_gate_popover(self, gate, x, y):
         if self._popover_timeout_id is not None:
@@ -2569,7 +2643,6 @@ class MmuSpoolTray(Gtk.DrawingArea):
         self._popover.popup()
         self._popover_timeout_id = GLib.timeout_add_seconds(3, self._on_popover_timeout)
 
-
     def _close_gate_popover(self):
         if self._popover_timeout_id is not None:
             GLib.source_remove(self._popover_timeout_id)
@@ -2578,10 +2651,8 @@ class MmuSpoolTray(Gtk.DrawingArea):
         if self._popover is not None:
             self._popover.popdown()
 
-
     def _on_popover_show(self, popover):
         self._panel._screen.show_popup_dimmer()
-
 
     def _on_popover_closed(self, popover):
         if self._popover_timeout_id is not None:
@@ -2590,12 +2661,10 @@ class MmuSpoolTray(Gtk.DrawingArea):
 
         self._panel._screen.hide_popup_dimmer()
 
-
     def _on_popover_timeout(self):
         self._popover_timeout_id = None
         self._close_gate_popover()
         return False
-
 
     def _on_gate_menu_clicked(self, button, action):
         gate = self._popover_gate
@@ -2605,28 +2674,28 @@ class MmuSpoolTray(Gtk.DrawingArea):
         self._handle_gate_action(gate, action)
         self._popover.popdown()
 
-
     def _update_popover_button_sensitivity(self, gate):
         mmu = self._printer.get_stat("mmu")
         lbl = self._panel.labels
 
         # We should only get here if not printing
-        loaded = (mmu['filament'] == "Loaded")
-        unloaded = (mmu['filament'] == "Unloaded")
-        selected = (mmu['gate'] == gate)
-        bypass = (gate == TOOL_GATE_BYPASS)
+        loaded = mmu["filament"] == "Loaded"
+        unloaded = mmu["filament"] == "Unloaded"
+        selected = mmu["gate"] == gate
+        bypass = gate == TOOL_GATE_BYPASS
         unit = self._panel.get_mmu_unit(gate)
         can_crossload = False
         if unit is not None:
-            can_crossload = unit.get('can_crossload', False)
+            can_crossload = unit.get("can_crossload", False)
 
-        lbl['menu_select'].set_sensitive(unloaded and not selected)
-        lbl['menu_check'].set_sensitive(unloaded and not bypass)
-        lbl['menu_preload'].set_sensitive((unloaded or can_crossload and not selected) and not bypass)
-        lbl['menu_load'].set_sensitive(unloaded)
-        lbl['menu_unload'].set_sensitive(loaded)
-        lbl['menu_eject'].set_sensitive((unloaded or can_crossload and not selected) and not bypass)
-
+        lbl["menu_select"].set_sensitive(unloaded and not selected)
+        lbl["menu_check"].set_sensitive(unloaded and not bypass)
+        lbl["menu_preload"].set_sensitive(
+            (unloaded or can_crossload and not selected) and not bypass
+        )
+        lbl["menu_load"].set_sensitive(unloaded)
+        lbl["menu_unload"].set_sensitive(loaded)
+        lbl["menu_eject"].set_sensitive((unloaded or can_crossload and not selected) and not bypass)
 
     def _handle_gate_action(self, gate, action):
         self._close_gate_popover()
@@ -2668,7 +2737,6 @@ class MmuSpoolTray(Gtk.DrawingArea):
         # Shouldn't get here
         logging.error(f"MMU: Illegal action {action} on gate {gate}")
 
-
     # ---------------------------------------------------------------------------
     # Drawing helpers
     # ---------------------------------------------------------------------------
@@ -2677,23 +2745,27 @@ class MmuSpoolTray(Gtk.DrawingArea):
         """
         Centralized layout sizing logic for tweaking look and feel of major components
         """
-        top_margin = height * 0.04       # Top padding
-        bottom_margin = height * 0.01    # Bottom padding
+        top_margin = height * 0.04  # Top padding
+        bottom_margin = height * 0.01  # Bottom padding
 
-        spool_aspect = 0.77              # Overall spool width/height ratio
-        slot_overlap = 0.47              # Spool centre spacing
+        spool_aspect = 0.77  # Overall spool width/height ratio
+        slot_overlap = 0.47  # Spool centre spacing
 
         content_h = height - top_margin - bottom_margin
 
-        spool_h = content_h * 0.86       # Height drives spool size. Everything else is derived from spool_h
-        spool_w = spool_h * spool_aspect # Overall drawing width allocated to one spool image
-        slot_w = spool_w * slot_overlap  # Horizontal spacing between spool centers; Smaller = tighter overlap inside a unit.
+        spool_h = (
+            content_h * 0.86
+        )  # Height drives spool size. Everything else is derived from spool_h
+        spool_w = spool_h * spool_aspect  # Overall drawing width allocated to one spool image
+        slot_w = (
+            spool_w * slot_overlap
+        )  # Horizontal spacing between spool centers; Smaller = tighter overlap inside a unit.
 
-        margin = spool_w * 0.1           # Left/right outer margin
-        scroll_pad = slot_w * 0.10       # Extra scroll padding before first and after last spool
+        margin = spool_w * 0.1  # Left/right outer margin
+        scroll_pad = slot_w * 0.10  # Extra scroll padding before first and after last spool
 
         tray_pad_ratio = 0.25
-        group_gap = spool_w * 0.10       # Gap between separate MMU units, in spool-height units
+        group_gap = spool_w * 0.10  # Gap between separate MMU units, in spool-height units
 
         spool_cy = top_margin + content_h * 0.44
 
@@ -2715,7 +2787,6 @@ class MmuSpoolTray(Gtk.DrawingArea):
             "tray_top": tray_top,
             "tray_h": tray_h,
         }
-
 
     def _draw_oval(self, cr, cx, cy, w, h, fill_rgb, stroke_rgb=None, stroke_width=1.0):
         cr.save()
@@ -2742,8 +2813,9 @@ class MmuSpoolTray(Gtk.DrawingArea):
         else:
             cr.new_path()
 
-
-    def _draw_rounded_rect(self, cr, x, y, w, h, r, fill_rgb=None, stroke_rgb=None, stroke_width=1.0):
+    def _draw_rounded_rect(
+        self, cr, x, y, w, h, r, fill_rgb=None, stroke_rgb=None, stroke_width=1.0
+    ):
         cr.new_sub_path()
         cr.arc(x + w - r, y + r, r, -math.pi / 2, 0)
         cr.arc(x + w - r, y + h - r, r, 0, math.pi / 2)
@@ -2776,7 +2848,6 @@ class MmuSpoolTray(Gtk.DrawingArea):
 
             cr.stroke()
 
-
     def _rounded_rect_path(self, cr, x, y, w, h, r):
         cr.new_sub_path()
         cr.arc(x + w - r, y + r, r, -math.pi / 2, 0)
@@ -2786,13 +2857,12 @@ class MmuSpoolTray(Gtk.DrawingArea):
         cr.close_path()
 
 
-
 # ---------------------------------------------------------------------------
 # SPOOL/FILAMENT DETAILS WIDGET
 # ---------------------------------------------------------------------------
 
-class MmuSpoolDetails(Gtk.Box):
 
+class MmuSpoolDetails(Gtk.Box):
     def __init__(self, printer, panel):
         super().__init__(orientation=Gtk.Orientation.VERTICAL, spacing=2)
         self._printer = printer
@@ -2809,7 +2879,9 @@ class MmuSpoolDetails(Gtk.Box):
         self._line1 = self._make_label(["mmu-spool-detail-small", "mmu-spool-detail-margin"])
         self._line2 = self._make_label(["mmu-spool-detail-important"], wrap=True)
         self._line3 = self._make_label(["mmu-spool-detail-normal"])
-        self._line4 = self._make_label(["mmu-spool-detail-small", "mmu-spool-detail-margin"], wrap=self._panel.show_spool_tray)
+        self._line4 = self._make_label(
+            ["mmu-spool-detail-small", "mmu-spool-detail-margin"], wrap=self._panel.show_spool_tray
+        )
         self._line5 = self._make_label(["mmu-spool-detail-small", "mmu-spool-detail-margin"])
 
         self._header_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
@@ -2834,7 +2906,6 @@ class MmuSpoolDetails(Gtk.Box):
 
         self.set_gate(None)
 
-
     def _make_label(self, css_classes, wrap=False):
         label = Gtk.Label()
 
@@ -2846,7 +2917,7 @@ class MmuSpoolDetails(Gtk.Box):
             label.set_line_wrap(True)
             label.set_line_wrap_mode(Pango.WrapMode.WORD_CHAR)
             label.set_lines(2)
-            label.set_max_width_chars(1) # use allocated width
+            label.set_max_width_chars(1)  # use allocated width
             label.set_justify(Gtk.Justification.LEFT)
         else:
             label.set_single_line_mode(True)
@@ -2859,11 +2930,9 @@ class MmuSpoolDetails(Gtk.Box):
 
         return label
 
-
     def set_gate(self, gate):
         self._gate = gate
         self.refresh()
-
 
     def refresh(self):
         if self._gate is None or self._gate == TOOL_GATE_BYPASS:
@@ -2886,7 +2955,6 @@ class MmuSpoolDetails(Gtk.Box):
             details["line5"],
         )
 
-
     def _set_lines(self, line1, line2, line3, line4, line5):
         self._line1.set_text(line1 or "")
         self._line2.set_text(line2 or "")
@@ -2894,15 +2962,14 @@ class MmuSpoolDetails(Gtk.Box):
         self._line4.set_text(line4 or "")
         self._line5.set_text(line5 or "")
 
-
     def _build_spool_details(self, gate):
         mmu = self._printer.get_stat("mmu") or {}
 
         filament_name = self._get_gate_value(mmu, "gate_filament_name", gate, "Unknown")
-        material      = self._get_gate_value(mmu, "gate_material", gate, "?")
-        temperature   = self._get_gate_value(mmu, "gate_temperature", gate, None)
-        speed         = self._get_gate_value(mmu, "gate_speed_override", gate, 100)
-        spool_id      = self._get_gate_value(mmu, "gate_spool_id", gate, -1)
+        material = self._get_gate_value(mmu, "gate_material", gate, "?")
+        temperature = self._get_gate_value(mmu, "gate_temperature", gate, None)
+        speed = self._get_gate_value(mmu, "gate_speed_override", gate, 100)
+        spool_id = self._get_gate_value(mmu, "gate_spool_id", gate, -1)
 
         # Get Spoolman supplied details
         spool = self._panel.spools.get(str(spool_id))
@@ -2917,10 +2984,7 @@ class MmuSpoolDetails(Gtk.Box):
         description = getattr(filament, "name", None) or filament_name or "Unknown"
 
         remaining_weight = getattr(spool, "remaining_weight", None)
-        total_weight = (
-            getattr(spool, "initial_weight", None)
-            or getattr(filament, "weight", None)
-        )
+        total_weight = getattr(spool, "initial_weight", None) or getattr(filament, "weight", None)
         remaining_length = getattr(spool, "remaining_length", None)
 
         line1 = f"{vendor}"
@@ -2953,7 +3017,9 @@ class MmuSpoolDetails(Gtk.Box):
             line4_parts = [f"ID #{spool_id}"] if self._panel.show_spool_tray else []
 
             if remaining_weight is not None and total_weight is not None:
-                line4_parts.append(f"{self._format_weight(remaining_weight)} / {self._format_weight(total_weight)}")
+                line4_parts.append(
+                    f"{self._format_weight(remaining_weight)} / {self._format_weight(total_weight)}"
+                )
 
             if remaining_length is not None:
                 line4_parts.append(f"{self._format_length(remaining_length)}")
@@ -2971,13 +3037,11 @@ class MmuSpoolDetails(Gtk.Box):
             "line5": line5,
         }
 
-
     def _get_gate_value(self, mmu, key, gate, default=None):
         values = mmu.get(key)
         if isinstance(values, (list, tuple)) and 0 <= gate < len(values):
             return values[gate]
         return default
-
 
     def _format_weight(self, grams):
         try:
@@ -2990,7 +3054,6 @@ class MmuSpoolDetails(Gtk.Box):
         if grams >= 1000:
             return f"{grams / 1000:.1f}kg"
         return f"{int(round(grams))}g"
-
 
     def _format_length(self, meters):
         try:

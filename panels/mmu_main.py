@@ -1070,7 +1070,7 @@ class Panel(ScreenPanel, MmuMixin):
 
     def update_filament_status(self):
         # Supports classic and visual layouts
-        if not mmu_status_ready(self._printer): # Happy Hare
+        if not mmu_status_ready(self._printer):  # Happy Hare
             return
         if self.markup_filament:
             self.labels["filament_pos"].set_markup(
@@ -1081,7 +1081,7 @@ class Panel(ScreenPanel, MmuMixin):
 
     def update_status(self, show_gate=None):
         # Supports classic and visual layouts
-        if not mmu_status_ready(self._printer): # Happy Hare
+        if not mmu_status_ready(self._printer):  # Happy Hare
             return
 
         if not self.show_spool_tray:
@@ -1770,7 +1770,7 @@ class MmuSpoolTray(Gtk.DrawingArea):
         self.queue_draw()
 
     def _build_items(self):
-        if not mmu_status_ready(self._printer): # Happy Hare
+        if not mmu_status_ready(self._printer):  # Happy Hare
             return []
         mmu = self._printer.get_stat("mmu")
         gate_status = mmu["gate_status"]

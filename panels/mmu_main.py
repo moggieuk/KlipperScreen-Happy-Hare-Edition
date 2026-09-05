@@ -62,6 +62,26 @@ from panels.mmu_mixin import (
     MmuUtils,
 )
 
+# Happy Hare: keys that must be present in 'printer.mmu' before the panel can render.
+# KlipperScreen takes a single printer.objects.query snapshot during init, which can
+# land while Klipper is still in 'startup' and Happy Hare has yet to publish its gate
+# arrays. Subsequent subscription updates only carry *changed* fields, so keys absent
+# from that snapshot never arrive on their own. See Screen.refresh_mmu_stats().
+MMU_STATUS_KEYS = (
+    "gate",
+    "gate_color",
+    "gate_spool_id",
+    "gate_status",
+    "filament_pos",
+    "ttg_map",
+)
+
+
+def mmu_status_ready(printer):
+    """True once 'printer.mmu' holds the fields the MMU panel needs to draw itself."""
+    mmu = printer.get_stat("mmu")
+    return all(key in mmu for key in MMU_STATUS_KEYS)
+
 
 class Panel(ScreenPanel, MmuMixin):
     def __init__(self, screen, title):
@@ -508,15 +528,23 @@ class Panel(ScreenPanel, MmuMixin):
 
     def activate(self):
         self.config_update()
-        self.update_status()
-        self.update_filament_status()
-        self._update_notebook_corner_pages()
 
-        if self.show_spool_tray:
-            mmu = self._printer.get_stat("mmu")
-            gate = mmu["gate"]
-            if gate != TOOL_GATE_UNKNOWN:
-                self.labels["spool_tray"].scroll_gate_into_view(gate, center=True)
+        if mmu_status_ready(self._printer):
+            self.update_status()
+            self.update_filament_status()
+            self._update_notebook_corner_pages()
+
+            if self.show_spool_tray:
+                mmu = self._printer.get_stat("mmu")
+                gate = mmu["gate"]
+                if gate != TOOL_GATE_UNKNOWN:
+                    self.labels["spool_tray"].scroll_gate_into_view(gate, center=True)
+        else:
+            # Happy Hare: MMU status is incomplete (see MMU_STATUS_KEYS). Ask for a fresh
+            # snapshot and leave the panel in its default state rather than crashing; the
+            # query response arrives as a status update and redraws the panel.
+            logging.info("MMU: status incomplete, requesting refresh before rendering panel")
+            self._screen.refresh_mmu_stats()
 
         self.spoolman_start_polling(callback=self.process_spoolman_update, interval=60)
 
@@ -1042,6 +1070,8 @@ class Panel(ScreenPanel, MmuMixin):
 
     def update_filament_status(self):
         # Supports classic and visual layouts
+        if not mmu_status_ready(self._printer):  # Happy Hare
+            return
         if self.markup_filament:
             self.labels["filament_pos"].set_markup(
                 self.get_filament_text(markup=True, bold=self.bold_filament)
@@ -1051,6 +1081,8 @@ class Panel(ScreenPanel, MmuMixin):
 
     def update_status(self, show_gate=None):
         # Supports classic and visual layouts
+        if not mmu_status_ready(self._printer):  # Happy Hare
+            return
 
         if not self.show_spool_tray:
             text, current_unit_name, multi_tool = self.get_status_text(
@@ -1738,6 +1770,8 @@ class MmuSpoolTray(Gtk.DrawingArea):
         self.queue_draw()
 
     def _build_items(self):
+        if not mmu_status_ready(self._printer):  # Happy Hare
+            return []
         mmu = self._printer.get_stat("mmu")
         gate_status = mmu["gate_status"]
         gate_color = mmu["gate_color"]

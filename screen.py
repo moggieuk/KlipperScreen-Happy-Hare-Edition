@@ -223,6 +223,8 @@ class KlipperScreen(Gtk.ApplicationWindow):
             self.set_screenblanking_timeout(self._config.get_main_config().get("screen_blanking"))
             for warning in self.printer.warnings:
                 self.show_popup_message(f"Klipper:\n{warning['message']}", level=2)
+        if state == "ready": # Happy Hare - Klipper became ready after the initial object query
+            self.refresh_mmu_stats()
         callback()
         return False
 
@@ -1339,6 +1341,32 @@ class KlipperScreen(Gtk.ApplicationWindow):
             return
         self.printer.process_update(data["result"]["status"])
         self._finish_init()
+
+    # Happy Hare vvv
+    def refresh_mmu_stats(self):
+        """Re-query the MMU objects and merge the result into the printer state.
+
+        The initial printer.objects.query is a one-shot snapshot taken during init,
+        which can complete while Klipper is still in 'startup'. Happy Hare may not
+        have published its gate arrays (gate_status, gate_color, ...) at that point,
+        and because the subscription only delivers *changed* fields, those keys would
+        otherwise stay missing for the lifetime of the process - leaving the MMU panel
+        permanently broken until KlipperScreen is restarted.
+        """
+        if not self.printer or not self.printer.has_mmu:
+            return
+        logging.info("Happy Hare: refreshing MMU status")
+        self._ws.api.query_objects({"mmu": None, "mmu_machine": None}, self.query_mmu_objects)
+
+    def query_mmu_objects(self, data, method, params):
+        if "error" in data:
+            logging.error(f"Error refreshing MMU status: {data['error'].get('message', 'Unknown')}")
+            return
+        status = data["result"]["status"]
+        self.printer.process_update(status)
+        # Push the merged data to the active panel so it redraws with the new state
+        self.process_update("notify_status_update", status)
+    # Happy Hare ^^^
 
     def set_commands(self, data, method, params):
         if "error" in data:

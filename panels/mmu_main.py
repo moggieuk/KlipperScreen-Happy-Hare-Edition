@@ -1693,6 +1693,7 @@ class MmuSpoolTray(Gtk.DrawingArea):
 
         # Drag scrolling
         self._scroll_x = 0
+        self._pending_gate_scroll = None
         self._drag_active = False
         self._drag_start_x = 0
         self._drag_start_y = 0
@@ -1711,6 +1712,7 @@ class MmuSpoolTray(Gtk.DrawingArea):
 
         self.set_app_paintable(True)
         self.connect("draw", self._draw)
+        self.connect("size-allocate", self._on_size_allocate)
 
         # Pop-up menu construction ---------------
 
@@ -2493,9 +2495,15 @@ class MmuSpoolTray(Gtk.DrawingArea):
         width = alloc.width
         height = alloc.height
 
+        if width <= 1 or height <= 1:
+            self._pending_gate_scroll = (gate, center)
+            return
+
+        self._pending_gate_scroll = None
+
         groups = self._items
         total_spools = sum(len(g) for g in groups)
-        if total_spools == 0 or width <= 0:
+        if total_spools == 0:
             return
 
         layout = self._get_layout(width, height)
@@ -2573,6 +2581,14 @@ class MmuSpoolTray(Gtk.DrawingArea):
         if new_scroll_x != self._scroll_x:
             self._scroll_x = new_scroll_x
             self.queue_draw()
+
+    def _on_size_allocate(self, widget, allocation):
+        if self._pending_gate_scroll is None or allocation.width <= 1 or allocation.height <= 1:
+            return
+
+        gate, center = self._pending_gate_scroll
+        self._pending_gate_scroll = None
+        self.scroll_gate_into_view(gate, center)
 
     def _invalidate_render_cache(self):
         self._render_cache = None

@@ -534,11 +534,6 @@ class Panel(ScreenPanel, MmuMixin):
             self.update_filament_status()
             self._update_notebook_corner_pages()
 
-            if self.show_spool_tray:
-                mmu = self._printer.get_stat("mmu")
-                gate = mmu["gate"]
-                if gate != TOOL_GATE_UNKNOWN:
-                    self.labels["spool_tray"].scroll_gate_into_view(gate, center=True)
         else:
             # Happy Hare: MMU status is incomplete (see MMU_STATUS_KEYS). Ask for a fresh
             # snapshot and leave the panel in its default state rather than crashing; the
@@ -554,6 +549,11 @@ class Panel(ScreenPanel, MmuMixin):
     def post_attach(self):
         # Gtk Notebook will only change layer after show_all() hence this extra callback to fix state
         self.update_active_buttons()
+
+        if mmu_status_ready(self._printer) and self.show_spool_tray:
+            gate = self._printer.get_stat("mmu", "gate")
+            if gate != TOOL_GATE_UNKNOWN:
+                self.labels["spool_tray"].scroll_gate_into_view(gate, center=True)
 
     def config_update(self):
         self.markup_status = self._config.get_main_config().getboolean("mmu_color_gates", True)

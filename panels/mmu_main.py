@@ -2743,8 +2743,8 @@ class MmuSpoolTray(Gtk.DrawingArea):
         lbl["menu_preload"].set_sensitive(
             (unloaded or can_crossload and not selected) and not bypass
         )
-        lbl["menu_load"].set_sensitive(unloaded)
-        lbl["menu_unload"].set_sensitive(loaded)
+        lbl["menu_load"].set_sensitive(unloaded and selected)
+        lbl["menu_unload"].set_sensitive(loaded and selected)
         lbl["menu_eject"].set_sensitive((unloaded or can_crossload and not selected) and not bypass)
 
     def _handle_gate_action(self, gate, action):
